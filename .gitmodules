@@ -1,0 +1,3 @@
+[submodule "thirdparty/rhi"]
+	path = thirdparty/rhi
+	url = https://github.com/rtryan98/rhi
