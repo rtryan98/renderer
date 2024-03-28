@@ -13,6 +13,7 @@ target_link_libraries(
     renderer PUBLIC
     rhi
     rhi_dxc_lib
+    imgui
 )
 target_include_directories(
     renderer PUBLIC
@@ -29,3 +30,5 @@ get_target_property(RENDERER_SOURCES renderer SOURCES)
 source_group(TREE ${CMAKE_CURRENT_LIST_DIR}/src/renderer PREFIX src FILES ${RENDERER_SOURCES})
 
 set_property(DIRECTORY ${CMAKE_CURRENT_LIST_DIR} PROPERTY VS_STARTUP_PROJECT renderer)
+
+core_deploy_d3d12(D3D12)

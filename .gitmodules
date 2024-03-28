@@ -1,3 +1,6 @@
 [submodule "thirdparty/rhi"]
 	path = thirdparty/rhi
 	url = https://github.com/rtryan98/rhi
+[submodule "thirdparty/imgui"]
+	path = thirdparty/imgui
+	url = https://github.com/ocornut/imgui
