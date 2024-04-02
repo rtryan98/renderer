@@ -13,7 +13,7 @@ Application::Application() noexcept
         }))
     , m_device(rhi::Graphics_Device::create({
         .graphics_api = rhi::Graphics_API::D3D12,
-        .enable_validation = false,
+        .enable_validation = true,
         .enable_gpu_validation = false,
         .enable_locking = false
         }))
@@ -26,6 +26,11 @@ Application::Application() noexcept
     , m_frames()
     , m_frame_counter(0)
     , m_is_running(true)
+    , m_imgui_renderer(std::make_unique<Imgui_Renderer>(Imgui_Renderer_Create_Info{
+        .device = m_device.get(),
+        .frames_in_flight = FRAME_IN_FLIGHT_COUNT,
+        .swapchain_image_format = m_swapchain->get_image_format()
+        }))
 {
     for (auto& frame : m_frames)
     {

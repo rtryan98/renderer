@@ -1,6 +1,7 @@
 #pragma once
 
 #include "window.hpp"
+#include "renderer/imgui_renderer.hpp"
 
 #include <rhi/graphics_device.hpp>
 #include <rhi/swapchain.hpp>
@@ -38,5 +39,6 @@ private:
     std::array<Frame, FRAME_IN_FLIGHT_COUNT> m_frames;
     uint64_t m_frame_counter;
     bool m_is_running;
+    std::unique_ptr<Imgui_Renderer> m_imgui_renderer;
 };
 }
