@@ -2,12 +2,18 @@
 
 #include <Windows.h>
 #include <immintrin.h>
+#include <backends/imgui_impl_win32.h>
+
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace ren
 {
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
     Window_Data* data = reinterpret_cast<Window_Data*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+
+    if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
+        return true;
 
     switch (msg)
     {
@@ -83,10 +89,13 @@ public:
         SetForegroundWindow(m_hwnd);
         SetFocus(m_hwnd);
         m_data.is_alive = true;
+
+        ImGui_ImplWin32_Init(m_hwnd);
     }
 
     virtual ~Window_Win32() noexcept override
     {
+        ImGui_ImplWin32_Shutdown();
         DestroyWindow(m_hwnd);
     }
 
@@ -99,6 +108,7 @@ public:
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
+        ImGui_ImplWin32_NewFrame();
     }
 
     virtual void* get_native_handle() noexcept override

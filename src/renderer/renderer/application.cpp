@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <print>
+#include <imgui.h>
 
 namespace ren
 {
@@ -13,7 +14,7 @@ Application::Application() noexcept
         }))
     , m_device(rhi::Graphics_Device::create({
         .graphics_api = rhi::Graphics_API::D3D12,
-        .enable_validation = true,
+        .enable_validation = false,
         .enable_gpu_validation = false,
         .enable_locking = false
         }))
@@ -42,6 +43,7 @@ Application::Application() noexcept
         frame.compute_command_pool = m_device->create_command_pool({ .queue_type = rhi::Queue_Type::Compute });
         frame.copy_command_pool = m_device->create_command_pool({ .queue_type = rhi::Queue_Type::Copy });
     }
+    m_imgui_renderer->create_fonts_texture();
 }
 
 Application::~Application() noexcept
@@ -55,8 +57,8 @@ Application::~Application() noexcept
 
 void Application::run()
 {
-    auto current_time = std::chrono::high_resolution_clock::now();
-    auto last_time = std::chrono::high_resolution_clock::now();
+    auto current_time = std::chrono::steady_clock::now();
+    auto last_time = std::chrono::steady_clock::now();
     double delta_time = 0.0;
     double total_time = 0.0;
 
@@ -71,7 +73,13 @@ void Application::run()
 
         auto& frame = m_frames[m_frame_counter % FRAME_IN_FLIGHT_COUNT];
         setup_frame(frame);
+        ImGui::NewFrame();
+
+        bool demo = true;
+        ImGui::ShowDemoWindow(&demo);
+
         render_frame(frame, total_time, delta_time);
+        ImGui::EndFrame();
 
         if (!m_window->get_window_data().is_alive)
         {
@@ -79,7 +87,7 @@ void Application::run()
         }
 
         last_time = current_time;
-        current_time = std::chrono::high_resolution_clock::now();
+        current_time = std::chrono::steady_clock::now();
     }
 }
 
@@ -95,6 +103,7 @@ void Application::setup_frame(Frame& frame) noexcept
         // Resize window size dependent resources
     }
     m_swapchain->acquire_next_image();
+    m_imgui_renderer->next_frame();
 }
 
 void Application::render_frame(Frame& frame, double t, double dt) noexcept
@@ -120,7 +129,8 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
             .array_size = 1,
             .first_plane = 0,
             .plane_count = 1
-        }
+        },
+        .discard = true
     };
     graphics_cmd->barrier({
         .buffer_barriers = {},
@@ -130,14 +140,23 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
 
     graphics_cmd->clear_color_attachment(
         swapchain_image_view,
-        0.0f, 0.0f, 0.0f, 1.0f);
+        0.0f, 0.0f, 0.0f, 0.0f);
+    rhi::Render_Pass_Begin_Info render_pass_info = {
+        .color_attachments = { &swapchain_image_view, 1 },
+        .depth_attachment = nullptr
+    };
 
-    swapchain_layout_transition_barrier.stage_before = rhi::Barrier_Pipeline_Stage::Clear;
+    graphics_cmd->begin_render_pass(render_pass_info);
+    m_imgui_renderer->render(graphics_cmd);
+    graphics_cmd->end_render_pass();
+
+    swapchain_layout_transition_barrier.stage_before = rhi::Barrier_Pipeline_Stage::Color_Attachment_Output;
     swapchain_layout_transition_barrier.stage_after = rhi::Barrier_Pipeline_Stage::None;
     swapchain_layout_transition_barrier.access_before = rhi::Barrier_Access::Color_Attachment_Write;
     swapchain_layout_transition_barrier.access_after = rhi::Barrier_Access::None;
     swapchain_layout_transition_barrier.layout_before = rhi::Barrier_Image_Layout::Color_Attachment;
     swapchain_layout_transition_barrier.layout_after = rhi::Barrier_Image_Layout::Present;
+    swapchain_layout_transition_barrier.discard = false;
     graphics_cmd->barrier({
         .buffer_barriers = {},
         .image_barriers = { &swapchain_layout_transition_barrier, 1 },

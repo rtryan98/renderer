@@ -25,6 +25,7 @@ public:
 
     void next_frame() noexcept;
     void render(rhi::Command_List* cmd) noexcept;
+    void create_fonts_texture() noexcept;
 
 private:
     void setup_render_state(

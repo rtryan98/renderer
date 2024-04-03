@@ -5,13 +5,14 @@
 
 struct Imgui_Push_Constants
 {
-    rhi::Array_Buffer vertex_buffer;
-    rhi::Handle texture;
-    rhi::Sampler sampler;
+    uint vertex_buffer_idx;
+    uint texture_idx;
+    uint sampler_idx;
     float left;
     float top;
     float right;
     float bottom;
+    uint vertex_offset;
 };
 
 struct Imgui_Vert
@@ -38,11 +39,10 @@ struct PS_Out
 float4x4 ortho(float left, float top, float right, float bottom)
 {
     return float4x4(
-        float4(2.0 / (right - left), 0.0, 0.0, 0.0),
-        float4(0.0, 2.0 / (top - bottom), 0.0, 0.0),
-        float4(0.0, 0.0, 0.5, 0.0),
-        float4((right + left) / (left - right), (top + bottom) / (bottom - top), 0.5, 1.0)
-    );
+        float4(2.0 / (right - left)           , 0.0                            , 0.0, 0.0),
+        float4(0.0                            , 2.0 / (top - bottom)           , 0.0, 0.0),
+        float4(0.0                            , 0.0                            , 0.5, 0.0),
+        float4((right + left) / (left - right), (top + bottom) / (bottom - top), 0.5, 1.0));
 }
 
 #endif
