@@ -33,7 +33,7 @@ typedef VS_Out PS_In;
 
 struct PS_Out
 {
-    float4 col : SV_TARGET;
+    float4 col : SV_TARGET0;
 };
 
 float4x4 ortho(float left, float top, float right, float bottom)

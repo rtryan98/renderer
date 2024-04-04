@@ -114,7 +114,7 @@ Imgui_Renderer::Imgui_Renderer(const Imgui_Renderer_Create_Info& create_info)
         .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
         .mip_lod_bias = 0.0f,
         .max_anisotropy = 0,
-        .comparison_func = rhi::Comparison_Func::Always,
+        .comparison_func = rhi::Comparison_Func::None,
         .reduction = rhi::Sampler_Reduction_Type::Standard,
         .border_color = {},
         .min_lod = 0.0f,
@@ -162,7 +162,7 @@ void Imgui_Renderer::render(rhi::Command_List* cmd) noexcept
     }
 
     auto vertex_buffer = m_vertex_buffers[m_frame_index];
-    auto index_buffer = m_vertex_buffers[m_frame_index];
+    auto index_buffer = m_index_buffers[m_frame_index];
 
     auto calculate_next_buffer_size = [](auto requested_size) {
         return (requested_size / BUFFER_SIZE_STEP + 1) * BUFFER_SIZE_STEP;
@@ -171,8 +171,7 @@ void Imgui_Renderer::render(rhi::Command_List* cmd) noexcept
     // Resize vertex buffer if required
     if (vertex_buffer == nullptr || vertex_buffer->size < draw_data->TotalVtxCount * sizeof(ImDrawVert))
     {
-        // HACK: add mechanism to defer deletion in case this becomes slow
-        m_device->wait_idle();
+        // No wait idle - rendering should've been fenced already!
         auto next_buffer_size = calculate_next_buffer_size(draw_data->TotalVtxCount * sizeof(ImDrawVert));
         m_device->destroy_buffer(vertex_buffer);
         rhi::Buffer_Create_Info vertex_buffer_create_info = {
@@ -187,7 +186,7 @@ void Imgui_Renderer::render(rhi::Command_List* cmd) noexcept
     // Resize index buffer if requried
     if (index_buffer == nullptr || index_buffer->size < draw_data->TotalIdxCount * sizeof(ImDrawIdx))
     {
-        m_device->wait_idle();
+        // No wait idle - rendering should've been fenced already!
         auto next_buffer_size = calculate_next_buffer_size(draw_data->TotalIdxCount * sizeof(ImDrawIdx));
         m_device->destroy_buffer(index_buffer);
         rhi::Buffer_Create_Info index_buffer_create_info = {
@@ -264,7 +263,7 @@ void Imgui_Renderer::render(rhi::Command_List* cmd) noexcept
                     imgui_cmd.ElemCount,
                     1,
                     imgui_cmd.IdxOffset + global_index_offset,
-                    imgui_cmd.VtxOffset + global_vertex_offset,
+                    0,
                     0);
             }
         }

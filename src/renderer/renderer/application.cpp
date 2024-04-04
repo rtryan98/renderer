@@ -114,7 +114,7 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
     graphics_cmd->begin_debug_region("PASS-Swapchain", 0.5f, 0.25f, 0.25f);
     rhi::Image_Barrier_Info swapchain_layout_transition_barrier = {
         .stage_before = rhi::Barrier_Pipeline_Stage::None,
-        .stage_after = rhi::Barrier_Pipeline_Stage::Clear,
+        .stage_after = rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
         .access_before = rhi::Barrier_Access::None,
         .access_after = rhi::Barrier_Access::Color_Attachment_Write,
         .layout_before = rhi::Barrier_Image_Layout::Undefined,
@@ -138,12 +138,17 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
         .memory_barriers = {}
         });
 
-    graphics_cmd->clear_color_attachment(
-        swapchain_image_view,
-        0.0f, 0.0f, 0.0f, 0.0f);
+    rhi::Render_Pass_Color_Attachment_Info swapchain_attachment_info = {
+        .attachment = swapchain_image_view,
+        .load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
+        .store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
+        .clear_value = {
+            .color = { 0.0f, 0.0f, 0.0f, 1.0f }
+        }
+    };
     rhi::Render_Pass_Begin_Info render_pass_info = {
-        .color_attachments = { &swapchain_image_view, 1 },
-        .depth_attachment = nullptr
+        .color_attachments = { &swapchain_attachment_info, 1 },
+        .depth_stencil_attachment = {}
     };
 
     graphics_cmd->begin_render_pass(render_pass_info);
@@ -157,6 +162,7 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
     swapchain_layout_transition_barrier.layout_before = rhi::Barrier_Image_Layout::Color_Attachment;
     swapchain_layout_transition_barrier.layout_after = rhi::Barrier_Image_Layout::Present;
     swapchain_layout_transition_barrier.discard = false;
+
     graphics_cmd->barrier({
         .buffer_barriers = {},
         .image_barriers = { &swapchain_layout_transition_barrier, 1 },
