@@ -7,8 +7,6 @@ int32_t main([[maybe_unused]] uint32_t argc, [[maybe_unused]] const char* argv[]
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    auto& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     auto application = std::make_unique<ren::Application>();
     application->run();

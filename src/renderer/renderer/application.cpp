@@ -32,6 +32,7 @@ Application::Application() noexcept
         .frames_in_flight = FRAME_IN_FLIGHT_COUNT,
         .swapchain_image_format = m_swapchain->get_image_format()
         }))
+    , m_cbt_cpu_vis(nullptr)
 {
     for (auto& frame : m_frames)
     {
@@ -187,8 +188,16 @@ void Application::process_gui() noexcept
 {
     ImGui::NewFrame();
     imgui_menubar();
+    if (m_imgui_data.windows.renderer_settings)
+        imgui_renderer_settings();
     if (m_imgui_data.windows.debug_renderer_settings)
         imgui_debug_renderer_settings();
+    if (m_imgui_data.windows.tool_cbt_vis)
+    {
+        // no need to allocate cpu-sided vis if it's not used
+        if (!m_cbt_cpu_vis) m_cbt_cpu_vis = std::make_unique<CBT_CPU_Vis>();
+        m_cbt_cpu_vis->imgui_window(m_imgui_data.windows.tool_cbt_vis);
+    }
     if (m_imgui_data.windows.demo)
         ImGui::ShowDemoWindow(&m_imgui_data.windows.demo);
     ImGui::EndFrame();
@@ -197,7 +206,9 @@ void Application::process_gui() noexcept
 void Application::imgui_close_all_windows() noexcept
 {
     m_imgui_data.windows.demo = false;
+    m_imgui_data.windows.renderer_settings = false;
     m_imgui_data.windows.debug_renderer_settings = false;
+    m_imgui_data.windows.tool_cbt_vis = false;
 }
 
 void Application::imgui_setup_style() noexcept
@@ -243,7 +254,7 @@ void Application::imgui_setup_style() noexcept
     colors[ImGuiCol_TabUnfocused] = ImVec4(0.00f, 0.00f, 0.00f, 0.52f);
     colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
     colors[ImGuiCol_DockingPreview] = ImVec4(0.33f, 0.67f, 0.86f, 1.00f);
-    colors[ImGuiCol_DockingEmptyBg] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_DockingEmptyBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.00f);
     colors[ImGuiCol_PlotLines] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
     colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
     colors[ImGuiCol_PlotHistogram] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
@@ -255,9 +266,9 @@ void Application::imgui_setup_style() noexcept
     colors[ImGuiCol_TableRowBgAlt] = ImVec4(1.00f, 1.00f, 1.00f, 0.06f);
     colors[ImGuiCol_TextSelectedBg] = ImVec4(0.20f, 0.22f, 0.23f, 1.00f);
     colors[ImGuiCol_DragDropTarget] = ImVec4(0.33f, 0.67f, 0.86f, 1.00f);
-    colors[ImGuiCol_NavHighlight] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
-    colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 0.00f, 0.00f, 0.70f);
-    colors[ImGuiCol_NavWindowingDimBg] = ImVec4(1.00f, 0.00f, 0.00f, 0.20f);
+    colors[ImGuiCol_NavHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
+    colors[ImGuiCol_NavWindowingDimBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.20f);
     colors[ImGuiCol_ModalWindowDimBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.25f);
 
     ImGuiStyle& style = ImGui::GetStyle();
@@ -299,21 +310,8 @@ void Application::imgui_menubar() noexcept
 
     if (ImGui::BeginMainMenuBar())
     {
-        if (ImGui::BeginMenu("Render"))
-        {
-            if (ImGui::MenuItem("Settings"))
-            {
-
-            }
-            imgui_menu_toggle_window("Debug Renderer Settings", m_imgui_data.windows.debug_renderer_settings);
-            ImGui::EndMenu();
-        }
         if (ImGui::BeginMenu("Scene"))
         {
-            if (ImGui::MenuItem("Select Scene..."))
-            {
-
-            }
             if (ImGui::MenuItem("Import Model..."))
             {
 
@@ -322,10 +320,17 @@ void Application::imgui_menubar() noexcept
         }
         if (ImGui::BeginMenu("Window"))
         {
+            imgui_menu_toggle_window("Renderer Settings", m_imgui_data.windows.renderer_settings);
+            imgui_menu_toggle_window("Debug Renderer Settings", m_imgui_data.windows.debug_renderer_settings);
             if (ImGui::MenuItem("Close all Windows"))
             {
                 imgui_close_all_windows();
             }
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Tools"))
+        {
+            imgui_menu_toggle_window("CBT and LEB Visualization", m_imgui_data.windows.tool_cbt_vis);
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Debug"))
@@ -337,12 +342,26 @@ void Application::imgui_menubar() noexcept
     }
 }
 
+void Application::imgui_renderer_settings() noexcept
+{
+    if (ImGui::Begin(
+            "Renderer Settings",
+            &m_imgui_data.windows.renderer_settings,
+            ImGuiWindowFlags_NoCollapse))
+    {
+        ImGui::Text("Dummy Text");
+        ImGui::End();
+    }
+}
+
 void Application::imgui_debug_renderer_settings() noexcept
 {
-    if (ImGui::Begin("Debug Renderer Settings", &m_imgui_data.windows.debug_renderer_settings))
+    if (ImGui::Begin(
+            "Debug Renderer Settings",
+            &m_imgui_data.windows.debug_renderer_settings,
+        ImGuiWindowFlags_NoCollapse))
     {
-        static bool f = true;
-        ImGui::Checkbox("Lock Camera", &f);
+        ImGui::Text("Dummy Text");
         ImGui::End();
     }
 }

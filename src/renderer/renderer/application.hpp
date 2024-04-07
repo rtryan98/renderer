@@ -2,6 +2,7 @@
 
 #include "window.hpp"
 #include "renderer/imgui_renderer.hpp"
+#include "renderer/cbt/cbt_cpu.hpp"
 
 #include <rhi/graphics_device.hpp>
 #include <rhi/swapchain.hpp>
@@ -16,7 +17,9 @@ struct ImGui_Data
     struct
     {
         bool demo = false;
+        bool renderer_settings = false;
         bool debug_renderer_settings = false;
+        bool tool_cbt_vis = false;
     } windows;
 };
 
@@ -46,6 +49,7 @@ private:
 
     void imgui_setup_style() noexcept;
     void imgui_menubar() noexcept;
+    void imgui_renderer_settings() noexcept;
     void imgui_debug_renderer_settings() noexcept;
 
 private:
@@ -57,5 +61,6 @@ private:
     bool m_is_running;
     std::unique_ptr<Imgui_Renderer> m_imgui_renderer;
     ImGui_Data m_imgui_data = {};
+    std::unique_ptr<CBT_CPU_Vis> m_cbt_cpu_vis;
 };
 }

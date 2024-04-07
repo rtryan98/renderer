@@ -1,3 +1,5 @@
+add_subdirectory(cbt)
+
 target_sources(
     renderer PRIVATE
     application.cpp
