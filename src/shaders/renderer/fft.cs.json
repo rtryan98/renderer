@@ -1,0 +1,285 @@
+{
+    "permutations": [
+        {
+            "name": "64",
+            "defines": [
+                {
+                    "FFT_SIZE": 64
+                },
+                {
+                    "FFT_LOG_SIZE": 6
+                }
+            ]
+        },
+        {
+            "name": "128",
+            "defines": [
+                {
+                    "FFT_SIZE": 128
+                },
+                {
+                    "FFT_LOG_SIZE": 7
+                }
+            ]
+        },
+        {
+            "name": "256",
+            "defines": [
+                {
+                    "FFT_SIZE": 256
+                },
+                {
+                    "FFT_LOG_SIZE": 8
+                }
+            ]
+        },
+        {
+            "name": "512",
+            "defines": [
+                {
+                    "FFT_SIZE": 512
+                },
+                {
+                    "FFT_LOG_SIZE": 9
+                }
+            ]
+        },
+        {
+            "name": "1024",
+            "defines": [
+                {
+                    "FFT_SIZE": 1024
+                },
+                {
+                    "FFT_LOG_SIZE": 10
+                }
+            ]
+        },
+        {
+            "name": "64_fp16",
+            "defines": [
+                {
+                    "FFT_SIZE": 64
+                },
+                {
+                    "FFT_LOG_SIZE": 6
+                },
+                {
+                    "FFT_FP16": 1
+                }
+            ]
+        },
+        {
+            "name": "128_fp16",
+            "defines": [
+                {
+                    "FFT_SIZE": 128
+                },
+                {
+                    "FFT_LOG_SIZE": 7
+                },
+                {
+                    "FFT_FP16": 1
+                }
+            ]
+        },
+        {
+            "name": "256_fp16",
+            "defines": [
+                {
+                    "FFT_SIZE": 256
+                },
+                {
+                    "FFT_LOG_SIZE": 8
+                },
+                {
+                    "FFT_FP16": 1
+                }
+            ]
+        },
+        {
+            "name": "512_fp16",
+            "defines": [
+                {
+                    "FFT_SIZE": 512
+                },
+                {
+                    "FFT_LOG_SIZE": 9
+                },
+                {
+                    "FFT_FP16": 1
+                }
+            ]
+        },
+        {
+            "name": "1024_fp16",
+            "defines": [
+                {
+                    "FFT_SIZE": 1024
+                },
+                {
+                    "FFT_LOG_SIZE": 10
+                },
+                {
+                    "FFT_FP16": 1
+                }
+            ]
+        },
+        
+        {
+            "name": "64_float4",
+            "defines": [
+                {
+                    "FFT_SIZE": 64
+                },
+                {
+                    "FFT_LOG_SIZE": 6
+                },
+                {
+                    "FFT_FLOAT4": 1
+                }
+            ]
+        },
+        {
+            "name": "128_float4",
+            "defines": [
+                {
+                    "FFT_SIZE": 128
+                },
+                {
+                    "FFT_LOG_SIZE": 7
+                },
+                {
+                    "FFT_FLOAT4": 1
+                }
+            ]
+        },
+        {
+            "name": "256_float4",
+            "defines": [
+                {
+                    "FFT_SIZE": 256
+                },
+                {
+                    "FFT_LOG_SIZE": 8
+                },
+                {
+                    "FFT_FLOAT4": 1
+                }
+            ]
+        },
+        {
+            "name": "512_float4",
+            "defines": [
+                {
+                    "FFT_SIZE": 512
+                },
+                {
+                    "FFT_LOG_SIZE": 9
+                },
+                {
+                    "FFT_FLOAT4": 1
+                }
+            ]
+        },
+        {
+            "name": "1024_float4",
+            "defines": [
+                {
+                    "FFT_SIZE": 1024
+                },
+                {
+                    "FFT_LOG_SIZE": 10
+                },
+                {
+                    "FFT_FLOAT4": 1
+                }
+            ]
+        },
+        {
+            "name": "64_fp16_float4",
+            "defines": [
+                {
+                    "FFT_SIZE": 64
+                },
+                {
+                    "FFT_LOG_SIZE": 6
+                },
+                {
+                    "FFT_FP16": 1
+                },
+                {
+                    "FFT_FLOAT4": 1
+                }
+            ]
+        },
+        {
+            "name": "128_fp16_float4",
+            "defines": [
+                {
+                    "FFT_SIZE": 128
+                },
+                {
+                    "FFT_LOG_SIZE": 7
+                },
+                {
+                    "FFT_FP16": 1
+                },
+                {
+                    "FFT_FLOAT4": 1
+                }
+            ]
+        },
+        {
+            "name": "256_fp16_float4",
+            "defines": [
+                {
+                    "FFT_SIZE": 256
+                },
+                {
+                    "FFT_LOG_SIZE": 8
+                },
+                {
+                    "FFT_FP16": 1
+                },
+                {
+                    "FFT_FLOAT4": 1
+                }
+            ]
+        },
+        {
+            "name": "512_fp16_float4",
+            "defines": [
+                {
+                    "FFT_SIZE": 512
+                },
+                {
+                    "FFT_LOG_SIZE": 9
+                },
+                {
+                    "FFT_FP16": 1
+                },
+                {
+                    "FFT_FLOAT4": 1
+                }
+            ]
+        },
+        {
+            "name": "1024_fp16_float4",
+            "defines": [
+                {
+                    "FFT_SIZE": 1024
+                },
+                {
+                    "FFT_LOG_SIZE": 10
+                },
+                {
+                    "FFT_FP16": 1
+                },
+                {
+                    "FFT_FLOAT4": 1
+                }
+            ]
+        }
+    ]
+}
