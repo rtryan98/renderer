@@ -7,6 +7,8 @@ target_sources(
     imgui_renderer.cpp
     imgui_renderer.hpp
     main.cpp
+    shader_manager.cpp
+    shader_manager.hpp
     window.cpp
     window.hpp
 )

@@ -74,7 +74,7 @@ add_custom_command(
     COMMAND ${RENDERER_BUILTIN_RESOURCES_COMMAND} echo on #hack for last &&
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
-generate_compute_pipeline_library(renderer renderer_compute_pipeline_library ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders ./shaders  ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer/renderer/generated/compute_pipeline_library.hpp)
+generate_compute_pipeline_library(renderer renderer_compute_pipeline_library ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders ./shaders ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer/renderer/generated/compute_pipeline_library ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer)
 
 set_property(DIRECTORY ${CMAKE_CURRENT_LIST_DIR} PROPERTY VS_STARTUP_PROJECT renderer)
 
