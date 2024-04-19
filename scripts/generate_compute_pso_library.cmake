@@ -4,6 +4,10 @@ set(COMPUTE_PIPELINE_LIBRARY_BASE_CMD py ${CMAKE_CURRENT_SOURCE_DIR}/scripts/gen
 function (generate_compute_pipeline_library CONSUMING_TARGET TARGET SHADER_SOURCE_PATH SHADER_BINARY_RELATIVE_BASE_PATH OUT_FILE SOURCE_BASE_PATH)
     set(JSON_FILE_LIST)
     get_target_property(COMPUTE_LIBRARY_SOURCES ${TARGET} SOURCES)
+    set_source_files_properties(
+        ${COMPUTE_LIBRARY_SOURCES} PROPERTIES
+        VS_TOOL_OVERRIDE "Text"
+    )
     foreach(JSON_FILE ${COMPUTE_LIBRARY_SOURCES})
         get_filename_component(SOURCE_FILE_EXT ${JSON_FILE} LAST_EXT)
         if(NOT ${SOURCE_FILE_EXT} STREQUAL ".json")
@@ -19,6 +23,7 @@ function (generate_compute_pipeline_library CONSUMING_TARGET TARGET SHADER_SOURC
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
+    target_sources(${TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_compute_pso_library.py)
     target_sources(
         ${CONSUMING_TARGET} PRIVATE
         ${OUT_FILE}.cpp ${OUT_FILE}.hpp
@@ -26,6 +31,10 @@ function (generate_compute_pipeline_library CONSUMING_TARGET TARGET SHADER_SOURC
     set_source_files_properties(
         ${OUT_FILE}.cpp ${OUT_FILE}.hpp PROPERTIES
         GENERATED TRUE
+    )
+    set_source_files_properties(
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_compute_pso_library.py PROPERTIES
+        VS_TOOL_OVERRIDE "Text"
     )
     get_filename_component(OUT_FILE_DIR ${OUT_FILE}.cpp DIRECTORY)
     source_group(TREE ${OUT_FILE_DIR} PREFIX src_generated FILES ${OUT_FILE}.cpp ${OUT_FILE}.hpp)

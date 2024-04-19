@@ -1,5 +1,7 @@
 {
     "name": "fft",
+    "shader_type": "cs",
+    "entry_point": "main",
     "permutation_groups": [
         {
             "name": "size",

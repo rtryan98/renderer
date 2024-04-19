@@ -5,12 +5,12 @@
 
 namespace ren
 {
-class Pipeline_Manager
+class Shader_Library
 {
 public:
-    rhi::Pipeline* get_compute_pipeline(Compute_Pipelines pipeline) const;
+    rhi::Shader_Blob* get_shader(Shaders shader) const;
 
 private:
-    std::array<rhi::Pipeline*, compute_pipeline_metadata.size()> m_predefined_compute_pipelines = {};
+    std::array<rhi::Shader_Blob*, shader_metadata.size()> m_predefined_shaders = {};
 };
 }
