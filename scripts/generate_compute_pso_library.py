@@ -2,7 +2,7 @@ import argparse
 import itertools
 import json
 import os
-from typing import list, Tuple
+from typing import Tuple
 from dataclasses import dataclass
 
 output_template_string_hpp = """// Generated file (generate_compute_pso_library.py). Do not edit directly.
@@ -45,24 +45,25 @@ const auto shader_metadata = std::to_array<Shader_Metadata>({$SHADER_METADATA
 }
 """
 
-select_shader_template_string = "Shaders select_$NAME_shader($ARGS) noexcept;\n"
+select_shader_function_signature_template_string = "Shaders select_$NAME_shader($ARGS) noexcept;\n"
 
-compute_pipeline_template_string = """\n{
+shader_metadata_template_string = """\n{
     .type = $SHADER_TYPE,
     .name = $NAME,
+    .entry_point = $ENTRY_POINT,
     .binary_path = $BINARY_PATH,
     .source_path = $SOURCE_PATH,
     .defines = {$DEFINES}
 },"""
 
-select_shader_switch_case_template_string_cpp = "\n    case $CASE: $ARG = $TARGET; break;"
+select_shader_switch_case_template_string = "\n    case $CASE: $ARG = $TARGET; break;"
 
-select_shader_switch_template_string_cpp ="""switch($ARG)
+select_shader_switch_template_string ="""switch($ARG)
     {$CASES
     }
 """
 
-select_shader_template_string_cpp = """Shaders select_$NAME_shader($ARGS) noexcept
+select_shader_function_body_template_string = """Shaders select_$NAME_shader($ARGS) noexcept
 {
     $SWITCHES
     constexpr auto permutation_factors = calc_param_factors(std::to_array({ $PERMUTATION_SIZES}));
@@ -101,9 +102,16 @@ $FUNCTIONS
 """
 
 @dataclass
+class ShaderDefine:
+    name: str
+    value: str
+
+@dataclass
 class ShaderParameter:
-    parameter_names: list[str]
-    parameter_types: list[str]
+    name: str
+    type: str
+    value_count: int
+    swizzle_values: list[int]
 
 @dataclass
 class ShaderVariant:
@@ -111,7 +119,7 @@ class ShaderVariant:
     entry_point: str
     binary_path: str
     source_path: str
-    defines: list[str]
+    defines: list[ShaderDefine]
 
 @dataclass
 class Shader:
@@ -120,22 +128,10 @@ class Shader:
     variants: list[ShaderVariant]
     parameters: list[ShaderParameter]
 
-def construct_shader_name_string(name: str) -> str:
-    return "\n    " + name + ","
-
 def construct_shader_binary_path_string(binary_base_path: str, name: str) -> str:
     return binary_base_path + name + ".bin"
 
-def construct_metadata_string(shader_type: str, entry_point: str, name: str, binary_path: str, source_path: str, defines: str) -> str:
-    return compute_pipeline_template_string.replace(
-                "$SHADER_TYPE", decode_shader_type(shader_type)).replace(
-                "$ENTRY_POINT", entry_point).replace(
-                "$NAME", "\"" + name + "\"").replace(
-                "$BINARY_PATH", "\"" + binary_path + "\"").replace(
-                "$SOURCE_PATH", "\"" + source_path + "\"").replace(
-                "$DEFINES", defines)
-
-def decode_shader_type(shader_type):
+def process_shader_type(shader_type):
     if shader_type == "vs":
         return "Shader_Type::Vertex"
     elif shader_type == "ps":
@@ -151,75 +147,166 @@ def decode_shader_type(shader_type):
     else:
         return "Shader_Type::Unknown"
 
-def generate_permutations(shader, source_path: str, binary_base_path: str) -> Tuple[str, str, str, str, str, str, str, bool]:
-    has_permutations = "permutation_groups" in shader and len(shader["permutation_groups"]) > 0
-    permutation_count = 1
-    name_list = ""
-    metadata = ""
-    fn_args = ""
-    fn_arg_names = ""
-    fn_switches = ""
-    first_element = ""
-    permutation_sizes = ""
+def generate_shader_base_variant(shader_json, source_path: str, binary_base_path: str) -> ShaderVariant:
+    return ShaderVariant(
+        name=shader_json["name"],
+        entry_point=shader_json["entry_point"],
+        binary_path=construct_shader_binary_path_string(binary_base_path, shader_json["name"]),
+        source_path=source_path,
+        defines=[])
 
-    shader_type = shader["shader_type"]
-    entry_point = shader["entry_point"]
-    name = shader["name"]
+def generate_shader_permutation_index_tuples(shader_json):
+    permutation_index_lists = []
+    for permutation_group in shader_json["permutation_groups"]:
+        if permutation_group["type"] == "int":
+            permutation_index_lists.append(list(range(0, len(permutation_group["define_values"][0]))))
+        elif permutation_group["type"] == "bool":
+            permutation_index_lists.append([0, 1])
+    return list(itertools.product(*permutation_index_lists))
 
+def generate_shader_permutation_variants(shader_json, source_path: str, binary_base_path: str) -> list[ShaderVariant]:
+    result = []
+
+    for permutation in generate_shader_permutation_index_tuples(shader_json):
+        permutation_name = shader_json['name']
+        permutation_entry_point = shader_json['entry_point']
+        permutation_defines = []
+
+        for i, tuple_value in enumerate(permutation):
+            permutation_element = shader_json['permutation_groups'][i]
+            if permutation_element['type'] == "int":
+                permutation_name += "_" + (permutation_element['name'] if 'use_name' in permutation_element and permutation_element['use_name'] else "") + str(permutation_element['define_values'][0][tuple_value])
+                for j, define_name in enumerate(permutation_element['define_names']):
+                    permutation_defines.append(ShaderDefine(define_name, str(permutation_element['define_values'][j][tuple_value])))
+            elif permutation_element['type'] == "bool":
+                if tuple_value == 1:
+                    permutation_name += "_" + permutation_element['name']
+                    permutation_defines.append(ShaderDefine(define_name, '1'))
+                else:
+                    permutation_defines.append(ShaderDefine(define_name, '0'))
+            # TODO: add support for entry point permutations
+            # elif permutation_element["type"] == "entry_points":
+            #     permutation_entry_point = permutation_element['entry_point_names'][tuple_value]
+
+        result.append(ShaderVariant(
+            name=permutation_name,
+            entry_point=permutation_entry_point,
+            binary_path=construct_shader_binary_path_string(binary_base_path, permutation_name),
+            source_path=source_path,
+            defines=permutation_defines))
+
+    return result
+
+def generate_shader_parameters(shader_json) -> list[ShaderParameter]:
+    result = []
+    for permutation_group in shader_json['permutation_groups']:
+        value_count = 2 # default for type == 'bool'
+        swizzle_values = []
+        if permutation_group['type'] == 'int':
+            value_count = len(permutation_group['define_values'][0])
+        if permutation_group['type'] == 'int' and 'swizzle_define_values' in permutation_group:
+            for value in permutation_group['define_values'][0]:
+                swizzle_values.append(value)
+        result.append(ShaderParameter(
+            name=permutation_group['name'],
+            type=permutation_group['type'],
+            value_count=value_count,
+            swizzle_values=swizzle_values))
+    return result
+
+def generate_shader(shader_json, source_path: str, binary_base_path: str) -> Shader:
+    result = Shader(name=shader_json['name'], type=shader_json['shader_type'], variants=None, parameters=None)
+    has_permutations = 'permutation_groups' in shader_json and len(shader_json['permutation_groups']) > 0
     if has_permutations:
-        permutation_index_lists = []
-        for permutation_group in shader["permutation_groups"]:
-            if permutation_group["type"] == "int":
-                permutation_index_lists.append(list(range(0, len(permutation_group["define_values"][0]))))
-            elif permutation_group["type"] == "bool":
-                permutation_index_lists.append([0, 1])
-        permutation_index_tuples = list(itertools.product(*permutation_index_lists))
-        permutation_count = len(permutation_index_tuples)
-
-        for permutation_group in shader["permutation_groups"]:
-            fn_arg_names += permutation_group['name'] + ", "
-            if permutation_group["type"] == "int":
-                fn_args += f"uint32_t {permutation_group['name']}, "
-                if "swizzle_define_values" in permutation_group and permutation_group["swizzle_define_values"]:
-                    switch_cases = ""
-                    for i, define_value in enumerate(permutation_group["define_values"][0]):
-                        switch_cases += select_shader_switch_case_template_string_cpp.replace("$CASE", str(define_value)).replace("$ARG", permutation_group["name"]).replace("$TARGET", str(i))
-                    fn_switches += select_shader_switch_template_string_cpp.replace("$ARG", permutation_group["name"]).replace("$CASES", switch_cases)
-                    permutation_sizes += f"{len(permutation_group['define_values'][0])}, "
-            elif permutation_group["type"] == "bool":
-                fn_args += f"bool {permutation_group['name']}, "
-                permutation_sizes += "2, "
-
-        for permutation in permutation_index_tuples:
-            permutation_name = shader["name"]
-            permutation_entry_point = entry_point
-            defines = ""
-            for i, tuple_value in enumerate(permutation):
-                permutation_element = shader["permutation_groups"][i]
-                if permutation_element["type"] == "int":
-                    permutation_name += "_" + (permutation_element["name"] if "use_name" in permutation_element and permutation_element["use_name"] else "") + str(permutation_element["define_values"][0][tuple_value])
-                    for j, define_name in enumerate(permutation_element["define_names"]):
-                        defines += f"\"{define_name}={permutation_element['define_values'][j][tuple_value]}\", "
-                elif permutation_element["type"] == "bool":
-                    if tuple_value == 1:
-                        permutation_name += "_" + permutation_element["name"]
-                        defines += f"\"{permutation_element['define_name']}=1\", "
-                    else:
-                        defines += f"\"{permutation_element['define_name']}=0\", "
-                # TODO: add support for entry point permutations
-                # elif permutation_element["type"] == "entry_points":
-                #     permutation_entry_point = permutation_element['entry_point_names'][tuple_value]
-            if first_element == "":
-                first_element = permutation_name
-
-            name_list += construct_shader_name_string(permutation_name)
-            metadata += construct_metadata_string(shader_type, permutation_entry_point, name, construct_shader_binary_path_string(binary_base_path, permutation_name), source_path, defines)
+        result.variants = generate_shader_permutation_variants(shader_json, source_path, binary_base_path)
+        result.parameters = generate_shader_parameters(shader_json)
     else:
-        name_list += construct_shader_name_string(name)
-        metadata += construct_metadata_string(shader_type, entry_point, name, construct_shader_binary_path_string(binary_base_path, name), source_path, "")
+        result.variants = [generate_shader_base_variant(shader_json, source_path, binary_base_path)]
+    return result
 
-    has_permutations = has_permutations and permutation_count > 1
-    return name_list, metadata, shader["name"], fn_args[:-2], fn_switches, first_element, permutation_sizes, fn_arg_names, has_permutations
+def process_parameter_type(type: str) -> str:
+    if type == "int":
+        return "uint32_t"
+    elif type == "bool":
+        return "bool"
+    return ""
+
+def process_select_shader_parameters(parameters: list[ShaderParameter]) -> str:
+    params = ""
+    for parameter in parameters:
+        params += process_parameter_type(parameter.type) + " " + parameter.name + ", "
+    return params[:-2]
+
+def process_select_shader_parameter_names(parameters: list[ShaderParameter]) -> str:
+    param_names = ""
+    for parameter in parameters:
+        param_names += parameter.name + ", "
+    return param_names[:-2]
+
+def process_select_shader_function_signature(shader: Shader) -> str:
+    return select_shader_function_signature_template_string.replace(
+        "$NAME", shader.name).replace(
+        "$ARGS", process_select_shader_parameters(shader.parameters))
+
+def process_select_shader_permutation_sizes(shader: Shader) -> str:
+    result = ""
+    for parameter in shader.parameters:
+        result += str(parameter.value_count) + ", "
+    return result
+
+def process_select_shader_function_switches(shader: Shader):
+    switches = ""
+    for parameter in shader.parameters:
+        if parameter.swizzle_values:
+            switch_cases = ""
+            for i, value in enumerate(parameter.swizzle_values):
+                switch_cases += select_shader_switch_case_template_string.replace(
+                    "$ARG", parameter.name).replace(
+                    "$CASE", str(value)).replace(
+                    "$TARGET", str(i))
+            switches += select_shader_switch_template_string.replace(
+                "$ARG", parameter.name).replace(
+                "$CASES", switch_cases)
+    return switches
+
+def process_select_shader_function_body(shader: Shader):
+    switches = process_select_shader_function_switches(shader)
+    permutation_sizes = process_select_shader_permutation_sizes(shader)
+    return select_shader_function_body_template_string.replace(
+        "$NAME", shader.name).replace(
+        "$ARGS", process_select_shader_parameters(shader.parameters)).replace(
+        "$SWITCHES", switches).replace(
+        "$FIRST_ENUM_ELEMENT", "Shaders::" + shader.variants[0].name).replace(
+        "$PERMUTATION_SIZES", permutation_sizes).replace(
+        "$ARG_NAMES", process_select_shader_parameter_names(shader.parameters))
+
+def process_defines(variant: ShaderVariant) -> str:
+    defines = ""
+    for define in variant.defines:
+        defines += "\"" + define.name + "=" + str(define.value) + "\", "
+    return defines
+
+def process_shaders(shaders: list[Shader]) -> Tuple[str, str, str, str]:
+    shader_select_function_signatures = ""
+    shader_select_function_bodies = ""
+    enum_values = ""
+    metadata = ""
+
+    for shader in shaders:
+        if len(shader.parameters) > 0:
+            shader_select_function_signatures += process_select_shader_function_signature(shader)
+            shader_select_function_bodies += process_select_shader_function_body(shader)
+        for variant in shader.variants:
+            enum_values += "\n    " + variant.name + ","
+            metadata += shader_metadata_template_string.replace(
+                "$SHADER_TYPE", process_shader_type(shader.type)).replace(
+                "$NAME", "\"" + variant.name + "\"").replace(
+                "$ENTRY_POINT", "\"" + variant.entry_point + "\"").replace(
+                "$BINARY_PATH", "\"" + variant.binary_path + "\"").replace(
+                "$SOURCE_PATH", "\"." + variant.source_path + "\"").replace(
+                "$DEFINES", process_defines(variant))
+
+    return shader_select_function_signatures, shader_select_function_bodies, enum_values, metadata
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -230,40 +317,25 @@ if __name__ == '__main__':
     parser.add_argument("--cpp-source-base-path", type=str, required=True)
     args = parser.parse_args()
 
-    Shaders_string = ""
-    Shader_Metadata_string = ""
-    compute_pipeline_select_shader_string = ""
-    compute_pipeline_select_shader_cpp_string = ""
-
+    shaders = []
     for shader_json_file in args.shader_json_files:
         print(f"Processing {shader_json_file}.")
-        json_object = json.load(open(shader_json_file))
+        shader_json = json.load(open(shader_json_file))
         shader_source_path = shader_json_file.replace(args.source_base_path, "").replace(".json", ".hlsl")
-        pipeline_string, metadata, name, fn_args, fn_switches, first_element, permutation_sizes, fn_arg_names, has_permutations = generate_permutations(json_object, "." + shader_source_path, args.binary_base_path + os.path.dirname(shader_source_path) + "/")
-        Shaders_string += pipeline_string
-        Shader_Metadata_string += metadata
-        if has_permutations:
-            compute_pipeline_select_shader_string += select_shader_template_string.replace(
-                "$NAME", name).replace(
-                "$ARGS", fn_args)
-            compute_pipeline_select_shader_cpp_string += select_shader_template_string_cpp.replace(
-                "$NAME", name).replace(
-                "$ARGS", fn_args).replace(
-                "$SWITCHES", fn_switches).replace(
-                "$FIRST_ENUM_ELEMENT", "Shaders::" + first_element).replace(
-                "$PERMUTATION_SIZES", permutation_sizes).replace(
-                "$ARG_NAMES", fn_arg_names)
+        shader_binary_base_path = args.binary_base_path + os.path.dirname(shader_source_path) + "/"
+        shaders.append(generate_shader(shader_json, shader_source_path, shader_binary_base_path))
+    function_signatures, function_bodies, enum_values, metadata = process_shaders(shaders)
 
     output_string_hpp = output_template_string_hpp.replace(
-        "$SHADERS", Shaders_string).replace(
-        "$SHADER_METADATA", Shader_Metadata_string).replace(
-        "$SELECT_FUNCTIONS", compute_pipeline_select_shader_string)
+        "$SHADERS", enum_values).replace(
+        "$SHADER_METADATA", metadata).replace(
+        "$SELECT_FUNCTIONS", function_signatures)
     output_hpp = args.outfile_path_wo_ext + ".hpp"
 
     output_cpp = args.outfile_path_wo_ext + ".cpp"
     output_string_cpp = output_template_string_cpp.replace(
         "$HPP_INCLUDE_PATH", output_hpp.replace(args.cpp_source_base_path + "/", "")).replace(
-        "$FUNCTIONS", compute_pipeline_select_shader_cpp_string)
+        "$FUNCTIONS", function_bodies)
     with open(output_cpp, 'w') as outfile:
         outfile.write(output_string_cpp)
         outfile.close()
