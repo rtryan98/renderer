@@ -24,6 +24,7 @@ target_link_libraries(
 target_include_directories(
     renderer PUBLIC
     src/renderer
+    thirdparty/spdlog/include
 )
 set_target_properties(
     renderer PROPERTIES

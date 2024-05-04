@@ -1,6 +1,7 @@
 #pragma once
 
-#include "window.hpp"
+#include "renderer/logger.hpp"
+#include "renderer/window.hpp"
 #include "renderer/imgui_renderer.hpp"
 #include "renderer/cbt/cbt_cpu.hpp"
 
@@ -53,6 +54,7 @@ private:
     void imgui_debug_renderer_settings() noexcept;
 
 private:
+    std::unique_ptr<Logger> m_logger;
     std::unique_ptr<Window> m_window;
     std::unique_ptr<rhi::Graphics_Device> m_device;
     std::unique_ptr<rhi::Swapchain> m_swapchain;

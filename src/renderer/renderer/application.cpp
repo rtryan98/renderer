@@ -1,13 +1,13 @@
 #include "renderer/application.hpp"
 
 #include <chrono>
-#include <print>
 #include <imgui.h>
 
 namespace ren
 {
 Application::Application() noexcept
-    : m_window(Window::create({
+    : m_logger(std::make_unique<Logger>())
+    , m_window(Window::create({
         .width = 1920,
         .height = 1080,
         .title = "Renderer"
@@ -38,7 +38,11 @@ Application::Application() noexcept
     {
         auto frame_fence = m_device->create_fence(0);
         frame.frame_fence = frame_fence.value_or(nullptr);
-        if (!frame.frame_fence) std::print("Failed to create frame fence!");
+        if (!frame.frame_fence)
+        {
+            m_logger->critical("Failed to create frame fence!");
+            std::abort();
+        }
         frame.fence_value = 0ull;
         frame.graphics_command_pool = m_device->create_command_pool({ .queue_type = rhi::Queue_Type::Graphics });
         frame.compute_command_pool = m_device->create_command_pool({ .queue_type = rhi::Queue_Type::Compute });
@@ -46,10 +50,13 @@ Application::Application() noexcept
     }
     imgui_setup_style();
     m_imgui_renderer->create_fonts_texture();
+
+    m_logger->info("Finished initializing.");
 }
 
 Application::~Application() noexcept
 {
+    m_logger->info("Shutting down.");
     m_device->wait_idle();
     for (auto& frame : m_frames)
     {

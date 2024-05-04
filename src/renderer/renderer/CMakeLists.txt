@@ -1,4 +1,5 @@
 add_subdirectory(cbt)
+add_subdirectory(ocean)
 
 target_sources(
     renderer PRIVATE
@@ -6,6 +7,8 @@ target_sources(
     application.hpp
     imgui_renderer.cpp
     imgui_renderer.hpp
+    logger.cpp
+    logger.hpp
     main.cpp
     shader_manager.cpp
     shader_manager.hpp
