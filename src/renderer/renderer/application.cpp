@@ -203,8 +203,6 @@ void Application::process_gui() noexcept
 
     if (m_imgui_data.windows.renderer_settings)
         m_renderer_settings.process_gui(&m_imgui_data.windows.renderer_settings);
-    if (m_imgui_data.windows.debug_renderer_settings)
-        imgui_debug_renderer_settings();
     if (m_imgui_data.windows.tool_cbt_vis)
     {
         // no need to allocate cpu-sided vis if it's not used
@@ -220,7 +218,6 @@ void Application::imgui_close_all_windows() noexcept
 {
     m_imgui_data.windows.demo = false;
     m_imgui_data.windows.renderer_settings = false;
-    m_imgui_data.windows.debug_renderer_settings = false;
     m_imgui_data.windows.tool_cbt_vis = false;
 }
 
@@ -334,7 +331,6 @@ void Application::imgui_menubar() noexcept
         if (ImGui::BeginMenu("Window"))
         {
             imgui_menu_toggle_window("Renderer Settings", m_imgui_data.windows.renderer_settings);
-            imgui_menu_toggle_window("Debug Renderer Settings", m_imgui_data.windows.debug_renderer_settings);
             if (ImGui::MenuItem("Close all Windows"))
             {
                 imgui_close_all_windows();
@@ -352,18 +348,6 @@ void Application::imgui_menubar() noexcept
             ImGui::EndMenu();
         }
         ImGui::EndMainMenuBar();
-    }
-}
-
-void Application::imgui_debug_renderer_settings() noexcept
-{
-    if (ImGui::Begin(
-            "Debug Renderer Settings",
-            &m_imgui_data.windows.debug_renderer_settings,
-        ImGuiWindowFlags_NoCollapse))
-    {
-        ImGui::Text("Dummy Text");
-        ImGui::End();
     }
 }
 }

@@ -22,7 +22,6 @@ struct ImGui_Data
     {
         bool demo = false;
         bool renderer_settings = false;
-        bool debug_renderer_settings = false;
         bool tool_cbt_vis = false;
     } windows;
 };
@@ -53,7 +52,6 @@ private:
 
     void imgui_setup_style() noexcept;
     void imgui_menubar() noexcept;
-    void imgui_debug_renderer_settings() noexcept;
 
 private:
     std::shared_ptr<Logger> m_logger;
