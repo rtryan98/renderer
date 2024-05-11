@@ -4,8 +4,6 @@
 #include "renderer/logger.hpp"
 
 #include <rhi/graphics_device.hpp>
-#include <unordered_map>
-#include <unordered_set>
 
 namespace ren
 {
