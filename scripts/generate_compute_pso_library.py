@@ -215,7 +215,7 @@ def generate_shader_parameters(shader_json) -> list[ShaderParameter]:
     return result
 
 def generate_shader(shader_json, source_path: str, binary_base_path: str) -> Shader:
-    result = Shader(name=shader_json['name'], type=shader_json['shader_type'], variants=None, parameters=None)
+    result = Shader(name=shader_json['name'], type=shader_json['shader_type'], variants=[], parameters=[])
     has_permutations = 'permutation_groups' in shader_json and len(shader_json['permutation_groups']) > 0
     if has_permutations:
         result.variants = generate_shader_permutation_variants(shader_json, source_path, binary_base_path)
