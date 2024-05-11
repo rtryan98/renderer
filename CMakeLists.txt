@@ -24,6 +24,7 @@ target_link_libraries(
 target_include_directories(
     renderer PUBLIC
     src/renderer
+    src/shaders
     thirdparty/spdlog/include
 )
 set_target_properties(
@@ -40,11 +41,8 @@ add_subdirectory(src)
 
 get_target_property(RENDERER_CPP_SOURCES renderer SOURCES)
 list(FILTER RENDERER_CPP_SOURCES INCLUDE REGEX "[ch]pp")
-get_target_property(RENDERER_HLSLI_SOURCES renderer SOURCES)
-list(FILTER RENDERER_HLSLI_SOURCES INCLUDE REGEX "hlsli")
 
 source_group(TREE ${CMAKE_CURRENT_LIST_DIR}/src/renderer PREFIX src FILES ${RENDERER_CPP_SOURCES})
-source_group(TREE ${CMAKE_CURRENT_LIST_DIR}/src/shaders PREFIX src FILES ${RENDERER_HLSLI_SOURCES})
 get_target_property(RENDERER_BUILTIN_RESOURCES_SOURCES renderer_builtin_resources SOURCES)
 source_group(TREE ${CMAKE_CURRENT_LIST_DIR}/src/shaders PREFIX src_shader FILES ${RENDERER_BUILTIN_RESOURCES_SOURCES})
 set(RENDERER_BUILTIN_RESOURCES_COMMAND)
