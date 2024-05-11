@@ -35,7 +35,7 @@ Application::Application() noexcept
         }))
     , m_cbt_cpu_vis(nullptr)
     , m_renderer_settings()
-    , m_ocean_settings()
+    , m_ocean_renderer()
 {
     for (auto& frame : m_frames)
     {
@@ -54,7 +54,7 @@ Application::Application() noexcept
     imgui_setup_style();
     m_imgui_renderer->create_fonts_texture();
 
-    m_renderer_settings.add_settings(&m_ocean_settings);
+    m_renderer_settings.add_settings(m_ocean_renderer.get_settings());
 
     m_logger->info("Finished initializing.");
 }

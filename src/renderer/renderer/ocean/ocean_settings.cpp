@@ -4,11 +4,10 @@
 
 namespace ren
 {
-Ocean_Settings::Ocean_Settings()
+Ocean_Settings::Ocean_Settings(Ocean_Resources& resources)
     : Settings_Base("Ocean")
-{
-
-}
+    , m_resources(resources)
+{}
 
 void Ocean_Settings::process_gui()
 {

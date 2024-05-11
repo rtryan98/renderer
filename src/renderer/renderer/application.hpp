@@ -6,7 +6,7 @@
 #include "renderer/cbt/cbt_cpu.hpp"
 #include "renderer/shader_manager.hpp"
 #include "renderer/imgui/renderer_settings.hpp"
-#include "renderer/ocean/ocean_settings.hpp"
+#include "renderer/ocean/ocean_renderer.hpp"
 
 #include <rhi/graphics_device.hpp>
 #include <rhi/swapchain.hpp>
@@ -66,6 +66,6 @@ private:
     ImGui_Data m_imgui_data = {};
     std::unique_ptr<CBT_CPU_Vis> m_cbt_cpu_vis;
     Renderer_Settings m_renderer_settings;
-    Ocean_Settings m_ocean_settings;
+    Ocean_Renderer m_ocean_renderer;
 };
 }
