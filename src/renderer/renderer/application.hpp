@@ -4,6 +4,9 @@
 #include "renderer/window.hpp"
 #include "renderer/imgui_renderer.hpp"
 #include "renderer/cbt/cbt_cpu.hpp"
+#include "renderer/shader_manager.hpp"
+#include "renderer/imgui/renderer_settings.hpp"
+#include "renderer/ocean/ocean_settings.hpp"
 
 #include <rhi/graphics_device.hpp>
 #include <rhi/swapchain.hpp>
@@ -50,19 +53,21 @@ private:
 
     void imgui_setup_style() noexcept;
     void imgui_menubar() noexcept;
-    void imgui_renderer_settings() noexcept;
     void imgui_debug_renderer_settings() noexcept;
 
 private:
-    std::unique_ptr<Logger> m_logger;
+    std::shared_ptr<Logger> m_logger;
     std::unique_ptr<Window> m_window;
     std::unique_ptr<rhi::Graphics_Device> m_device;
     std::unique_ptr<rhi::Swapchain> m_swapchain;
+    std::unique_ptr<Shader_Library> m_shader_library;
     std::array<Frame, FRAME_IN_FLIGHT_COUNT> m_frames;
     uint64_t m_frame_counter;
     bool m_is_running;
     std::unique_ptr<Imgui_Renderer> m_imgui_renderer;
     ImGui_Data m_imgui_data = {};
     std::unique_ptr<CBT_CPU_Vis> m_cbt_cpu_vis;
+    Renderer_Settings m_renderer_settings;
+    Ocean_Settings m_ocean_settings;
 };
 }

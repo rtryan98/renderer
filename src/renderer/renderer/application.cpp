@@ -6,7 +6,7 @@
 namespace ren
 {
 Application::Application() noexcept
-    : m_logger(std::make_unique<Logger>())
+    : m_logger(std::make_shared<Logger>())
     , m_window(Window::create({
         .width = 1920,
         .height = 1080,
@@ -24,6 +24,7 @@ Application::Application() noexcept
         .image_count = FRAME_IN_FLIGHT_COUNT + 1,
         .present_mode = rhi::Present_Mode::Immediate
         }))
+    , m_shader_library(std::make_unique<Shader_Library>(m_logger))
     , m_frames()
     , m_frame_counter(0)
     , m_is_running(true)
@@ -33,6 +34,8 @@ Application::Application() noexcept
         .swapchain_image_format = m_swapchain->get_image_format()
         }))
     , m_cbt_cpu_vis(nullptr)
+    , m_renderer_settings()
+    , m_ocean_settings()
 {
     for (auto& frame : m_frames)
     {
@@ -50,6 +53,8 @@ Application::Application() noexcept
     }
     imgui_setup_style();
     m_imgui_renderer->create_fonts_texture();
+
+    m_renderer_settings.add_settings(&m_ocean_settings);
 
     m_logger->info("Finished initializing.");
 }
@@ -195,8 +200,9 @@ void Application::process_gui() noexcept
 {
     ImGui::NewFrame();
     imgui_menubar();
+
     if (m_imgui_data.windows.renderer_settings)
-        imgui_renderer_settings();
+        m_renderer_settings.process_gui(&m_imgui_data.windows.renderer_settings);
     if (m_imgui_data.windows.debug_renderer_settings)
         imgui_debug_renderer_settings();
     if (m_imgui_data.windows.tool_cbt_vis)
@@ -346,18 +352,6 @@ void Application::imgui_menubar() noexcept
             ImGui::EndMenu();
         }
         ImGui::EndMainMenuBar();
-    }
-}
-
-void Application::imgui_renderer_settings() noexcept
-{
-    if (ImGui::Begin(
-            "Renderer Settings",
-            &m_imgui_data.windows.renderer_settings,
-            ImGuiWindowFlags_NoCollapse))
-    {
-        ImGui::Text("Dummy Text");
-        ImGui::End();
     }
 }
 
