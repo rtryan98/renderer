@@ -128,8 +128,8 @@ class Shader:
     variants: list[ShaderVariant]
     parameters: list[ShaderParameter]
 
-def construct_shader_binary_path_string(binary_base_path: str, name: str) -> str:
-    return binary_base_path + name + ".bin"
+def construct_shader_binary_path_string(binary_base_path: str, name: str, shadertype: str) -> str:
+    return binary_base_path + name + "." + shadertype + ".bin"
 
 def process_shader_type(shader_type):
     if shader_type == "vs":
@@ -151,7 +151,7 @@ def generate_shader_base_variant(shader_json, source_path: str, binary_base_path
     return ShaderVariant(
         name=shader_json["name"],
         entry_point=shader_json["entry_point"],
-        binary_path=construct_shader_binary_path_string(binary_base_path, shader_json["name"]),
+        binary_path=construct_shader_binary_path_string(binary_base_path, shader_json["name"], shader_json['shader_type']),
         source_path=source_path,
         defines=[])
 
@@ -191,7 +191,7 @@ def generate_shader_permutation_variants(shader_json, source_path: str, binary_b
         result.append(ShaderVariant(
             name=permutation_name,
             entry_point=permutation_entry_point,
-            binary_path=construct_shader_binary_path_string(binary_base_path, permutation_name),
+            binary_path=construct_shader_binary_path_string(binary_base_path, permutation_name, shader_json['shader_type']),
             source_path=source_path,
             defines=permutation_defines))
 
