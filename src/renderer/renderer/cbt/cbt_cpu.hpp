@@ -1,9 +1,11 @@
 #pragma once
 
+#include <DirectXMath.h>
 #include <vector>
 
 namespace ren
 {
+
 class CBT_CPU_Vis
 {
 public:
@@ -13,6 +15,7 @@ public:
 private:
     void imgui_init_at_depth() noexcept;
     void imgui_show_tree() noexcept;
+    void imgui_show_leb_triangle() noexcept;
 
     uint32_t access_value(uint32_t heap_idx) noexcept;
     void write_value(uint32_t heap_idx, uint32_t value) noexcept;
@@ -24,6 +27,10 @@ private:
 
     uint32_t calculate_num_bits(uint32_t depth) noexcept;
     uint32_t calculate_binary_heap_size(uint32_t depth) noexcept;
+
+    DirectX::XMFLOAT3X3 leb_matrix(uint32_t heap_idx);
+
+    uint32_t decode_node(uint32_t leaf_id) noexcept;
 
 private:
     uint32_t m_max_depth;
