@@ -9,5 +9,6 @@ Logger::Logger() noexcept
     , m_log(std::make_unique<spdlog::logger>("Renderer", m_stdout_sink))
 {
     m_stdout_sink->set_pattern("%^[%T] [%l]%$ : %v");
+    m_log->set_level(spdlog::level::trace);
 }
 }
