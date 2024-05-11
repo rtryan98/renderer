@@ -6,8 +6,9 @@ target_sources(
     renderer PRIVATE
     application.cpp
     application.hpp
-    imgui_renderer.cpp
-    imgui_renderer.hpp
+    asset.hpp
+    asset_manager.cpp
+    asset_manager.hpp
     logger.cpp
     logger.hpp
     main.cpp

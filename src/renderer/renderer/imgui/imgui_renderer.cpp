@@ -1,4 +1,4 @@
-#include "renderer/imgui_renderer.hpp"
+#include "renderer/imgui/imgui_renderer.hpp"
 
 #include "renderer/generated/imgui.vs.dxil.hpp"
 #include "renderer/generated/imgui.vs.spv.hpp"

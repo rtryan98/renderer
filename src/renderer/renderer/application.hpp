@@ -2,7 +2,7 @@
 
 #include "renderer/logger.hpp"
 #include "renderer/window.hpp"
-#include "renderer/imgui_renderer.hpp"
+#include "renderer/imgui/imgui_renderer.hpp"
 #include "renderer/cbt/cbt_cpu.hpp"
 #include "renderer/shader_manager.hpp"
 #include "renderer/imgui/renderer_settings.hpp"
