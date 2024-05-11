@@ -1,4 +1,4 @@
-#include "renderer/imgui/imgui.hlsli"
+#include "shaders/imgui/imgui.hlsli"
 
 DECLARE_PUSH_CONSTANTS(Imgui_Push_Constants, pc);
 

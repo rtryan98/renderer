@@ -1,5 +1,5 @@
-#include "renderer/imgui/imgui.hlsli"
-#include "renderer/util.hlsli"
+#include "shaders/imgui/imgui.hlsli"
+#include "shaders/util.hlsli"
 
 DECLARE_PUSH_CONSTANTS(Imgui_Push_Constants, pc);
 
