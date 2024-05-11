@@ -258,7 +258,7 @@ void Imgui_Renderer::render(rhi::Command_List* cmd) noexcept
                     .vertex_offset = imgui_cmd.VtxOffset + global_vertex_offset
                 };
                 cmd->set_push_constants(push_consts, rhi::Pipeline_Bind_Point::Graphics);
-                cmd->set_scissor(clip_min.x, clip_min.y, clip_max.x, clip_max.y);
+                cmd->set_scissor(clip_min.x, clip_min.y, clip_max.x - clip_min.x, clip_max.y - clip_min.y);
                 cmd->draw_indexed(
                     imgui_cmd.ElemCount,
                     1,
