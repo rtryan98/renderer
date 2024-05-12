@@ -200,6 +200,7 @@ def generate_shader_permutation_variants(shader_json, source_path: str, binary_b
 def generate_shader_parameters(shader_json) -> list[ShaderParameter]:
     result = []
     for permutation_group in shader_json['permutation_groups']:
+        name_mod = ""
         value_count = 2 # default for type == 'bool'
         swizzle_values = []
         if permutation_group['type'] == 'int':
@@ -207,8 +208,10 @@ def generate_shader_parameters(shader_json) -> list[ShaderParameter]:
         if permutation_group['type'] == 'int' and 'swizzle_define_values' in permutation_group:
             for value in permutation_group['define_values'][0]:
                 swizzle_values.append(value)
+        if permutation_group['type'] == 'bool':
+            name_mod="use_"
         result.append(ShaderParameter(
-            name=permutation_group['name'],
+            name=name_mod+permutation_group['name'],
             type=permutation_group['type'],
             value_count=value_count,
             swizzle_values=swizzle_values))
