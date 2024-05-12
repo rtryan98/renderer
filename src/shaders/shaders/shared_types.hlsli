@@ -2,6 +2,7 @@
 #define SHARED_TYPES_HLSLI
 
 #if __cplusplus
+    #include <DirectXMath.h>
     // Structs
     #ifndef SHADER_STRUCT_ALIGN
         #define SHADER_STRUCT_ALIGN alignas(16) // HLSL structs are aligned to 16 bytes
