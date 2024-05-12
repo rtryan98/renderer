@@ -179,6 +179,7 @@ def generate_shader_permutation_variants(shader_json, source_path: str, binary_b
                 for j, define_name in enumerate(permutation_element['define_names']):
                     permutation_defines.append(ShaderDefine(define_name, str(permutation_element['define_values'][j][tuple_value])))
             elif permutation_element['type'] == "bool":
+                define_name = permutation_element['define_name']
                 if tuple_value == 1:
                     permutation_name += "_" + permutation_element['name']
                     permutation_defines.append(ShaderDefine(define_name, '1'))
