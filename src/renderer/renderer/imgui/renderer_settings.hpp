@@ -8,6 +8,8 @@ namespace ren
 class Settings_Base
 {
 public:
+    constexpr static auto CONTENT_NEGATIVE_PAD = -175.f;
+
     virtual ~Settings_Base() noexcept = default;
 
     const [[nodiscard]] std::string& get_name() noexcept;

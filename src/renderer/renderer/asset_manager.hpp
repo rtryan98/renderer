@@ -21,6 +21,7 @@ public:
     [[nodiscard]] rhi::Pipeline* create_pipeline(const rhi::Graphics_Pipeline_Create_Info& create_info) noexcept;
     [[nodiscard]] rhi::Pipeline* create_pipeline(const rhi::Mesh_Shading_Pipeline_Create_Info& create_info) noexcept;
     [[nodiscard]] rhi::Pipeline* create_pipeline(const rhi::Compute_Pipeline_Create_Info& create_info) noexcept;
+    void destroy_pipeline(rhi::Pipeline* pipeline) noexcept;
 
     // void recreate_dirty_pipelines();
     void flush_deletion_queue(uint64_t frame);

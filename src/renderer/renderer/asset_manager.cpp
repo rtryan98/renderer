@@ -111,13 +111,22 @@ rhi::Pipeline* Asset_Manager::create_pipeline(const rhi::Compute_Pipeline_Create
     return result.value();
 }
 
+void Asset_Manager::destroy_pipeline(rhi::Pipeline* pipeline) noexcept
+{
+    m_deletion_queue.push_back({
+        .frame = get_deletion_frame(),
+        .type = Asset_Deletion_Type::Pipeline,
+        .pipeline = pipeline
+        });
+}
+
 void Asset_Manager::flush_deletion_queue(uint64_t frame)
 {
     std::vector<Deletion_Queue_Entry> kept_entries;
     kept_entries.reserve(m_deletion_queue.size());
     for (auto& entry : m_deletion_queue)
     {
-        if (entry.frame >= frame)
+        if (frame >= entry.frame)
         {
             switch (entry.type)
             {
@@ -139,6 +148,7 @@ void Asset_Manager::flush_deletion_queue(uint64_t frame)
             kept_entries.emplace_back(entry);
         }
     }
+
     m_deletion_queue = kept_entries;
 }
 

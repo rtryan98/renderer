@@ -2,6 +2,7 @@
 
 #include "renderer/logger.hpp"
 #include "renderer/window.hpp"
+#include "renderer/asset_manager.hpp"
 #include "renderer/imgui/imgui_renderer.hpp"
 #include "renderer/cbt/cbt_cpu.hpp"
 #include "renderer/shader_manager.hpp"
@@ -58,7 +59,8 @@ private:
     std::unique_ptr<Window> m_window;
     std::unique_ptr<rhi::Graphics_Device> m_device;
     std::unique_ptr<rhi::Swapchain> m_swapchain;
-    std::unique_ptr<Shader_Library> m_shader_library;
+    Shader_Library m_shader_library;
+    Asset_Manager m_asset_manager;
     std::array<Frame, FRAME_IN_FLIGHT_COUNT> m_frames;
     uint64_t m_frame_counter;
     bool m_is_running;
@@ -66,6 +68,6 @@ private:
     ImGui_Data m_imgui_data = {};
     std::unique_ptr<CBT_CPU_Vis> m_cbt_cpu_vis;
     Renderer_Settings m_renderer_settings;
-    Ocean_Renderer m_ocean_renderer;
+    std::unique_ptr<Ocean_Renderer> m_ocean_renderer;
 };
 }

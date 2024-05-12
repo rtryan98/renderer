@@ -14,7 +14,7 @@ Application::Application() noexcept
         }))
     , m_device(rhi::Graphics_Device::create({
         .graphics_api = rhi::Graphics_API::D3D12,
-        .enable_validation = false,
+        .enable_validation = true,
         .enable_gpu_validation = false,
         .enable_locking = false
         }))
@@ -24,7 +24,8 @@ Application::Application() noexcept
         .image_count = FRAME_IN_FLIGHT_COUNT + 1,
         .present_mode = rhi::Present_Mode::Immediate
         }))
-    , m_shader_library(std::make_unique<Shader_Library>(m_logger))
+    , m_shader_library(m_logger, m_device.get())
+    , m_asset_manager(m_logger, m_device.get(), 2)
     , m_frames()
     , m_frame_counter(0)
     , m_is_running(true)
@@ -35,7 +36,7 @@ Application::Application() noexcept
         }))
     , m_cbt_cpu_vis(nullptr)
     , m_renderer_settings()
-    , m_ocean_renderer()
+    , m_ocean_renderer(std::make_unique<Ocean_Renderer>(m_asset_manager, m_shader_library))
 {
     for (auto& frame : m_frames)
     {
@@ -54,7 +55,7 @@ Application::Application() noexcept
     imgui_setup_style();
     m_imgui_renderer->create_fonts_texture();
 
-    m_renderer_settings.add_settings(m_ocean_renderer.get_settings());
+    m_renderer_settings.add_settings(m_ocean_renderer->get_settings());
 
     m_logger->info("Finished initializing.");
 }
@@ -63,6 +64,8 @@ Application::~Application() noexcept
 {
     m_logger->info("Shutting down.");
     m_device->wait_idle();
+    m_ocean_renderer = nullptr;
+    m_asset_manager.flush_deletion_queue(~0ull);
     for (auto& frame : m_frames)
     {
         m_device->destroy_fence(frame.frame_fence);
@@ -98,6 +101,9 @@ void Application::run()
 
         last_time = current_time;
         current_time = std::chrono::steady_clock::now();
+
+        m_asset_manager.next_frame();
+        m_frame_counter += 1;
     }
 }
 
@@ -107,6 +113,7 @@ void Application::setup_frame(Frame& frame) noexcept
     frame.graphics_command_pool->reset();
     frame.compute_command_pool->reset();
     frame.copy_command_pool->reset();
+    m_asset_manager.flush_deletion_queue(m_frame_counter);
     auto swapchain_resize = m_swapchain->query_resize();
     if (swapchain_resize.is_size_changed)
     {

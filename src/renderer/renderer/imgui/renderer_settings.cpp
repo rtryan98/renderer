@@ -29,7 +29,7 @@ void Renderer_Settings::process_gui(bool* active)
         last_size = m_settings.size();
     }
 
-    ImGui::SetNextWindowSizeConstraints(ImVec2(500.f, 350.f), ImVec2(FLT_MAX, FLT_MAX));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(650.f, 350.f), ImVec2(FLT_MAX, FLT_MAX));
     if (ImGui::Begin(RENDERER_SETTINGS_NAME, active, ImGuiWindowFlags_NoCollapse))
     {
         auto avail = ImGui::GetContentRegionAvail();
