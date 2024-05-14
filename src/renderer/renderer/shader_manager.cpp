@@ -10,7 +10,7 @@ namespace ren
 std::string get_shader_source_prefix_path()
 {
     constexpr auto shader_source_prefix_paths = std::to_array({
-       "../../src/shaders/",   // Standalone from build
+       "../../src/shaders/",   // Standalone from build directory
        "./"                    // Standalone deploy
        "../src/shaders/",      // VS Debugger
         });
@@ -64,6 +64,17 @@ std::wstring cstr_to_wstring(const char* cstr)
     return std::wstring(tempstr.begin(), tempstr.end());
 }
 
+auto str_vec_to_wstring_vec(const auto& from)
+{
+    std::vector<std::wstring> result;
+    result.reserve(from.size());
+    for (auto str : from)
+    {
+        result.push_back(std::wstring(str.begin(), str.end()));
+    }
+    return result;
+}
+
 auto cstr_vec_to_wstring_vec(const auto& from)
 {
     std::vector<std::wstring> result;
@@ -81,7 +92,7 @@ std::vector<uint8_t> load_file_binary(const char* path, std::shared_ptr<Logger>&
     std::ifstream file(path, std::ios::binary);
     if (!file)
     {
-        logger->error("Critical to open {}.", path);
+        logger->error("Failed to open {}.", path);
     }
     file.unsetf(std::ios::skipws);
     std::streampos file_size;
@@ -108,6 +119,16 @@ Shader_Library::Shader_Library(std::shared_ptr<Logger> logger, rhi::Graphics_Dev
 
     auto prefix_path = get_shader_source_prefix_path();
     m_logger->debug("Shader source prefix path is '{}'", prefix_path.c_str());
+
+    auto include_dirs = std::to_array({
+        prefix_path,
+        std::string("../../thirdparty/rhi/src/shaders") + prefix_path
+        });
+    m_logger->debug("Shader compiler include dirs are:");
+    for (const auto& include_dir : include_dirs)
+    {
+        m_logger->debug("\t'{}'", include_dir.c_str());
+    }
 
     std::unordered_set<std::string> shader_sources;
     for (auto i = 0; i < shader_metadata.size(); ++i)
@@ -156,7 +177,7 @@ Shader_Library::Shader_Library(std::shared_ptr<Logger> logger, rhi::Graphics_Dev
             auto path = prefix_path + std::string(shader.source_path);
             auto file = load_file_binary(path.c_str(), m_logger);
             rhi::dxc::Shader_Compiler_Settings settings = {
-                .include_dirs = {},
+                .include_dirs = str_vec_to_wstring_vec(include_dirs),
                 .defines = cstr_vec_to_wstring_vec(shader.defines)
             };
             rhi::dxc::Shader_Compile_Info compile_info = {
@@ -179,7 +200,7 @@ Shader_Library::Shader_Library(std::shared_ptr<Logger> logger, rhi::Graphics_Dev
                 .groups_z = compile_result.reflection.workgroups_z });
             if (!shader_blob_result.has_value())
             {
-                m_logger->error("Failed to create shader blob!");
+                m_logger->error("Failed to create shader blob for shader '{}'!", shader.name);
             }
             m_predefined_shaders[i] = shader_blob_result.value_or(nullptr);
         }
