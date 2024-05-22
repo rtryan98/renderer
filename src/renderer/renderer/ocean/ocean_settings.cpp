@@ -113,8 +113,7 @@ void Ocean_Settings::process_gui_options()
     {
         const auto create_info = m_resources.options.generate_create_info();
 
-        m_asset_manager.destroy_image(m_resources.gpu_resources.spectrum_texture);
-        m_resources.gpu_resources.spectrum_texture = m_asset_manager.create_image(create_info);
+        m_resources.create_textures(m_asset_manager);
     }
 
     bool recreate_pipelines =

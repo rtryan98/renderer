@@ -11,9 +11,7 @@ Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library& sha
     , m_resources()
     , m_settings(m_resources, m_asset_manager, m_shader_library)
 {
-    const auto image_create_info = m_resources.options.generate_create_info();
-    m_resources.gpu_resources.spectrum_texture = m_asset_manager.create_image(image_create_info);
-
+    m_resources.create_textures(m_asset_manager);
     m_resources.gpu_resources.fft_pipeline = m_asset_manager.create_pipeline({
         .cs = m_shader_library.get_shader(
             select_fft_shader(
