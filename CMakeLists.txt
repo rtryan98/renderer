@@ -20,6 +20,7 @@ target_link_libraries(
     rhi
     rhi_dxc_lib
     imgui
+    Shcore.lib
 )
 target_include_directories(
     renderer PUBLIC
@@ -44,7 +45,7 @@ list(FILTER RENDERER_CPP_SOURCES INCLUDE REGEX "[ch]pp")
 
 source_group(TREE ${CMAKE_CURRENT_LIST_DIR}/src/renderer PREFIX src FILES ${RENDERER_CPP_SOURCES})
 get_target_property(RENDERER_BUILTIN_RESOURCES_SOURCES renderer_builtin_resources SOURCES)
-source_group(TREE ${CMAKE_CURRENT_LIST_DIR}/src/shaders PREFIX src_shader FILES ${RENDERER_BUILTIN_RESOURCES_SOURCES})
+# source_group(TREE ${CMAKE_CURRENT_LIST_DIR}/src/shaders PREFIX src_shader FILES ${RENDERER_BUILTIN_RESOURCES_SOURCES})
 set(RENDERER_BUILTIN_RESOURCES_COMMAND)
 foreach(BUILTIN_SHADER_SOURCE ${RENDERER_BUILTIN_RESOURCES_SOURCES})
 

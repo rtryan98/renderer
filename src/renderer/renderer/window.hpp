@@ -23,10 +23,12 @@ class Window
 public:
     static std::unique_ptr<Window> create(const Window_Create_Info& create_info) noexcept;
 
+
     virtual ~Window() noexcept = default;
 
     virtual void update() noexcept = 0;
 
+    virtual float get_dpi_scale() noexcept = 0;
     virtual void* get_native_handle() noexcept = 0;
     virtual const Window_Data& get_window_data() const noexcept = 0;
 };

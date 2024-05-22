@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <immintrin.h>
 #include <backends/imgui_impl_win32.h>
+#include <ShellScalingApi.h>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -50,11 +51,12 @@ public:
             .is_alive = true
         }
     {
+        auto dpi_scale = get_dpi_scale();
         RECT wr = {
-            .left = LONG((GetSystemMetrics(SM_CXSCREEN) - create_info.width) / 2),
-            .top = LONG((GetSystemMetrics(SM_CYSCREEN) - create_info.height) / 2),
-            .right = LONG(create_info.width),
-            .bottom = LONG(create_info.height)
+            .left = LONG((GetSystemMetrics(SM_CXSCREEN) - dpi_scale * create_info.width) / 2),
+            .top = LONG((GetSystemMetrics(SM_CYSCREEN) - dpi_scale * create_info.height) / 2),
+            .right = LONG(dpi_scale * create_info.width),
+            .bottom = LONG(dpi_scale * create_info.height)
         };
         WNDCLASSEX wc = {
             .cbSize = sizeof(WNDCLASSEX),
@@ -109,6 +111,55 @@ public:
             DispatchMessage(&msg);
         }
         ImGui_ImplWin32_NewFrame();
+    }
+
+    virtual float get_dpi_scale() noexcept
+    {
+        DEVICE_SCALE_FACTOR scale_factor = {};
+        if (m_hwnd)
+            GetScaleFactorForMonitor(MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTONEAREST), &scale_factor);
+        else
+            GetScaleFactorForMonitor(MonitorFromPoint({}, MONITOR_DEFAULTTOPRIMARY), &scale_factor);
+
+        switch (scale_factor)
+        {
+        case DEVICE_SCALE_FACTOR_INVALID:
+            return 1.f;
+        case SCALE_100_PERCENT:
+            return 1.f;
+        case SCALE_120_PERCENT:
+            return 1.2f;
+        case SCALE_125_PERCENT:
+            return 1.25f;
+        case SCALE_140_PERCENT:
+            return 1.4f;
+        case SCALE_150_PERCENT:
+            return 1.5f;
+        case SCALE_160_PERCENT:
+            return 1.6f;
+        case SCALE_175_PERCENT:
+            return 1.75f;
+        case SCALE_180_PERCENT:
+            return 1.8f;
+        case SCALE_200_PERCENT:
+            return 2.f;
+        case SCALE_225_PERCENT:
+            return 2.25f;
+        case SCALE_250_PERCENT:
+            return 2.5f;
+        case SCALE_300_PERCENT:
+            return 3.f;
+        case SCALE_350_PERCENT:
+            return 3.5f;
+        case SCALE_400_PERCENT:
+            return 4.f;
+        case SCALE_450_PERCENT:
+            return 4.5f;
+        case SCALE_500_PERCENT:
+            return 5.f;
+        default:
+            return 1.f;
+        }
     }
 
     virtual void* get_native_handle() noexcept override
