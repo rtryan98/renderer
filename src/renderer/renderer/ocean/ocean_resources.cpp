@@ -1,6 +1,7 @@
 #include "renderer/ocean/ocean_resources.hpp"
 
 #include "renderer/asset_manager.hpp"
+#include "renderer/shader_manager.hpp"
 
 namespace ren
 {
@@ -22,10 +23,34 @@ rhi::Image_Create_Info Ocean_Resources::Options::generate_create_info() const no
 
 void Ocean_Resources::create_textures(Asset_Manager& asset_manager)
 {
-    auto image_create_info = options.generate_create_info();
+    destroy_textures(asset_manager);
 
-    if (gpu_resources.spectrum_texture)
-        asset_manager.destroy_image(gpu_resources.spectrum_texture);
+    auto image_create_info = options.generate_create_info();
     gpu_resources.spectrum_texture = asset_manager.create_image(image_create_info);
 }
+
+void Ocean_Resources::destroy_textures(Asset_Manager& asset_manager)
+{
+    if (gpu_resources.spectrum_texture)
+        asset_manager.destroy_image(gpu_resources.spectrum_texture);
+}
+
+void Ocean_Resources::create_pipelines(Asset_Manager& asset_manager, Shader_Library& shader_library)
+{
+    destroy_pipelines(asset_manager);
+
+    gpu_resources.fft_pipeline = asset_manager.create_pipeline({
+        .cs = shader_library.get_shader(
+            select_fft_shader(
+                options.size,
+                options.use_fp16_maths,
+                true))});
+}
+
+void Ocean_Resources::destroy_pipelines(Asset_Manager& asset_manager)
+{
+    if (gpu_resources.fft_pipeline)
+        asset_manager.destroy_pipeline(gpu_resources.fft_pipeline);
+}
+
 }

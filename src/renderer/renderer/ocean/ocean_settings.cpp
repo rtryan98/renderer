@@ -111,8 +111,6 @@ void Ocean_Settings::process_gui_options()
         m_resources.options.cascade_count != options.cascade_count;
     if (recreate_textures)
     {
-        const auto create_info = m_resources.options.generate_create_info();
-
         m_resources.create_textures(m_asset_manager);
     }
 
@@ -120,13 +118,7 @@ void Ocean_Settings::process_gui_options()
         m_resources.options.use_fp16_maths != options.use_fp16_maths;
     if (recreate_pipelines)
     {
-        m_asset_manager.destroy_pipeline(m_resources.gpu_resources.fft_pipeline);
-        m_resources.gpu_resources.fft_pipeline = m_asset_manager.create_pipeline({
-            .cs = m_shader_library.get_shader(
-                select_fft_shader(
-                    m_resources.options.size,
-                    m_resources.options.use_fp16_maths,
-                    true)) });
+        m_resources.create_pipelines(m_asset_manager, m_shader_library);
     }
 
     m_resources.options = options;
