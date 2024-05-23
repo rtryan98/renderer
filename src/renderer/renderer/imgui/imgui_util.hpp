@@ -1,6 +1,6 @@
 #pragma once
 
-namespace ren
+namespace ren::imutil
 {
-void imgui_help_marker(const char* text, bool is_same_line = true);
+void help_marker(const char* text, bool is_same_line = true);
 }

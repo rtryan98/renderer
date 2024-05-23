@@ -2,9 +2,9 @@
 
 #include <imgui.h>
 
-namespace ren
+namespace ren::imutil
 {
-void imgui_help_marker(const char* text, bool is_same_line)
+void help_marker(const char* text, bool is_same_line)
 {
     if (is_same_line) ImGui::SameLine();
     ImGui::TextDisabled("(?)");

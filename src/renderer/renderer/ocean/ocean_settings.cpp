@@ -68,7 +68,7 @@ void Ocean_Settings::process_gui_options()
             }
             ImGui::EndCombo();
         }
-        imgui_help_marker(OCEAN_HELP_TEXT_SIZE);
+        imutil::help_marker(OCEAN_HELP_TEXT_SIZE);
     }
     {
         constexpr static auto cascade_values = std::to_array({ 1, 2, 3, 4 });
@@ -92,17 +92,17 @@ void Ocean_Settings::process_gui_options()
             }
             ImGui::EndCombo();
         }
-        imgui_help_marker(OCEAN_HELP_TEXT_CASCADES);
+        imutil::help_marker(OCEAN_HELP_TEXT_CASCADES);
     }
     {
         ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
         ImGui::Checkbox("Use fp16 textures", &options.use_fp16_textures);
-        imgui_help_marker(OCEAN_HELP_TEXT_FP16_TEXTURES);
+        imutil::help_marker(OCEAN_HELP_TEXT_FP16_TEXTURES);
     }
     {
         ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
         ImGui::Checkbox("Use fp16 maths", &options.use_fp16_maths);
-        imgui_help_marker(OCEAN_HELP_TEXT_FP16_MATH);
+        imutil::help_marker(OCEAN_HELP_TEXT_FP16_MATH);
     }
 
     bool recreate_textures =
