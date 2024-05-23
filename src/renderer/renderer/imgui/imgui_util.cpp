@@ -16,4 +16,15 @@ void help_marker(const char* text, bool is_same_line)
         ImGui::EndTooltip();
     }
 }
+
+Context_Wrapper::Context_Wrapper() noexcept
+{
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+}
+
+Context_Wrapper::~Context_Wrapper() noexcept
+{
+    ImGui::DestroyContext();
+}
 }
