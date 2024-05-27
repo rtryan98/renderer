@@ -3,6 +3,10 @@
 #include "renderer/asset_manager.hpp"
 #include "renderer/shader_manager.hpp"
 
+#include <rhi/command_list.hpp>
+#include <shaders/fft_shared_types.hlsli>
+#include <shaders/ocean/ocean_shared_types.hlsli>
+
 namespace ren
 {
 Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library& shader_library)
@@ -24,5 +28,14 @@ Ocean_Renderer::~Ocean_Renderer()
 Ocean_Settings* Ocean_Renderer::get_settings() noexcept
 {
     return &m_settings;
+}
+
+void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd) noexcept
+{
+    cmd->set_pipeline(m_resources.gpu_resources.fft_pipeline);
+    cmd->set_push_constants<FFT_Push_Constants>(
+        { m_resources.gpu_resources.spectrum_texture->image_view->bindless_index, true },
+        rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(m_resources.options.size, 1, 1);
 }
 }
