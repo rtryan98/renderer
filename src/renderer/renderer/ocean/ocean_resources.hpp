@@ -2,7 +2,7 @@
 
 #include <rhi/resource.hpp>
 
-#include "shaders/ocean/ocean_shared_types.hlsli"
+#include <shared/ocean_shared_types.h>
 
 namespace ren
 {

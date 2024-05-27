@@ -1,6 +1,6 @@
 #ifndef FFT_SHARED_TYPES
 #define FFT_SHARED_TYPES
-#include "shaders/shared_types.hlsli"
+#include "shared/shared_types.h"
 
 struct SHADER_STRUCT_ALIGN FFT_Push_Constants
 {

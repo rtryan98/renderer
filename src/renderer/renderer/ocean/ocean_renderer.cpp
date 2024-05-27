@@ -4,8 +4,8 @@
 #include "renderer/shader_manager.hpp"
 
 #include <rhi/command_list.hpp>
-#include <shaders/fft_shared_types.hlsli>
-#include <shaders/ocean/ocean_shared_types.hlsli>
+#include <shared/fft_shared_types.h>
+#include <shared/ocean_shared_types.h>
 
 namespace ren
 {
