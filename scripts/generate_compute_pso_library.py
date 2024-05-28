@@ -149,7 +149,7 @@ def process_shader_type(shader_type):
 
 def generate_shader_base_variant(shader_json, source_path: str, binary_base_path: str) -> ShaderVariant:
     return ShaderVariant(
-        name=shader_json["name"],
+        name=shader_json["name"] + "_" + shader_json['shader_type'],
         entry_point=shader_json["entry_point"],
         binary_path=construct_shader_binary_path_string(binary_base_path, shader_json["name"], shader_json['shader_type']),
         source_path=source_path,
@@ -190,7 +190,7 @@ def generate_shader_permutation_variants(shader_json, source_path: str, binary_b
             #     permutation_entry_point = permutation_element['entry_point_names'][tuple_value]
 
         result.append(ShaderVariant(
-            name=permutation_name,
+            name=permutation_name + "_" + shader_json['shader_type'],
             entry_point=permutation_entry_point,
             binary_path=construct_shader_binary_path_string(binary_base_path, permutation_name, shader_json['shader_type']),
             source_path=source_path,
