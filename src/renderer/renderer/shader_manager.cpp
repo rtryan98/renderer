@@ -123,7 +123,7 @@ Shader_Library::Shader_Library(std::shared_ptr<Logger> logger, rhi::Graphics_Dev
     auto include_dirs = std::to_array({
         prefix_path,
         prefix_path + std::string("../shared"),
-        std::string("./../thirdparty/rhi/shaders/") + prefix_path
+        prefix_path + std::string("../../thirdparty/rhi/src/shaders/")
         });
     m_logger->debug("Shader compiler include dirs are:");
     for (const auto& include_dir : include_dirs)
