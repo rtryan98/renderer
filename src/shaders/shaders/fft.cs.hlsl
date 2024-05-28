@@ -40,9 +40,11 @@ void main(uint3 id : SV_DispatchThreadID)
         float2 twiddle_factor;
         butterfly(id.x, i, twiddle_indices, twiddle_factor);
         FFT_VECTOR_TYPE result;
-        result.xy = ping_pong_buffer[ping_pong][twiddle_indices.x].xy + ren::cmul(ping_pong_buffer[ping_pong][twiddle_indices.y].xy, twiddle_factor);
+        FFT_VECTOR_TYPE twiddle_x = ping_pong_buffer[ping_pong][twiddle_indices.x];
+        FFT_VECTOR_TYPE twiddle_y = ping_pong_buffer[ping_pong][twiddle_indices.y];
+        result.xy = twiddle_x.xy + ren::cmul(twiddle_y.xy, twiddle_factor);
         #if FFT_FLOAT4
-        result.zw = ping_pong_buffer[ping_pong][twiddle_indices.x].zw + ren::cmul(ping_pong_buffer[ping_pong][twiddle_indices.y].zw, twiddle_factor);
+        result.zw = twiddle_x.zw + ren::cmul(twiddle_y.zw, twiddle_factor);
         #endif
         ping_pong_buffer[!ping_pong][id.x] = result;
         GroupMemoryBarrierWithGroupSync();
