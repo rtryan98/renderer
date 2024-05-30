@@ -2,7 +2,7 @@
 #include "shared/ocean_shared_types.h"
 #include "rhi/bindless.hlsli"
 
-DECLARE_PUSH_CONSTANTS(Ocean_Initial_Spectrum_Push_Constants, pc);
+DECLARE_PUSH_CONSTANTS(Ocean_Time_Dependent_Spectrum_Push_Constants, pc);
 
 [numthreads(32, 32, 1)]
 void main(uint3 id : SV_DispatchThreadID)

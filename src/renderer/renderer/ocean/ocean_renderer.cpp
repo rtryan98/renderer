@@ -77,7 +77,8 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd) noexcept
     cmd->begin_debug_region("Time Dependent Spectrum", 0.25f, 0.25f, 1.0f);
     cmd->set_pipeline(m_resources.gpu_resources.time_dependent_spectrum_pipeline);
     cmd->set_push_constants<Ocean_Time_Dependent_Spectrum_Push_Constants>({
-        m_resources.gpu_resources.spectrum_texture->image_view->bindless_index },
+        m_resources.gpu_resources.spectrum_texture->image_view->bindless_index,
+        0.f },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(tex_dispatch_size_xy, tex_dispatch_size_xy, m_resources.options.cascade_count);
     cmd->end_debug_region();
