@@ -8,7 +8,7 @@ namespace ren
 class Settings_Base
 {
 public:
-    constexpr static auto CONTENT_NEGATIVE_PAD = -175.f;
+    constexpr static auto CONTENT_NEGATIVE_PAD = -225.f;
 
     virtual ~Settings_Base() noexcept = default;
 
