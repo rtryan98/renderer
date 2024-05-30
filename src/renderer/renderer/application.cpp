@@ -14,7 +14,7 @@ Application::Application() noexcept
         }))
     , m_device(rhi::Graphics_Device::create({
         .graphics_api = rhi::Graphics_API::D3D12,
-        .enable_validation = true,
+        .enable_validation = false,
         .enable_gpu_validation = false,
         .enable_locking = false
         }))
@@ -128,7 +128,9 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
     auto swapchain_image_view = m_swapchain->get_current_image_view();
     auto graphics_cmd = frame.graphics_command_pool->acquire_command_list();
 
-    graphics_cmd->begin_debug_region("PASS-Swapchain", 0.5f, 0.25f, 0.25f);
+    m_ocean_renderer->simulate(*this, graphics_cmd);
+
+    graphics_cmd->begin_debug_region("Swapchain Pass", 0.5f, 0.25f, 0.25f);
     rhi::Image_Barrier_Info swapchain_layout_transition_barrier = {
         .stage_before = rhi::Barrier_Pipeline_Stage::None,
         .stage_after = rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,

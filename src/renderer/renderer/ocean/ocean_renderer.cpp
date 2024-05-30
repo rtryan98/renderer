@@ -32,6 +32,8 @@ Ocean_Settings* Ocean_Renderer::get_settings() noexcept
 
 void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd) noexcept
 {
+    cmd->begin_debug_region("Ocean Simulation", 0.5f, 0.5f, 1.f);
+
     rhi::Image_Barrier_Info image_barrier = {
         .stage_before = rhi::Barrier_Pipeline_Stage::None,
         .stage_after = rhi::Barrier_Pipeline_Stage::Compute_Shader,
@@ -54,11 +56,17 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd) noexcept
 
     cmd->barrier(barrier);
 
-    cmd->set_pipeline(m_resources.gpu_resources.fft_pipeline);
-    cmd->set_push_constants<FFT_Push_Constants>(
-        { m_resources.gpu_resources.spectrum_texture->image_view->bindless_index, FFT_VERTICAL, true },
+    cmd->begin_debug_region("Initial Spectrum", 0.25f, 0.0f, 1.0f);
+    cmd->set_pipeline(m_resources.gpu_resources.initial_spectrum_pipeline);
+    uint32_t tex_dispatch_size_xy =
+        m_resources.options.size /
+        m_resources.gpu_resources.initial_spectrum_pipeline->compute_shading_info.cs->groups_x;
+    cmd->set_push_constants<Ocean_Initial_Spectrum_Push_Constants>({
+        0,
+        m_resources.gpu_resources.spectrum_texture->image_view->bindless_index },
         rhi::Pipeline_Bind_Point::Compute);
-    cmd->dispatch(m_resources.options.size, 1, m_resources.options.cascade_count);
+    cmd->dispatch(tex_dispatch_size_xy, tex_dispatch_size_xy, m_resources.options.cascade_count);
+    cmd->end_debug_region();
 
     image_barrier.stage_before = rhi::Barrier_Pipeline_Stage::Compute_Shader;
     image_barrier.access_before = rhi::Barrier_Access::Shader_Write;
@@ -66,11 +74,35 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd) noexcept
     image_barrier.layout_before = rhi::Barrier_Image_Layout::General;
     cmd->barrier(barrier);
 
+    cmd->begin_debug_region("Time Dependent Spectrum", 0.25f, 0.25f, 1.0f);
+    cmd->set_pipeline(m_resources.gpu_resources.time_dependent_spectrum_pipeline);
+    cmd->set_push_constants<Ocean_Time_Dependent_Spectrum_Push_Constants>({
+        m_resources.gpu_resources.spectrum_texture->image_view->bindless_index },
+        rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(tex_dispatch_size_xy, tex_dispatch_size_xy, m_resources.options.cascade_count);
+    cmd->end_debug_region();
+
+    cmd->barrier(barrier);
+
+    cmd->begin_debug_region("IFFT", 0.25f, 0.5f, 1.0f);
+    cmd->set_pipeline(m_resources.gpu_resources.fft_pipeline);
+    cmd->set_push_constants<FFT_Push_Constants>(
+        { m_resources.gpu_resources.spectrum_texture->image_view->bindless_index, FFT_VERTICAL, true },
+        rhi::Pipeline_Bind_Point::Compute);
+    cmd->add_debug_marker("IFFT-Vertical", 0.25f, 0.5f, 1.0f);
+    cmd->dispatch(1, m_resources.options.size, m_resources.options.cascade_count);
+    cmd->barrier(barrier);
     cmd->set_push_constants<FFT_Push_Constants>(
         { m_resources.gpu_resources.spectrum_texture->image_view->bindless_index, FFT_HORIZONTAL, true },
         rhi::Pipeline_Bind_Point::Compute);
-    cmd->dispatch(m_resources.options.size, 1, m_resources.options.cascade_count);
+    cmd->add_debug_marker("IFFT-Horizontal", 0.25f, 0.5f, 1.0f);
+    cmd->dispatch(1, m_resources.options.size, m_resources.options.cascade_count);
+    cmd->end_debug_region();
 
+    image_barrier.stage_after = rhi::Barrier_Pipeline_Stage::Vertex_Shader;
+    image_barrier.layout_after = rhi::Barrier_Image_Layout::Shader_Read_Only;
     cmd->barrier(barrier);
+
+    cmd->end_debug_region();
 }
 }

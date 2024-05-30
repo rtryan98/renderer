@@ -39,6 +39,10 @@ void Ocean_Resources::create_pipelines(Asset_Manager& asset_manager, Shader_Libr
 {
     destroy_pipelines(asset_manager);
 
+    gpu_resources.initial_spectrum_pipeline = asset_manager.create_pipeline({
+        .cs = shader_library.get_shader(Shaders::initial_spectrum_cs)});
+    gpu_resources.time_dependent_spectrum_pipeline = asset_manager.create_pipeline({
+        .cs = shader_library.get_shader(Shaders::time_dependent_spectrum_cs)});
     gpu_resources.fft_pipeline = asset_manager.create_pipeline({
         .cs = shader_library.get_shader(
             select_fft_shader(
@@ -49,6 +53,10 @@ void Ocean_Resources::create_pipelines(Asset_Manager& asset_manager, Shader_Libr
 
 void Ocean_Resources::destroy_pipelines(Asset_Manager& asset_manager)
 {
+    if (gpu_resources.initial_spectrum_pipeline)
+        asset_manager.destroy_pipeline(gpu_resources.initial_spectrum_pipeline);
+    if (gpu_resources.time_dependent_spectrum_pipeline)
+        asset_manager.destroy_pipeline(gpu_resources.time_dependent_spectrum_pipeline);
     if (gpu_resources.fft_pipeline)
         asset_manager.destroy_pipeline(gpu_resources.fft_pipeline);
 }

@@ -105,23 +105,26 @@ void Ocean_Settings::process_gui_options()
         imutil::help_marker(OCEAN_HELP_TEXT_FP16_MATH);
     }
 
+    auto options_before = m_resources.options;
+
+    m_resources.options = options;
+
     bool recreate_textures =
-        m_resources.options.size != options.size ||
-        m_resources.options.use_fp16_textures != options.use_fp16_textures ||
-        m_resources.options.cascade_count != options.cascade_count;
+        options_before.size != options.size ||
+        options_before.use_fp16_textures != options.use_fp16_textures ||
+        options_before.cascade_count != options.cascade_count;
     if (recreate_textures)
     {
         m_resources.create_textures(m_asset_manager);
     }
 
     bool recreate_pipelines =
-        m_resources.options.use_fp16_maths != options.use_fp16_maths;
+        options_before.use_fp16_maths != options.use_fp16_maths ||
+        options_before.size != options.size;
     if (recreate_pipelines)
     {
         m_resources.create_pipelines(m_asset_manager, m_shader_library);
     }
-
-    m_resources.options = options;
 }
 
 void Ocean_Settings::process_gui_simulation_settings()
