@@ -22,9 +22,15 @@ float calculate_spectrum(float wavenumber, float delta_k, float theta, float g, 
         spectrum_data.u,
         g,
         spectrum_data.f,
-        spectrum_data.phillips_alpha
     };
-    float omega_peak = ren::ocean::omega_peak_jonswap(omega_peak_args);
+    float omega_peak = 0.;
+    switch (spectrum_data.spectrum)
+    {
+        case Pierson_Moskowitz: omega_peak = ren::ocean::omega_peak_pierson_moskowitz(omega_peak_args); break;
+        case Jonswap:           omega_peak = ren::ocean::omega_peak_jonswap(omega_peak_args); break;
+        case TMA:               omega_peak = ren::ocean::omega_peak_jonswap(omega_peak_args); break;
+        default: break;
+    }
 
     ren::ocean::Spectrum_Args spectrum_args = {
         omega,
@@ -37,7 +43,15 @@ float calculate_spectrum(float wavenumber, float delta_k, float theta, float g, 
         spectrum_data.generalized_a,
         spectrum_data.generalized_b
     };
-    float spectrum = ren::ocean::spectrum_tma(spectrum_args);
+    float spectrum = 0.;
+    switch (spectrum_data.spectrum)
+    {
+        case Phillips:          spectrum = ren::ocean::spectrum_phillips(spectrum_args); break;
+        case Pierson_Moskowitz: spectrum = ren::ocean::spectrum_pierson_moskowitz(spectrum_args); break;
+        case Generalized_A_B:   spectrum = ren::ocean::spectrum_generalized_a_b(spectrum_args); break;
+        case Jonswap:           spectrum = ren::ocean::spectrum_jonswap(spectrum_args); break;
+        case TMA:               spectrum = ren::ocean::spectrum_tma(spectrum_args); break;
+    }
     spectrum = sqrt(2. * spectrum * abs(omega_ddk / wavenumber) * delta_k * delta_k);
 
     ren::ocean::Directional_Spreading_Args directional_spreading_args = {
@@ -47,7 +61,15 @@ float calculate_spectrum(float wavenumber, float delta_k, float theta, float g, 
         spectrum_data.u,
         g
     };
-    float directional_spread = ren::ocean::dirspread_hasselmann(directional_spreading_args);
+    float directional_spread = 0.;
+    switch (spectrum_data.directional_spreading_function)
+    {
+        case Positive_Cosine_Squared: directional_spread = ren::ocean::dirspread_pos_cos_sq(directional_spreading_args);     break;
+        case Mitsuyasu:               directional_spread = ren::ocean::dirspread_mitsuyasu(directional_spreading_args);      break;
+        case Hasselmann:              directional_spread = ren::ocean::dirspread_hasselmann(directional_spreading_args);     break;
+        case Donelan_Banner:          directional_spread = ren::ocean::dirspread_donelan_banner(directional_spreading_args); break;
+        case Flat:                    directional_spread = ren::ocean::dirspread_flat();                                     break;
+    }
 
     return spectrum_data.contribution * directional_spread * spectrum;
 }
@@ -75,7 +97,7 @@ void main(uint3 id : SV_DispatchThreadID)
     float omega = ren::ocean::dispersion_capillary(dispersion_args);
     float omega_ddk = ren::ocean::dispersion_capillary_ddk(dispersion_args);
 
-    ren::ocean::Omega_Peak_Args omega_peak_args = { omega, u, g, f, phillips_alpha };
+    ren::ocean::Omega_Peak_Args omega_peak_args = { omega, u, g, f };
     float omega_peak = ren::ocean::omega_peak_jonswap(omega_peak_args);
 
     ren::ocean::Spectrum_Args spectrum_args = { omega, omega_peak, u, g, f, h, phillips_alpha, generalized_a, generalized_b };

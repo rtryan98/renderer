@@ -82,7 +82,6 @@ struct Omega_Peak_Args
     float u; // wind speed 10m above sea level
     float g; // gravity
     float f; // fetch
-    float phillips_alpha;
 };
 
 float omega_peak_pierson_moskowitz(Omega_Peak_Args args)
