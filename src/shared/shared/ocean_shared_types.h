@@ -31,6 +31,7 @@ struct SHADER_STRUCT_ALIGN Ocean_Spectrum_Data
     float generalized_a;
     float generalized_b;
     float contribution;
+    float wind_direction;
 };
 
 struct SHADER_STRUCT_ALIGN Ocean_Initial_Spectrum_Data
