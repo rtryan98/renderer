@@ -7,6 +7,10 @@
     #ifndef SHADER_STRUCT_ALIGN
         #define SHADER_STRUCT_ALIGN alignas(16) // HLSL structs are aligned to 16 bytes
     #endif
+    // Utilities
+    #ifndef SHADER_ENUM_CLASS
+        #define SHADER_ENUM_CLASS class
+    #endif
     // Bindless
     #ifndef SHADER_HANDLE_TYPE
         #define SHADER_HANDLE_TYPE uint32_t
@@ -36,6 +40,10 @@
     // Structs
     #ifndef SHADER_STRUCT_ALIGN
         #define SHADER_STRUCT_ALIGN
+    #endif
+    // Utilities
+    #ifndef SHADER_ENUM_CLASS
+        #define SHADER_ENUM_CLASS
     #endif
     // Bindless
     #ifndef SHADER_HANDLE_TYPE
