@@ -1,5 +1,6 @@
 #include "renderer/ocean/ocean_renderer.hpp"
 
+#include "renderer/application.hpp"
 #include "renderer/asset_manager.hpp"
 #include "renderer/shader_manager.hpp"
 
@@ -56,6 +57,9 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd) noexcept
 
     cmd->barrier(barrier);
 
+    app.upload_buffer_data_immediate(
+        m_resources.gpu_resources.initial_spectrum_data,
+        &m_resources.data.initial_spectrum_data, sizeof(Ocean_Initial_Spectrum_Data), 0);
     cmd->begin_debug_region("Initial Spectrum", 0.25f, 0.0f, 1.0f);
     cmd->set_pipeline(m_resources.gpu_resources.initial_spectrum_pipeline);
     uint32_t tex_dispatch_size_xy =

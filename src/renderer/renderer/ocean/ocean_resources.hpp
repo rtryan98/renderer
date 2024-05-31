@@ -31,6 +31,8 @@ struct Ocean_Resources
     {
         rhi::Image* spectrum_texture;
 
+        rhi::Buffer* initial_spectrum_data;
+
         rhi::Pipeline* initial_spectrum_pipeline;
         rhi::Pipeline* time_dependent_spectrum_pipeline;
         rhi::Pipeline* fft_pipeline;

@@ -35,6 +35,8 @@ public:
 
     void run();
 
+    void upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, uint64_t size, uint64_t offset) noexcept;
+
 private:
     struct Frame
     {
@@ -45,8 +47,17 @@ private:
         std::unique_ptr<rhi::Command_Pool> copy_command_pool;
     };
 
+    struct Buffer_Staging_Info
+    {
+        rhi::Buffer* src;
+        rhi::Buffer* dst;
+        uint64_t offset;
+        uint64_t size;
+    };
+
     void setup_frame(Frame& frame) noexcept;
     void render_frame(Frame& frame, double t, double dt) noexcept;
+    rhi::Command_List* handle_immediate_uploads(Frame& frame) noexcept;
     void process_gui() noexcept;
 
     void imgui_close_all_windows() noexcept;
@@ -62,6 +73,8 @@ private:
     Shader_Library m_shader_library;
     Asset_Manager m_asset_manager;
     std::array<Frame, FRAME_IN_FLIGHT_COUNT> m_frames;
+    std::array<std::vector<rhi::Buffer*>, FRAME_IN_FLIGHT_COUNT> m_staging_buffers;
+    std::array<std::vector<Buffer_Staging_Info>, FRAME_IN_FLIGHT_COUNT> m_buffer_staging_infos;
     uint64_t m_frame_counter;
     bool m_is_running;
     std::unique_ptr<Imgui_Renderer> m_imgui_renderer;

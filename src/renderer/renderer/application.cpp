@@ -27,6 +27,7 @@ Application::Application() noexcept
     , m_shader_library(m_logger, m_device.get())
     , m_asset_manager(m_logger, m_device.get(), 2)
     , m_frames()
+    , m_staging_buffers()
     , m_frame_counter(0)
     , m_is_running(true)
     , m_imgui_renderer(std::make_unique<Imgui_Renderer>(Imgui_Renderer_Create_Info{
@@ -70,6 +71,13 @@ Application::~Application() noexcept
     {
         m_device->destroy_fence(frame.frame_fence);
     }
+    for (auto& staging_buffer_vec : m_staging_buffers)
+    {
+        for (auto staging_buffer : staging_buffer_vec)
+        {
+            m_device->destroy_buffer(staging_buffer);
+        }
+    }
 }
 
 void Application::run()
@@ -107,6 +115,24 @@ void Application::run()
     }
 }
 
+void Application::upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, uint64_t size, uint64_t offset) noexcept
+{
+    auto& staging_buffers = m_staging_buffers[m_frame_counter % FRAME_IN_FLIGHT_COUNT];
+    rhi::Buffer_Create_Info buffer_info = {
+        .size = size,
+        .heap = rhi::Memory_Heap_Type::CPU_Upload
+    };
+    auto staging_buffer = m_device->create_buffer(buffer_info).value_or(nullptr);
+    memcpy(staging_buffer->data, data, size);
+
+    staging_buffers.push_back(staging_buffer);
+    m_buffer_staging_infos[m_frame_counter % FRAME_IN_FLIGHT_COUNT].push_back({
+        .src = staging_buffer,
+        .dst = buffer,
+        .offset = offset,
+        .size = size });
+}
+
 void Application::setup_frame(Frame& frame) noexcept
 {
     frame.frame_fence->wait_for_value(frame.fence_value);
@@ -121,6 +147,17 @@ void Application::setup_frame(Frame& frame) noexcept
     }
     m_swapchain->acquire_next_image();
     m_imgui_renderer->next_frame();
+
+    if (m_frame_counter > FRAME_IN_FLIGHT_COUNT)
+    {
+        auto last_frame_in_flight = (m_frame_counter - FRAME_IN_FLIGHT_COUNT) % FRAME_IN_FLIGHT_COUNT;
+        m_buffer_staging_infos[last_frame_in_flight].clear();
+        for (auto staging_buffer : m_staging_buffers[last_frame_in_flight])
+        {
+            m_device->destroy_buffer(staging_buffer);
+        }
+        m_staging_buffers[last_frame_in_flight].clear();
+    }
 }
 
 void Application::render_frame(Frame& frame, double t, double dt) noexcept
@@ -189,6 +226,8 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
         });
     graphics_cmd->end_debug_region();
 
+    auto cmds = std::to_array({ handle_immediate_uploads(frame), graphics_cmd });
+
     frame.fence_value += 1;
     rhi::Submit_Fence_Info frame_fence_signal_info = {
         .fence = frame.frame_fence,
@@ -199,10 +238,36 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
         .wait_swapchain = m_swapchain.get(),
         .present_swapchain = m_swapchain.get(),
         .wait_infos = {},
-        .command_lists = { &graphics_cmd, 1 },
+        .command_lists = cmds,
         .signal_infos = { &frame_fence_signal_info, 1 }
         });
     m_swapchain->present();
+}
+
+rhi::Command_List* Application::handle_immediate_uploads(Frame& frame) noexcept
+{
+    auto upload_cmd = frame.graphics_command_pool->acquire_command_list();
+
+    for (auto& buffer_staging_info : m_buffer_staging_infos[m_frame_counter % FRAME_IN_FLIGHT_COUNT])
+    {
+        upload_cmd->copy_buffer(
+            buffer_staging_info.src,
+            0,
+            buffer_staging_info.dst,
+            buffer_staging_info.offset,
+            buffer_staging_info.size);
+    }
+    rhi::Memory_Barrier_Info mem_barrier = {
+        .stage_before = rhi::Barrier_Pipeline_Stage::Copy,
+        .stage_after = rhi::Barrier_Pipeline_Stage::All_Commands,
+        .access_before = rhi::Barrier_Access::Transfer_Write,
+        .access_after = rhi::Barrier_Access::Shader_Read
+    };
+    rhi::Barrier_Info barrier = {
+        .memory_barriers = { &mem_barrier, 1 }
+    };
+    upload_cmd->barrier(barrier);
+    return upload_cmd;
 }
 
 void Application::process_gui() noexcept
