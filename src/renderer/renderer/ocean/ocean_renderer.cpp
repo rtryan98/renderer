@@ -16,12 +16,14 @@ Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library& sha
     , m_resources()
     , m_settings(m_resources, m_asset_manager, m_shader_library)
 {
+    m_resources.create_buffers(m_asset_manager);
     m_resources.create_textures(m_asset_manager);
     m_resources.create_pipelines(m_asset_manager, m_shader_library);
 }
 
 Ocean_Renderer::~Ocean_Renderer()
 {
+    m_resources.destroy_buffers(m_asset_manager);
     m_resources.destroy_textures(m_asset_manager);
     m_resources.destroy_pipelines(m_asset_manager);
 }
@@ -66,7 +68,7 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd) noexcept
         m_resources.options.size /
         m_resources.gpu_resources.initial_spectrum_pipeline->compute_shading_info.cs->groups_x;
     cmd->set_push_constants<Ocean_Initial_Spectrum_Push_Constants>({
-        0,
+        m_resources.gpu_resources.initial_spectrum_data->buffer_view->bindless_index,
         m_resources.gpu_resources.spectrum_texture->image_view->bindless_index },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(tex_dispatch_size_xy, tex_dispatch_size_xy, m_resources.options.cascade_count);

@@ -21,6 +21,21 @@ rhi::Image_Create_Info Ocean_Resources::Options::generate_create_info() const no
     };
 }
 
+void Ocean_Resources::create_buffers(Asset_Manager& asset_manager)
+{
+    rhi::Buffer_Create_Info initial_spectrum_data_buffer_create_info =  {
+        .size = sizeof(data.initial_spectrum_data),
+        .heap = rhi::Memory_Heap_Type::GPU
+    };
+    gpu_resources.initial_spectrum_data = asset_manager.create_buffer(initial_spectrum_data_buffer_create_info);
+}
+
+void Ocean_Resources::destroy_buffers(Asset_Manager& asset_manager)
+{
+    if (gpu_resources.initial_spectrum_data)
+        asset_manager.destroy_buffer(gpu_resources.initial_spectrum_data);
+}
+
 void Ocean_Resources::create_textures(Asset_Manager& asset_manager)
 {
     destroy_textures(asset_manager);

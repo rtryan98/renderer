@@ -38,6 +38,8 @@ struct Ocean_Resources
         rhi::Pipeline* fft_pipeline;
     } gpu_resources;
 
+    void create_buffers(Asset_Manager& asset_manager);
+    void destroy_buffers(Asset_Manager& asset_manager);
     void create_textures(Asset_Manager& asset_manager);
     void destroy_textures(Asset_Manager& asset_manager);
     void create_pipelines(Asset_Manager& asset_manager, Shader_Library& shader_library);
