@@ -15,12 +15,17 @@ groupshared FFT_VECTOR_TYPE ping_pong_buffer[2][FFT_SIZE];
 
 void butterfly(uint tid, uint iter, out uint2 twiddle_indices, out float2 twiddle_factor)
 {
-    float size = float(FFT_SIZE);
-    uint butterfly_size = uint(FFT_SIZE) >> (iter + 1);
+    uint butterfly_size = 2u << iter;
+    uint butterfly_half_size = (butterfly_size >> 1u);
+    uint butterfly_size_relative_idx = tid % butterfly_size;
     uint butterfly_start_idx = butterfly_size * (tid / butterfly_size);
-    uint butterfly_relative_idx = (butterfly_start_idx + tid) % uint(FFT_SIZE);
-    twiddle_indices = uint2(butterfly_relative_idx, butterfly_relative_idx + butterfly_size);
-    float arg = -ren::TWO_PI / size * butterfly_start_idx;
+
+    uint base_idx = butterfly_start_idx + (butterfly_size_relative_idx % butterfly_half_size);
+    uint lower_idx = base_idx;
+    uint upper_idx = base_idx + butterfly_half_size;
+    twiddle_indices = uint2(lower_idx, upper_idx);
+
+    float arg = -ren::TWO_PI * float(butterfly_size_relative_idx) / float(butterfly_size);
     sincos(arg, twiddle_factor.y, twiddle_factor.x);
     if (pc.inverse) twiddle_factor = ren::cconjugate(twiddle_factor);
 }
