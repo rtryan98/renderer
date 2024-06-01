@@ -22,7 +22,7 @@ public:
 
     [[nodiscard]] Ocean_Settings* get_settings() noexcept;
 
-    void simulate(Application& app, rhi::Command_List* cmd) noexcept;
+    void simulate(Application& app, rhi::Command_List* cmd, float dt) noexcept;
 
 private:
     Asset_Manager& m_asset_manager;

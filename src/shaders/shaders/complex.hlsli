@@ -37,6 +37,11 @@ float2 cpolar(float r, float phi)
     sincos(phi, result.y, result.x);
     return r * result;
 }
+
+float2 cmuli(float2 a)
+{
+    return float2(-a.y, a.x);
+}
 }
 
 #endif

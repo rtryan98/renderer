@@ -20,16 +20,19 @@ struct Ocean_Resources
 
         auto operator<=>(const Options& other) const = default;
 
-        rhi::Image_Create_Info generate_create_info() const noexcept;
+        rhi::Image_Create_Info generate_create_info(rhi::Image_Format format) const noexcept;
     } options;
     struct Data
     {
         Ocean_Initial_Spectrum_Data initial_spectrum_data;
-        Ocean_Time_Dependent_Spectrum_Data time_dependent_spectrum_data;
+        float total_time;
     } data;
     struct GPU_Resources
     {
-        rhi::Image* spectrum_texture;
+        rhi::Image* initial_spectrum_texture;
+        rhi::Image* angular_frequency_texture;
+        rhi::Image* x_y_z_xdx_texture;
+        rhi::Image* ydx_zdx_ydy_zdy_texture;
 
         rhi::Buffer* initial_spectrum_data;
 

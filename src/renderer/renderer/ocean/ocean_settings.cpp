@@ -177,6 +177,11 @@ void Ocean_Settings::process_gui_simulation_settings()
         imutil::help_marker(OCEAN_HELP_TEXT_LENGTHSCALE);
     }
 
+    auto depth_str = std::string("Depth");
+    ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+    ImGui::SliderFloat(depth_str.c_str(), &data.initial_spectrum_data.h, .001f, 1000.f);
+    imutil::help_marker(OCEAN_HELP_TEXT_DEPTH);
+
     uint32_t spectrum_count = 0;
     for (auto& spectrum : data.initial_spectrum_data.spectra)
     {
@@ -266,11 +271,6 @@ void Ocean_Settings::process_gui_simulation_settings()
         ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
         ImGui::SliderFloat(fetch_str.c_str(), &spectrum.f, .001f, 1000.f);
         imutil::help_marker(OCEAN_HELP_TEXT_FETCH);
-
-        auto depth_str = std::string("Depth##") + std::to_string(spectrum_count);
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
-        ImGui::SliderFloat(depth_str.c_str(), &spectrum.h, .001f, 1000.f);
-        imutil::help_marker(OCEAN_HELP_TEXT_DEPTH);
 
         auto phillips_alpha_str = std::string("Phillips Coefficient Alpha##") + std::to_string(spectrum_count);
         ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);

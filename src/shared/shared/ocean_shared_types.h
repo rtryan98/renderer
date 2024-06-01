@@ -26,7 +26,6 @@ struct Ocean_Spectrum_Data
     uint directional_spreading_function;
     float u;
     float f;
-    float h;
     float phillips_alpha;
     float generalized_a;
     float generalized_b;
@@ -41,22 +40,23 @@ struct SHADER_STRUCT_ALIGN Ocean_Initial_Spectrum_Data
     float length_scales[4];
     uint texture_size;
     float g;
+    float h;
 };
 
 struct SHADER_STRUCT_ALIGN Ocean_Initial_Spectrum_Push_Constants
 {
     SHADER_HANDLE_TYPE data;
     SHADER_HANDLE_TYPE spectrum_tex;
-};
-
-struct SHADER_STRUCT_ALIGN Ocean_Time_Dependent_Spectrum_Data
-{
-    
+    SHADER_HANDLE_TYPE angular_frequency_tex;
 };
 
 struct SHADER_STRUCT_ALIGN Ocean_Time_Dependent_Spectrum_Push_Constants
 {
-    SHADER_HANDLE_TYPE spectrum_tex;
+    SHADER_HANDLE_TYPE initial_spectrum_tex;
+    SHADER_HANDLE_TYPE angular_frequency_tex;
+    SHADER_HANDLE_TYPE x_y_z_xdx_tex;
+    SHADER_HANDLE_TYPE ydx_zdx_ydy_zdy_tex;
+    uint texture_size;
     float time;
 };
 

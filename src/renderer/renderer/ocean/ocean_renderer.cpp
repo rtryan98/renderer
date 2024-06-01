@@ -35,7 +35,6 @@ Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library& sha
                 .directional_spreading_function = uint32_t(Ocean_Directional_Spreading_Function::Mitsuyasu),
                 .u = 4.f,
                 .f = 750.f,
-                .h = 100.f,
                 .phillips_alpha = 1.f,
                 .generalized_a = 1.f,
                 .generalized_b = 1.f,
@@ -47,7 +46,6 @@ Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library& sha
                 .directional_spreading_function = uint32_t(Ocean_Directional_Spreading_Function::Mitsuyasu),
                 .u = 7.5f,
                 .f = 1000.f,
-                .h = 150.f,
                 .phillips_alpha = 1.f,
                 .generalized_a = 1.f,
                 .generalized_b = 1.f,
@@ -64,6 +62,7 @@ Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library& sha
         },
         .texture_size = m_resources.options.size,
         .g = 9.81f,
+        .h = 150.f,
     };
 }
 
@@ -79,31 +78,41 @@ Ocean_Settings* Ocean_Renderer::get_settings() noexcept
     return &m_settings;
 }
 
-void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd) noexcept
+void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt) noexcept
 {
+    m_resources.data.total_time += dt;
+
     cmd->begin_debug_region("Ocean Simulation", 0.5f, 0.5f, 1.f);
 
-    rhi::Image_Barrier_Info image_barrier = {
+    rhi::Image_Barrier_Info initial_spectrum_barrier_info = {
         .stage_before = rhi::Barrier_Pipeline_Stage::None,
         .stage_after = rhi::Barrier_Pipeline_Stage::Compute_Shader,
         .access_before = rhi::Barrier_Access::None,
         .access_after = rhi::Barrier_Access::Shader_Write,
         .layout_before = rhi::Barrier_Image_Layout::Undefined,
         .layout_after = rhi::Barrier_Image_Layout::General,
-        .image = m_resources.gpu_resources.spectrum_texture,
+        .image = m_resources.gpu_resources.initial_spectrum_texture,
         .subresource_range = {
             .first_mip_level = 0,
-            .mip_count = m_resources.gpu_resources.spectrum_texture->mip_levels,
+            .mip_count = m_resources.gpu_resources.initial_spectrum_texture->mip_levels,
             .first_array_index = 0,
-            .array_size = m_resources.gpu_resources.spectrum_texture->array_size,
+            .array_size = m_resources.gpu_resources.initial_spectrum_texture->array_size,
             .first_plane = 0,
             .plane_count = 1
         },
         .discard = true
     };
-    rhi::Barrier_Info barrier = { .image_barriers = { &image_barrier, 1 } };
+    auto angular_frequency_barrier_info = initial_spectrum_barrier_info;
+    angular_frequency_barrier_info.image = m_resources.gpu_resources.angular_frequency_texture;
 
-    cmd->barrier(barrier);
+    {
+        auto image_barriers = std::to_array({
+            initial_spectrum_barrier_info,
+            angular_frequency_barrier_info
+            });
+        rhi::Barrier_Info barrier = { .image_barriers = image_barriers };
+        cmd->barrier(barrier);
+    }
 
     app.upload_buffer_data_immediate(
         m_resources.gpu_resources.initial_spectrum_data,
@@ -115,46 +124,126 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd) noexcept
         m_resources.gpu_resources.initial_spectrum_pipeline->compute_shading_info.cs->groups_x;
     cmd->set_push_constants<Ocean_Initial_Spectrum_Push_Constants>({
         m_resources.gpu_resources.initial_spectrum_data->buffer_view->bindless_index,
-        m_resources.gpu_resources.spectrum_texture->image_view->bindless_index },
+        m_resources.gpu_resources.initial_spectrum_texture->image_view->bindless_index,
+        m_resources.gpu_resources.angular_frequency_texture->image_view->bindless_index },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(tex_dispatch_size_xy, tex_dispatch_size_xy, m_resources.options.cascade_count);
     cmd->end_debug_region();
 
-    image_barrier.stage_before = rhi::Barrier_Pipeline_Stage::Compute_Shader;
-    image_barrier.access_before = rhi::Barrier_Access::Shader_Write;
-    image_barrier.access_after = rhi::Barrier_Access::Shader_Read;
-    image_barrier.layout_before = rhi::Barrier_Image_Layout::General;
-    cmd->barrier(barrier);
+    auto x_y_z_xdx_barrier_info = initial_spectrum_barrier_info;
+    x_y_z_xdx_barrier_info.image = m_resources.gpu_resources.x_y_z_xdx_texture;
+    auto ydx_zdx_ydy_zdy_barrier_info = initial_spectrum_barrier_info;
+    ydx_zdx_ydy_zdy_barrier_info.image = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture;
+
+    initial_spectrum_barrier_info.stage_before
+        = angular_frequency_barrier_info.stage_before
+        = rhi::Barrier_Pipeline_Stage::Compute_Shader;
+    initial_spectrum_barrier_info.access_before
+        = angular_frequency_barrier_info.access_before
+        = rhi::Barrier_Access::Shader_Write;
+    initial_spectrum_barrier_info.access_after
+        = angular_frequency_barrier_info.access_after
+        = rhi::Barrier_Access::Shader_Read;
+    initial_spectrum_barrier_info.layout_before
+        = angular_frequency_barrier_info.layout_before
+        = rhi::Barrier_Image_Layout::General;
+    initial_spectrum_barrier_info.layout_after
+        = angular_frequency_barrier_info.layout_after
+        = rhi::Barrier_Image_Layout::Shader_Read_Only;
+
+    {
+        auto image_barriers = std::to_array({
+            initial_spectrum_barrier_info,
+            angular_frequency_barrier_info,
+            x_y_z_xdx_barrier_info,
+            ydx_zdx_ydy_zdy_barrier_info
+            });
+        rhi::Barrier_Info barrier = { .image_barriers = image_barriers };
+        cmd->barrier(barrier);
+    }
 
     cmd->begin_debug_region("Time Dependent Spectrum", 0.25f, 0.25f, 1.0f);
     cmd->set_pipeline(m_resources.gpu_resources.time_dependent_spectrum_pipeline);
     cmd->set_push_constants<Ocean_Time_Dependent_Spectrum_Push_Constants>({
-        m_resources.gpu_resources.spectrum_texture->image_view->bindless_index,
-        0.f },
+        m_resources.gpu_resources.initial_spectrum_texture->image_view->bindless_index,
+        m_resources.gpu_resources.angular_frequency_texture->image_view->bindless_index,
+        m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,
+        m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index,
+        m_resources.options.size,
+        m_resources.data.total_time },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(tex_dispatch_size_xy, tex_dispatch_size_xy, m_resources.options.cascade_count);
     cmd->end_debug_region();
 
-    cmd->barrier(barrier);
+    x_y_z_xdx_barrier_info.stage_before
+        = ydx_zdx_ydy_zdy_barrier_info.stage_before
+        = rhi::Barrier_Pipeline_Stage::Compute_Shader;
+    x_y_z_xdx_barrier_info.access_before
+        = ydx_zdx_ydy_zdy_barrier_info.access_before
+        = rhi::Barrier_Access::Shader_Write;
+    x_y_z_xdx_barrier_info.access_after
+        = ydx_zdx_ydy_zdy_barrier_info.access_after
+        = rhi::Barrier_Access::Shader_Read;
+    x_y_z_xdx_barrier_info.layout_before
+        = ydx_zdx_ydy_zdy_barrier_info.layout_before
+        = rhi::Barrier_Image_Layout::General;
+
+    {
+        auto image_barriers = std::to_array({
+            x_y_z_xdx_barrier_info,
+            ydx_zdx_ydy_zdy_barrier_info
+            });
+        rhi::Barrier_Info barrier = { .image_barriers = image_barriers };
+        cmd->barrier(barrier);
+    }
 
     cmd->begin_debug_region("IFFT", 0.25f, 0.5f, 1.0f);
     cmd->set_pipeline(m_resources.gpu_resources.fft_pipeline);
-    cmd->set_push_constants<FFT_Push_Constants>(
-        { m_resources.gpu_resources.spectrum_texture->image_view->bindless_index, FFT_VERTICAL, true },
-        rhi::Pipeline_Bind_Point::Compute);
     cmd->add_debug_marker("IFFT-Vertical", 0.25f, 0.5f, 1.0f);
-    cmd->dispatch(1, m_resources.options.size, m_resources.options.cascade_count);
-    cmd->barrier(barrier);
     cmd->set_push_constants<FFT_Push_Constants>(
-        { m_resources.gpu_resources.spectrum_texture->image_view->bindless_index, FFT_HORIZONTAL, true },
+        { m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index, FFT_VERTICAL, true },
         rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(1, m_resources.options.size, m_resources.options.cascade_count);
+    cmd->set_push_constants<FFT_Push_Constants>(
+        { m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index, FFT_VERTICAL, true },
+        rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(1, m_resources.options.size, m_resources.options.cascade_count);
+
+    {
+        auto image_barriers = std::to_array({
+            x_y_z_xdx_barrier_info,
+            ydx_zdx_ydy_zdy_barrier_info
+            });
+        rhi::Barrier_Info barrier = { .image_barriers = image_barriers };
+        cmd->barrier(barrier);
+    }
+
     cmd->add_debug_marker("IFFT-Horizontal", 0.25f, 0.5f, 1.0f);
+    cmd->set_push_constants<FFT_Push_Constants>(
+        { m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index, FFT_HORIZONTAL, true },
+        rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(1, m_resources.options.size, m_resources.options.cascade_count);
+    cmd->set_push_constants<FFT_Push_Constants>(
+        { m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index, FFT_HORIZONTAL, true },
+        rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(1, m_resources.options.size, m_resources.options.cascade_count);
     cmd->end_debug_region();
 
-    image_barrier.stage_after = rhi::Barrier_Pipeline_Stage::Vertex_Shader;
-    image_barrier.layout_after = rhi::Barrier_Image_Layout::Shader_Read_Only;
-    cmd->barrier(barrier);
+    x_y_z_xdx_barrier_info.stage_after
+        = ydx_zdx_ydy_zdy_barrier_info.stage_after
+        = rhi::Barrier_Pipeline_Stage::Vertex_Shader;
+    x_y_z_xdx_barrier_info.layout_after
+        = ydx_zdx_ydy_zdy_barrier_info.layout_after
+        = rhi::Barrier_Image_Layout::Shader_Read_Only;
+
+    {
+        auto image_barriers = std::to_array({
+            x_y_z_xdx_barrier_info,
+            ydx_zdx_ydy_zdy_barrier_info
+            });
+        rhi::Barrier_Info barrier = { .image_barriers = image_barriers };
+        cmd->barrier(barrier);
+    }
 
     cmd->end_debug_region();
 }
