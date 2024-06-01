@@ -16,7 +16,7 @@ struct Ocean_Resources
         bool use_fp16_textures = true;
         bool use_fp16_maths = false;
         uint32_t size = 256;
-        uint32_t cascade_count = 1;
+        uint32_t cascade_count = 4;
 
         auto operator<=>(const Options& other) const = default;
 

@@ -20,10 +20,10 @@ enum SHADER_ENUM_CLASS Ocean_Directional_Spreading_Function
     Flat
 };
 
-struct SHADER_STRUCT_ALIGN Ocean_Spectrum_Data
+struct Ocean_Spectrum_Data
 {
-    Ocean_Spectrum spectrum;
-    Ocean_Directional_Spreading_Function directional_spreading_function;
+    uint spectrum;
+    uint directional_spreading_function;
     float u;
     float f;
     float h;

@@ -53,6 +53,9 @@ constexpr const char* OCEAN_HELP_TEXT_GENERALIZED_B =
 constexpr const char* OCEAN_HELP_TEXT_CONTRIBUTION =
 "Lorem ipsum dolor sit amet.";
 
+constexpr const char* OCEAN_HELP_TEXT_LENGTHSCALE =
+"Lorem ipsum dolor sit amet.";
+
 Ocean_Settings::Ocean_Settings(
     Ocean_Resources& resources,
     Asset_Manager& asset_manager,
@@ -166,6 +169,14 @@ void Ocean_Settings::process_gui_simulation_settings()
     ImGui::SliderFloat("Gravity", &data.initial_spectrum_data.g, .001f, 100.f);
     imutil::help_marker(OCEAN_HELP_TEXT_GRAVITY);
 
+    for (auto i = 0; i < 4; ++i)
+    {
+        auto lengthscale_str = std::string("Lengthscale ") + std::to_string(i + 1);
+        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::SliderFloat(lengthscale_str.c_str(), &data.initial_spectrum_data.length_scales[i], .001f, 10000.f);
+        imutil::help_marker(OCEAN_HELP_TEXT_LENGTHSCALE);
+    }
+
     uint32_t spectrum_count = 0;
     for (auto& spectrum : data.initial_spectrum_data.spectra)
     {
@@ -194,7 +205,7 @@ void Ocean_Settings::process_gui_simulation_settings()
         auto spectrum_text_idx = 0;
         for (auto i = 0; i < spectrum_value_texts.size(); ++i)
         {
-            if (spectrum_values[i] == spectrum.spectrum) spectrum_text_idx = i;
+            if (uint32_t(spectrum_values[i]) == spectrum.spectrum) spectrum_text_idx = i;
         }
         ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
         auto spectrum_combo_str = std::string("Oceanographic Spectrum##") + std::to_string(spectrum_count);
@@ -202,10 +213,10 @@ void Ocean_Settings::process_gui_simulation_settings()
         {
             for (auto i = 0; i < spectrum_values.size(); ++i)
             {
-                bool selected = spectrum.spectrum == spectrum_values[i];
+                bool selected = spectrum.spectrum == uint32_t(spectrum_values[i]);
                 if (ImGui::Selectable(spectrum_value_texts[i], selected, ImGuiSelectableFlags_None))
                 {
-                    spectrum.spectrum = spectrum_values[i];
+                    spectrum.spectrum = uint32_t(spectrum_values[i]);
                 }
             }
             ImGui::EndCombo();
@@ -228,7 +239,7 @@ void Ocean_Settings::process_gui_simulation_settings()
         auto dirspread_text_idx = 0;
         for (auto i = 0; i < dirspread_value_texts.size(); ++i)
         {
-            if (dirspread_values[i] == spectrum.directional_spreading_function) dirspread_text_idx = i;
+            if (uint32_t(dirspread_values[i]) == spectrum.directional_spreading_function) dirspread_text_idx = i;
         }
         ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
         auto dirspread_combo_str = std::string("Directional Spread##") + std::to_string(spectrum_count);
@@ -236,10 +247,10 @@ void Ocean_Settings::process_gui_simulation_settings()
         {
             for (auto i = 0; i < dirspread_values.size(); ++i)
             {
-                bool selected = spectrum.directional_spreading_function == dirspread_values[i];
+                bool selected = spectrum.directional_spreading_function == uint32_t(dirspread_values[i]);
                 if (ImGui::Selectable(dirspread_value_texts[i], selected, ImGuiSelectableFlags_None))
                 {
-                    spectrum.directional_spreading_function = dirspread_values[i];
+                    spectrum.directional_spreading_function = uint32_t(dirspread_values[i]);
                 }
             }
             ImGui::EndCombo();

@@ -19,6 +19,52 @@ Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library& sha
     m_resources.create_buffers(m_asset_manager);
     m_resources.create_textures(m_asset_manager);
     m_resources.create_pipelines(m_asset_manager, m_shader_library);
+
+    float larges_lengthscale = 1024.f;
+    auto calc_lengthscale = [](float lengthscale, uint32_t factor) {
+        for (auto i = 0; i < factor; ++i)
+        {
+            lengthscale = lengthscale * (1.f - 1. / 1.681033988f);
+        }
+        return lengthscale;
+    };
+    m_resources.data.initial_spectrum_data = {
+        .spectra = {
+            {
+                .spectrum = uint32_t(Ocean_Spectrum::TMA),
+                .directional_spreading_function = uint32_t(Ocean_Directional_Spreading_Function::Mitsuyasu),
+                .u = 4.f,
+                .f = 750.f,
+                .h = 100.f,
+                .phillips_alpha = 1.f,
+                .generalized_a = 1.f,
+                .generalized_b = 1.f,
+                .contribution = 1.f,
+                .wind_direction = 0.f
+            },
+            {
+                .spectrum = uint32_t(Ocean_Spectrum::TMA),
+                .directional_spreading_function = uint32_t(Ocean_Directional_Spreading_Function::Mitsuyasu),
+                .u = 7.5f,
+                .f = 1000.f,
+                .h = 150.f,
+                .phillips_alpha = 1.f,
+                .generalized_a = 1.f,
+                .generalized_b = 1.f,
+                .contribution = .75f,
+                .wind_direction = 135.f
+            }
+        },
+        .active_cascades = { true, true, true, true },
+        .length_scales = {
+            larges_lengthscale,
+            calc_lengthscale(larges_lengthscale, 1),
+            calc_lengthscale(larges_lengthscale, 4),
+            calc_lengthscale(larges_lengthscale, 6)
+        },
+        .texture_size = m_resources.options.size,
+        .g = 9.81f,
+    };
 }
 
 Ocean_Renderer::~Ocean_Renderer()
