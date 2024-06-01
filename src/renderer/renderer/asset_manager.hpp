@@ -12,10 +12,10 @@ class Asset_Manager
 public:
     Asset_Manager(std::shared_ptr<Logger> logger, rhi::Graphics_Device* device, uint64_t frames_in_flight) noexcept;
 
-    [[nodiscard]] rhi::Buffer* create_buffer(const rhi::Buffer_Create_Info& create_info) noexcept;
+    [[nodiscard]] rhi::Buffer* create_buffer(const rhi::Buffer_Create_Info& create_info, const char* name = nullptr) noexcept;
     void destroy_buffer(rhi::Buffer* buffer) noexcept;
 
-    [[nodiscard]] rhi::Image* create_image(const rhi::Image_Create_Info& create_info) noexcept;
+    [[nodiscard]] rhi::Image* create_image(const rhi::Image_Create_Info& create_info, const char* name = nullptr) noexcept;
     void destroy_image(rhi::Image* image) noexcept;
 
     [[nodiscard]] rhi::Pipeline* create_pipeline(const rhi::Graphics_Pipeline_Create_Info& create_info) noexcept;

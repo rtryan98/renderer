@@ -38,7 +38,7 @@ Asset_Manager::Asset_Manager(
 {}
 
 // TODO: abort or keep going on error?
-rhi::Buffer* Asset_Manager::create_buffer(const rhi::Buffer_Create_Info& create_info) noexcept
+rhi::Buffer* Asset_Manager::create_buffer(const rhi::Buffer_Create_Info& create_info, const char* name) noexcept
 {
     auto result = m_device->create_buffer(create_info);
     if (!result.has_value())
@@ -46,6 +46,7 @@ rhi::Buffer* Asset_Manager::create_buffer(const rhi::Buffer_Create_Info& create_
         m_logger->critical("Failed to create buffer! Reason: {}", result_to_string(result.error()));
         return nullptr;
     }
+    if (name != nullptr) m_device->name_resource(result.value(), name);
     return result.value();
 }
 
@@ -58,7 +59,7 @@ void Asset_Manager::destroy_buffer(rhi::Buffer* buffer) noexcept
         });
 }
 
-rhi::Image* Asset_Manager::create_image(const rhi::Image_Create_Info& create_info) noexcept
+rhi::Image* Asset_Manager::create_image(const rhi::Image_Create_Info& create_info, const char* name) noexcept
 {
     auto result = m_device->create_image(create_info);
     if (!result.has_value())
@@ -66,6 +67,7 @@ rhi::Image* Asset_Manager::create_image(const rhi::Image_Create_Info& create_inf
         m_logger->critical("Failed to create image! Reason: {}", result_to_string(result.error()));
         return nullptr;
     }
+    if (name != nullptr) m_device->name_resource(result.value(), name);
     return result.value();
 }
 
