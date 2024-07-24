@@ -140,6 +140,7 @@ void Ocean_Settings::process_gui_options()
     auto options_before = m_resources.options;
 
     m_resources.options = options;
+    m_resources.data.initial_spectrum_data.texture_size = options.size;
 
     bool recreate_textures =
         options_before.size != options.size ||
@@ -155,7 +156,7 @@ void Ocean_Settings::process_gui_options()
         options_before.size != options.size;
     if (recreate_pipelines)
     {
-        m_resources.create_pipelines(m_asset_manager, m_shader_library);
+        m_resources.create_compute_pipelines(m_asset_manager, m_shader_library);
     }
 }
 

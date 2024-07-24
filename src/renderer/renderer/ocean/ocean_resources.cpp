@@ -67,9 +67,54 @@ void Ocean_Resources::destroy_textures(Asset_Manager& asset_manager)
         asset_manager.destroy_image(gpu_resources.ydx_zdx_ydy_zdy_texture);
 }
 
-void Ocean_Resources::create_pipelines(Asset_Manager& asset_manager, Shader_Library& shader_library)
+void Ocean_Resources::create_graphics_pipelines(Asset_Manager& asset_manager, Shader_Library& shader_library)
 {
-    destroy_pipelines(asset_manager);
+    destroy_graphics_pipelines(asset_manager);
+
+    auto debug_ci = rhi::Graphics_Pipeline_Create_Info {
+        .vs = shader_library.get_shader(Shaders::debug_render_ocean_normal_vs),
+        .ps = shader_library.get_shader(Shaders::debug_render_ocean_ps),
+        .blend_state_info = {
+            .independent_blend_enable = false,
+            .color_attachments = {
+                rhi::Pipeline_Color_Attachment_Blend_Info {
+                .blend_enable = false,
+                .logic_op_enable = false
+                }
+            }
+        },
+        .rasterizer_state_info = {
+            .fill_mode = rhi::Fill_Mode::Solid,
+            .cull_mode = rhi::Cull_Mode::None,
+            .winding_order = rhi::Winding_Order::Front_Face_CCW
+        },
+        .depth_stencil_info = {
+            .depth_enable = true,
+            .depth_write_enable = true,
+            .comparison_func = rhi::Comparison_Func::Less_Equal
+        },
+        .primitive_topology = rhi::Primitive_Topology_Type::Line,
+        .color_attachment_count = 1,
+        .color_attachment_formats = { rhi::Image_Format::R8G8B8A8_SRGB },
+        .depth_stencil_format = rhi::Image_Format::D32_SFLOAT
+    };
+
+    gpu_resources.debug_render_normals_pipeline = asset_manager.create_pipeline(debug_ci);
+    debug_ci.vs = shader_library.get_shader(Shaders::debug_render_ocean_slope_vs);
+    gpu_resources.debug_render_slopes_pipeline = asset_manager.create_pipeline(debug_ci);
+}
+
+void Ocean_Resources::destroy_graphics_pipelines(Asset_Manager& asset_manager)
+{
+    if (gpu_resources.debug_render_normals_pipeline)
+        asset_manager.destroy_pipeline(gpu_resources.debug_render_normals_pipeline);
+    if (gpu_resources.debug_render_slopes_pipeline)
+        asset_manager.destroy_pipeline(gpu_resources.debug_render_slopes_pipeline);
+}
+
+void Ocean_Resources::create_compute_pipelines(Asset_Manager& asset_manager, Shader_Library& shader_library)
+{
+    destroy_compute_pipelines(asset_manager);
 
     gpu_resources.initial_spectrum_pipeline = asset_manager.create_pipeline({
         .cs = shader_library.get_shader(Shaders::initial_spectrum_cs)});
@@ -83,7 +128,7 @@ void Ocean_Resources::create_pipelines(Asset_Manager& asset_manager, Shader_Libr
                 true))});
 }
 
-void Ocean_Resources::destroy_pipelines(Asset_Manager& asset_manager)
+void Ocean_Resources::destroy_compute_pipelines(Asset_Manager& asset_manager)
 {
     if (gpu_resources.initial_spectrum_pipeline)
         asset_manager.destroy_pipeline(gpu_resources.initial_spectrum_pipeline);

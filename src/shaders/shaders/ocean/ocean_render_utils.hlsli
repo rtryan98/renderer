@@ -1,0 +1,4 @@
+#ifndef REN_OCEAN_RENDER_UTILS
+#define REN_OCEAN_RENDER_UTILS
+
+#endif

@@ -60,4 +60,9 @@ struct SHADER_STRUCT_ALIGN Ocean_Time_Dependent_Spectrum_Push_Constants
     float time;
 };
 
+struct SHADER_STRUCT_ALIGN Ocean_Render_Debug_Push_Constants
+{
+    SHADER_HANDLE_TYPE vertices;
+};
+
 #endif

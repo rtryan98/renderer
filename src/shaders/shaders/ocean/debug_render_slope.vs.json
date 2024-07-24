@@ -1,0 +1,5 @@
+{
+    "name": "debug_render_ocean_slope",
+    "shader_type": "vs",
+    "entry_point": "main"
+}

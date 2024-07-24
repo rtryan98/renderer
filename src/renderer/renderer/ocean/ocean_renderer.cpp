@@ -18,7 +18,7 @@ Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library& sha
 {
     m_resources.create_buffers(m_asset_manager);
     m_resources.create_textures(m_asset_manager);
-    m_resources.create_pipelines(m_asset_manager, m_shader_library);
+    m_resources.create_compute_pipelines(m_asset_manager, m_shader_library);
 
     float larges_lengthscale = 1024.f;
     auto calc_lengthscale = [](float lengthscale, uint32_t factor) {
@@ -70,7 +70,7 @@ Ocean_Renderer::~Ocean_Renderer()
 {
     m_resources.destroy_buffers(m_asset_manager);
     m_resources.destroy_textures(m_asset_manager);
-    m_resources.destroy_pipelines(m_asset_manager);
+    m_resources.destroy_compute_pipelines(m_asset_manager);
 }
 
 Ocean_Settings* Ocean_Renderer::get_settings() noexcept
@@ -247,4 +247,11 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
 
     cmd->end_debug_region();
 }
+
+void Ocean_Renderer::render(rhi::Command_List* cmd) noexcept
+{
+
+    cmd->draw_indexed(0,1,0,0,0);
+}
+
 }
