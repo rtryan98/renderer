@@ -25,7 +25,8 @@ Application::Application() noexcept
         .present_mode = rhi::Present_Mode::Immediate
         }))
     , m_shader_library(m_logger, m_device.get())
-    , m_asset_manager(m_logger, m_device.get(), 2)
+    , m_asset_manager(m_logger, m_device.get(), FRAME_IN_FLIGHT_COUNT, *m_window)
+    , m_renderer(*this, m_asset_manager)
     , m_frames()
     , m_staging_buffers()
     , m_frame_counter(0)
@@ -143,7 +144,7 @@ void Application::setup_frame(Frame& frame) noexcept
     auto swapchain_resize = m_swapchain->query_resize();
     if (swapchain_resize.is_size_changed)
     {
-        // Resize window size dependent resources
+        m_asset_manager.recreate_size_dependent_render_attachment_images();
     }
     m_swapchain->acquire_next_image();
     m_imgui_renderer->next_frame();

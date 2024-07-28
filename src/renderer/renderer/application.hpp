@@ -8,6 +8,7 @@
 #include "renderer/shader_manager.hpp"
 #include "renderer/imgui/renderer_settings.hpp"
 #include "renderer/ocean/ocean_renderer.hpp"
+#include "renderer/renderer.hpp"
 
 #include <rhi/graphics_device.hpp>
 #include <rhi/swapchain.hpp>
@@ -72,6 +73,7 @@ private:
     std::unique_ptr<rhi::Swapchain> m_swapchain;
     Shader_Library m_shader_library;
     Asset_Manager m_asset_manager;
+    Renderer m_renderer;
     std::array<Frame, FRAME_IN_FLIGHT_COUNT> m_frames;
     std::array<std::vector<rhi::Buffer*>, FRAME_IN_FLIGHT_COUNT> m_staging_buffers;
     std::array<std::vector<Buffer_Staging_Info>, FRAME_IN_FLIGHT_COUNT> m_buffer_staging_infos;
