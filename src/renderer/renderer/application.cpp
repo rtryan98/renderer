@@ -26,16 +26,14 @@ Application::Application() noexcept
         }))
     , m_shader_library(m_logger, m_device.get())
     , m_asset_manager(m_logger, m_device.get(), FRAME_IN_FLIGHT_COUNT, *m_window)
-    , m_renderer(*this, m_asset_manager)
+    , m_renderer(*this, m_asset_manager, *m_swapchain, Imgui_Renderer_Create_Info{
+        .device = m_device.get(),
+        .frames_in_flight = FRAME_IN_FLIGHT_COUNT,
+        .swapchain_image_format = m_swapchain->get_image_format()})
     , m_frames()
     , m_staging_buffers()
     , m_frame_counter(0)
     , m_is_running(true)
-    , m_imgui_renderer(std::make_unique<Imgui_Renderer>(Imgui_Renderer_Create_Info{
-        .device = m_device.get(),
-        .frames_in_flight = FRAME_IN_FLIGHT_COUNT,
-        .swapchain_image_format = m_swapchain->get_image_format()
-        }))
     , m_cbt_cpu_vis(nullptr)
     , m_renderer_settings()
     , m_ocean_renderer(std::make_unique<Ocean_Renderer>(m_asset_manager, m_shader_library))
@@ -54,10 +52,9 @@ Application::Application() noexcept
         frame.compute_command_pool = m_device->create_command_pool({ .queue_type = rhi::Queue_Type::Compute });
         frame.copy_command_pool = m_device->create_command_pool({ .queue_type = rhi::Queue_Type::Copy });
     }
-    imgui_setup_style();
-    m_imgui_renderer->create_fonts_texture();
 
     m_renderer_settings.add_settings(m_ocean_renderer->get_settings());
+    imgui_setup_style();
 
     m_logger->info("Finished initializing.");
 }
@@ -101,6 +98,7 @@ void Application::run()
 
         setup_frame(frame);
         process_gui();
+        update(total_time, delta_time);
         render_frame(frame, total_time, delta_time);
 
         if (!m_window->get_window_data().is_alive)
@@ -147,7 +145,6 @@ void Application::setup_frame(Frame& frame) noexcept
         m_asset_manager.recreate_size_dependent_render_attachment_images();
     }
     m_swapchain->acquire_next_image();
-    m_imgui_renderer->next_frame();
 
     if (m_frame_counter > FRAME_IN_FLIGHT_COUNT)
     {
@@ -159,73 +156,17 @@ void Application::setup_frame(Frame& frame) noexcept
         }
         m_staging_buffers[last_frame_in_flight].clear();
     }
+
+    m_renderer.setup_frame();
 }
 
 void Application::render_frame(Frame& frame, double t, double dt) noexcept
 {
-    auto swapchain_image_view = m_swapchain->get_current_image_view();
     auto graphics_cmd = frame.graphics_command_pool->acquire_command_list();
 
-    m_ocean_renderer->simulate(*this, graphics_cmd, dt);
+    m_renderer.render(graphics_cmd);
 
-    graphics_cmd->begin_debug_region("Swapchain Pass", 0.5f, 0.25f, 0.25f);
-    rhi::Image_Barrier_Info swapchain_layout_transition_barrier = {
-        .stage_before = rhi::Barrier_Pipeline_Stage::None,
-        .stage_after = rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
-        .access_before = rhi::Barrier_Access::None,
-        .access_after = rhi::Barrier_Access::Color_Attachment_Write,
-        .layout_before = rhi::Barrier_Image_Layout::Undefined,
-        .layout_after = rhi::Barrier_Image_Layout::Color_Attachment,
-        .queue_type_ownership_transfer_target_queue = rhi::Queue_Type::Graphics,
-        .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
-        .image = swapchain_image_view->image,
-        .subresource_range = {
-            .first_mip_level = 0,
-            .mip_count = 1,
-            .first_array_index = 0,
-            .array_size = 1,
-            .first_plane = 0,
-            .plane_count = 1
-        },
-        .discard = true
-    };
-    graphics_cmd->barrier({
-        .buffer_barriers = {},
-        .image_barriers = { &swapchain_layout_transition_barrier, 1 },
-        .memory_barriers = {}
-        });
-
-    rhi::Render_Pass_Color_Attachment_Info swapchain_attachment_info = {
-        .attachment = swapchain_image_view,
-        .load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
-        .store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
-        .clear_value = {
-            .color = { 0.0f, 0.0f, 0.0f, 1.0f }
-        }
-    };
-    rhi::Render_Pass_Begin_Info render_pass_info = {
-        .color_attachments = { &swapchain_attachment_info, 1 },
-        .depth_stencil_attachment = {}
-    };
-
-    graphics_cmd->begin_render_pass(render_pass_info);
-    m_imgui_renderer->render(graphics_cmd);
-    graphics_cmd->end_render_pass();
-
-    swapchain_layout_transition_barrier.stage_before = rhi::Barrier_Pipeline_Stage::Color_Attachment_Output;
-    swapchain_layout_transition_barrier.stage_after = rhi::Barrier_Pipeline_Stage::None;
-    swapchain_layout_transition_barrier.access_before = rhi::Barrier_Access::Color_Attachment_Write;
-    swapchain_layout_transition_barrier.access_after = rhi::Barrier_Access::None;
-    swapchain_layout_transition_barrier.layout_before = rhi::Barrier_Image_Layout::Color_Attachment;
-    swapchain_layout_transition_barrier.layout_after = rhi::Barrier_Image_Layout::Present;
-    swapchain_layout_transition_barrier.discard = false;
-
-    graphics_cmd->barrier({
-        .buffer_barriers = {},
-        .image_barriers = { &swapchain_layout_transition_barrier, 1 },
-        .memory_barriers = {}
-        });
-    graphics_cmd->end_debug_region();
+    // m_ocean_renderer->simulate(*this, graphics_cmd, dt);
 
     auto cmds = std::to_array({ handle_immediate_uploads(frame), graphics_cmd });
 
@@ -287,6 +228,11 @@ void Application::process_gui() noexcept
     if (m_imgui_data.windows.demo)
         ImGui::ShowDemoWindow(&m_imgui_data.windows.demo);
     ImGui::EndFrame();
+}
+
+void Application::update(double t, double dt) noexcept
+{
+    m_renderer.update(t, dt);
 }
 
 void Application::imgui_close_all_windows() noexcept

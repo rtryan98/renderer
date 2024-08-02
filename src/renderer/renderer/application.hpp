@@ -3,7 +3,6 @@
 #include "renderer/logger.hpp"
 #include "renderer/window.hpp"
 #include "renderer/asset_manager.hpp"
-#include "renderer/imgui/imgui_renderer.hpp"
 #include "renderer/cbt/cbt_cpu.hpp"
 #include "renderer/shader_manager.hpp"
 #include "renderer/imgui/renderer_settings.hpp"
@@ -38,6 +37,7 @@ public:
 
     void upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, uint64_t size, uint64_t offset) noexcept;
 
+
 private:
     struct Frame
     {
@@ -60,6 +60,7 @@ private:
     void render_frame(Frame& frame, double t, double dt) noexcept;
     rhi::Command_List* handle_immediate_uploads(Frame& frame) noexcept;
     void process_gui() noexcept;
+    void update(double t, double dt) noexcept;
 
     void imgui_close_all_windows() noexcept;
 
@@ -79,7 +80,6 @@ private:
     std::array<std::vector<Buffer_Staging_Info>, FRAME_IN_FLIGHT_COUNT> m_buffer_staging_infos;
     uint64_t m_frame_counter;
     bool m_is_running;
-    std::unique_ptr<Imgui_Renderer> m_imgui_renderer;
     ImGui_Data m_imgui_data = {};
     std::unique_ptr<CBT_CPU_Vis> m_cbt_cpu_vis;
     Renderer_Settings m_renderer_settings;

@@ -2,5 +2,12 @@
 
 namespace ren
 {
+class Camera
+{
+public:
 
+
+private:
+
+};
 }
