@@ -6,15 +6,24 @@
 namespace ren
 {
 Renderer::Renderer(Application& app, Asset_Manager& asset_manager,
-    rhi::Swapchain& swapchain,
+    Shader_Library& shader_library, rhi::Swapchain& swapchain,
     const Imgui_Renderer_Create_Info& imgui_renderer_create_info)
     : m_app(app)
     , m_asset_manager(asset_manager)
+    , m_shader_library(shader_library)
     , m_swapchain(swapchain)
     , m_imgui_renderer(imgui_renderer_create_info)
+    , m_ocean_renderer(m_asset_manager, m_shader_library)
 {
     init_g_buffer();
     m_imgui_renderer.create_fonts_texture();
+}
+
+std::vector<Settings_Base*> Renderer::get_settings() noexcept
+{
+    std::vector<Settings_Base*> result;
+    result.push_back(m_ocean_renderer.get_settings());
+    return result;
 }
 
 void Renderer::update(double t, double dt) noexcept
@@ -27,8 +36,10 @@ void Renderer::setup_frame()
     m_imgui_renderer.next_frame();
 }
 
-void Renderer::render(rhi::Command_List* cmd) noexcept
+void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
 {
+    m_ocean_renderer.simulate(m_app, cmd, dt);
+
     auto swapchain_image_view = m_swapchain.get_current_image_view();
     constexpr static rhi::Image_Barrier_Subresource_Range RT_DEFAULT_SUBRESOURCE_RANGE = {
         .first_mip_level = 0,

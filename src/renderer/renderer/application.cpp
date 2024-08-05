@@ -26,7 +26,7 @@ Application::Application() noexcept
         }))
     , m_shader_library(m_logger, m_device.get())
     , m_asset_manager(m_logger, m_device.get(), FRAME_IN_FLIGHT_COUNT, *m_window)
-    , m_renderer(*this, m_asset_manager, *m_swapchain, Imgui_Renderer_Create_Info{
+    , m_renderer(*this, m_asset_manager, m_shader_library, *m_swapchain, Imgui_Renderer_Create_Info{
         .device = m_device.get(),
         .frames_in_flight = FRAME_IN_FLIGHT_COUNT,
         .swapchain_image_format = m_swapchain->get_image_format()})
@@ -36,7 +36,6 @@ Application::Application() noexcept
     , m_is_running(true)
     , m_cbt_cpu_vis(nullptr)
     , m_renderer_settings()
-    , m_ocean_renderer(std::make_unique<Ocean_Renderer>(m_asset_manager, m_shader_library))
 {
     for (auto& frame : m_frames)
     {
@@ -53,7 +52,11 @@ Application::Application() noexcept
         frame.copy_command_pool = m_device->create_command_pool({ .queue_type = rhi::Queue_Type::Copy });
     }
 
-    m_renderer_settings.add_settings(m_ocean_renderer->get_settings());
+    auto renderer_settings = m_renderer.get_settings();
+    for (auto settings : renderer_settings)
+    {
+        m_renderer_settings.add_settings(settings);
+    }
     imgui_setup_style();
 
     m_logger->info("Finished initializing.");
@@ -63,7 +66,6 @@ Application::~Application() noexcept
 {
     m_logger->info("Shutting down.");
     m_device->wait_idle();
-    m_ocean_renderer = nullptr;
     m_asset_manager.flush_deletion_queue(~0ull);
     for (auto& frame : m_frames)
     {
@@ -164,9 +166,7 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
 {
     auto graphics_cmd = frame.graphics_command_pool->acquire_command_list();
 
-    m_renderer.render(graphics_cmd);
-
-    // m_ocean_renderer->simulate(*this, graphics_cmd, dt);
+    m_renderer.render(graphics_cmd, t, dt);
 
     auto cmds = std::to_array({ handle_immediate_uploads(frame), graphics_cmd });
 

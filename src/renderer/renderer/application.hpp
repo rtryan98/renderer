@@ -83,6 +83,5 @@ private:
     ImGui_Data m_imgui_data = {};
     std::unique_ptr<CBT_CPU_Vis> m_cbt_cpu_vis;
     Renderer_Settings m_renderer_settings;
-    std::unique_ptr<Ocean_Renderer> m_ocean_renderer;
 };
 }
