@@ -6,8 +6,17 @@
 #include "renderer/window.hpp"
 #include "renderer/input_codes.hpp"
 
+#undef near
+#undef far
+
 namespace ren
 {
+float calculate_aspect_ratio(const Window& window)
+{
+    auto& window_data = window.get_window_data();
+    return float(window_data.width) / float(window_data.height);
+}
+
 Renderer::Renderer(Application& app, Asset_Manager& asset_manager,
     Shader_Library& shader_library, rhi::Swapchain& swapchain,
     const Imgui_Renderer_Create_Info& imgui_renderer_create_info)
@@ -15,6 +24,17 @@ Renderer::Renderer(Application& app, Asset_Manager& asset_manager,
     , m_asset_manager(asset_manager)
     , m_shader_library(shader_library)
     , m_swapchain(swapchain)
+    , m_fly_cam{
+        .fov_y = 90.f,
+        .aspect = calculate_aspect_ratio(app.get_window()),
+        .near = .001f,
+        .far = 1000.f,
+        .sensitivity = 1.f,
+        .movement_speed = 1.f,
+        .pitch = 0.f,
+        .yaw = 0.f,
+        .position = { .0f, .0f, .5f }
+    }
     , m_imgui_renderer(imgui_renderer_create_info)
     , m_ocean_renderer(m_asset_manager, m_shader_library)
 {
@@ -29,9 +49,17 @@ std::vector<Settings_Base*> Renderer::get_settings() noexcept
     return result;
 }
 
-void Renderer::update(Input_State& input_state, double t, double dt) noexcept
+void Renderer::update(const Input_State& input_state, double t, double dt) noexcept
 {
+    if (!(ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard))
+    {
+        // No input captured here from UI
 
+        m_fly_cam.process_inputs(input_state, float(dt));
+    }
+    // set aspect ratio in case of resize
+    m_fly_cam.aspect = calculate_aspect_ratio(m_app.get_window());
+    m_fly_cam.update();
 }
 
 void Renderer::setup_frame()

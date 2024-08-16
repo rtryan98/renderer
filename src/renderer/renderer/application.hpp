@@ -34,6 +34,7 @@ public:
     ~Application() noexcept;
 
     void run();
+    Window& get_window() const { return *m_window; };
 
     void upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, uint64_t size, uint64_t offset) noexcept;
 

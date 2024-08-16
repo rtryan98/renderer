@@ -2,6 +2,7 @@
 
 #include "renderer/imgui/imgui_renderer.hpp"
 #include "renderer/ocean/ocean_renderer.hpp"
+#include "renderer/scene/camera.hpp"
 
 namespace rhi
 {
@@ -26,7 +27,7 @@ public:
 
     std::vector<Settings_Base*> get_settings() noexcept;
 
-    void update(Input_State& input_state, double t, double dt) noexcept;
+    void update(const Input_State& input_state, double t, double dt) noexcept;
     void setup_frame();
     void render(rhi::Command_List* cmd, double t, double dt) noexcept;
 
@@ -41,6 +42,7 @@ private:
     Shader_Library& m_shader_library;
     rhi::Swapchain& m_swapchain;
 
+    Fly_Camera m_fly_cam;
     Imgui_Renderer m_imgui_renderer;
     Ocean_Renderer m_ocean_renderer;
 
