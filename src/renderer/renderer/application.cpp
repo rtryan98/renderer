@@ -12,6 +12,7 @@ Application::Application() noexcept
         .height = 1080,
         .title = "Renderer"
         }))
+    , m_input_state(std::make_unique<Input_State>(*m_window))
     , m_device(rhi::Graphics_Device::create({
         .graphics_api = rhi::Graphics_API::D3D12,
         .enable_validation = false,
@@ -90,6 +91,7 @@ void Application::run()
     while (m_is_running)
     {
         m_window->update();
+        m_input_state->update();
 
         delta_time = std::chrono::duration_cast<std::chrono::duration<double>>(
             current_time - last_time)
@@ -232,7 +234,7 @@ void Application::process_gui() noexcept
 
 void Application::update(double t, double dt) noexcept
 {
-    m_renderer.update(t, dt);
+    m_renderer.update(*m_input_state, t, dt);
 }
 
 void Application::imgui_close_all_windows() noexcept

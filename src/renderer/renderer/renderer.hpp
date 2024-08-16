@@ -14,6 +14,7 @@ namespace ren
 class Application;
 class Asset_Manager;
 class Shader_Library;
+class Input_State;
 struct Render_Attachment;
 
 class Renderer
@@ -25,7 +26,7 @@ public:
 
     std::vector<Settings_Base*> get_settings() noexcept;
 
-    void update(double t, double dt) noexcept;
+    void update(Input_State& input_state, double t, double dt) noexcept;
     void setup_frame();
     void render(rhi::Command_List* cmd, double t, double dt) noexcept;
 

@@ -1,9 +1,16 @@
 #pragma once
 
+#include <array>
 #include <memory>
+#include <DirectXMath.h>
 
 namespace ren
 {
+using namespace DirectX;
+
+enum class Key_Code : uint8_t;
+enum class Mouse_Button : uint8_t;
+
 struct Window_Create_Info
 {
     uint32_t width;
@@ -31,5 +38,31 @@ public:
     virtual float get_dpi_scale() noexcept = 0;
     virtual void* get_native_handle() noexcept = 0;
     virtual const Window_Data& get_window_data() const noexcept = 0;
+};
+
+class Input_State
+{
+public:
+    Input_State(Window& window);
+
+    void update();
+
+    bool is_key_released(Key_Code key) const noexcept;
+    bool is_key_pressed(Key_Code key) const noexcept;
+    bool is_key_clicked(Key_Code key) const noexcept;
+
+    bool is_mouse_released(Mouse_Button mb) const noexcept;
+    bool is_mouse_pressed(Mouse_Button mb) const noexcept;
+    bool is_mouse_clicked(Mouse_Button mb) const noexcept;
+
+    const XMFLOAT2 get_mouse_pos() const noexcept;
+    const XMFLOAT2 get_mouse_pos_delta() const noexcept;
+
+private:
+    Window& m_window;
+    std::array<uint8_t, 256> m_current_state = {};
+    std::array<uint8_t, 256> m_last_state = {};
+    XMFLOAT2 m_current_mouse_pos = {};
+    XMFLOAT2 m_last_mouse_pos = {};
 };
 }

@@ -10,6 +10,7 @@ target_sources(
     asset.hpp
     asset_manager.cpp
     asset_manager.hpp
+    input_codes.hpp
     logger.cpp
     logger.hpp
     main.cpp

@@ -70,6 +70,7 @@ private:
 private:
     std::shared_ptr<Logger> m_logger;
     std::unique_ptr<Window> m_window;
+    std::unique_ptr<Input_State> m_input_state;
     std::unique_ptr<rhi::Graphics_Device> m_device;
     std::unique_ptr<rhi::Swapchain> m_swapchain;
     Shader_Library m_shader_library;

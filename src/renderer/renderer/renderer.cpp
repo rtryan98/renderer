@@ -3,6 +3,9 @@
 #include "renderer/application.hpp"
 #include "renderer/asset_manager.hpp"
 
+#include "renderer/window.hpp"
+#include "renderer/input_codes.hpp"
+
 namespace ren
 {
 Renderer::Renderer(Application& app, Asset_Manager& asset_manager,
@@ -26,7 +29,7 @@ std::vector<Settings_Base*> Renderer::get_settings() noexcept
     return result;
 }
 
-void Renderer::update(double t, double dt) noexcept
+void Renderer::update(Input_State& input_state, double t, double dt) noexcept
 {
 
 }
