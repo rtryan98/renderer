@@ -19,6 +19,8 @@ Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library& sha
     m_resources.create_buffers(m_asset_manager);
     m_resources.create_textures(m_asset_manager);
     m_resources.create_compute_pipelines(m_asset_manager, m_shader_library);
+    m_resources.create_graphics_pipelines(m_asset_manager, m_shader_library);
+    m_resources.create_samplers(m_asset_manager);
 
     float larges_lengthscale = 1024.f;
     auto calc_lengthscale = [](float lengthscale, uint32_t factor) {
@@ -71,6 +73,8 @@ Ocean_Renderer::~Ocean_Renderer()
     m_resources.destroy_buffers(m_asset_manager);
     m_resources.destroy_textures(m_asset_manager);
     m_resources.destroy_compute_pipelines(m_asset_manager);
+    m_resources.destroy_graphics_pipelines(m_asset_manager);
+    m_resources.destroy_samplers(m_asset_manager);
 }
 
 Ocean_Settings* Ocean_Renderer::get_settings() noexcept
@@ -252,6 +256,25 @@ void Ocean_Renderer::render(rhi::Command_List* cmd) noexcept
 {
 
     cmd->draw_indexed(0,1,0,0,0);
+}
+
+void Ocean_Renderer::debug_render_slope(rhi::Command_List* cmd, uint32_t camera_buffer_bindless_index) noexcept
+{
+    cmd->add_debug_marker("Ocean Debug Render - Slopes", .2f, .2f, 1.f);
+    cmd->set_pipeline(m_resources.gpu_resources.debug_render_slopes_pipeline);
+    constexpr auto SIZE = 64;
+    const auto length_scales = m_resources.data.initial_spectrum_data.length_scales;
+    cmd->set_push_constants<Ocean_Render_Debug_Push_Constants>({
+        .length_scales =       { length_scales[0],length_scales[1],length_scales[2],length_scales[3] },
+        .tex_sampler =         m_resources.gpu_resources.linear_sampler->bindless_index,
+        .camera =              camera_buffer_bindless_index,
+        .x_y_z_xdx_tex =       m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,
+        .ydx_zdx_ydy_zdy_tex = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index,
+        .line_scale =          .5f,
+        .point_dist =          .5f,
+        .point_field_size =    SIZE
+        }, rhi::Pipeline_Bind_Point::Graphics);
+    cmd->draw(2 * SIZE * SIZE, 1, 0, 0);
 }
 
 }

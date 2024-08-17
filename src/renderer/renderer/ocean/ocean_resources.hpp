@@ -29,6 +29,8 @@ struct Ocean_Resources
     } data;
     struct GPU_Resources
     {
+        rhi::Sampler* linear_sampler;
+
         rhi::Image* initial_spectrum_texture;
         rhi::Image* angular_frequency_texture;
         rhi::Image* x_y_z_xdx_texture;
@@ -54,5 +56,7 @@ struct Ocean_Resources
     void destroy_graphics_pipelines(Asset_Manager& asset_manager);
     void create_compute_pipelines(Asset_Manager& asset_manager, Shader_Library& shader_library);
     void destroy_compute_pipelines(Asset_Manager& asset_manager);
+    void create_samplers(Asset_Manager& asset_manager);
+    void destroy_samplers(Asset_Manager& asset_manager);
 };
 }

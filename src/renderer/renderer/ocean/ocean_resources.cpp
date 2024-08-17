@@ -79,7 +79,8 @@ void Ocean_Resources::create_graphics_pipelines(Asset_Manager& asset_manager, Sh
             .color_attachments = {
                 rhi::Pipeline_Color_Attachment_Blend_Info {
                 .blend_enable = false,
-                .logic_op_enable = false
+                .logic_op_enable = false,
+                .color_write_mask = rhi::Color_Component::Enable_All
                 }
             }
         },
@@ -89,14 +90,14 @@ void Ocean_Resources::create_graphics_pipelines(Asset_Manager& asset_manager, Sh
             .winding_order = rhi::Winding_Order::Front_Face_CCW
         },
         .depth_stencil_info = {
-            .depth_enable = true,
-            .depth_write_enable = true,
-            .comparison_func = rhi::Comparison_Func::Less_Equal
+            .depth_enable = false,
+            .depth_write_enable = false,
+            .stencil_enable = false
         },
         .primitive_topology = rhi::Primitive_Topology_Type::Line,
         .color_attachment_count = 1,
-        .color_attachment_formats = { rhi::Image_Format::R8G8B8A8_SRGB },
-        .depth_stencil_format = rhi::Image_Format::D32_SFLOAT
+        .color_attachment_formats = { rhi::Image_Format::R8G8B8A8_UNORM },
+        .depth_stencil_format = /* rhi::Image_Format::D32_SFLOAT */ rhi::Image_Format::Undefined
     };
 
     gpu_resources.debug_render_normals_pipeline = asset_manager.create_pipeline(debug_ci);
@@ -136,6 +137,33 @@ void Ocean_Resources::destroy_compute_pipelines(Asset_Manager& asset_manager)
         asset_manager.destroy_pipeline(gpu_resources.time_dependent_spectrum_pipeline);
     if (gpu_resources.fft_pipeline)
         asset_manager.destroy_pipeline(gpu_resources.fft_pipeline);
+}
+
+void Ocean_Resources::create_samplers(Asset_Manager& asset_manager)
+{
+    rhi::Sampler_Create_Info create_info = {
+        .filter_min = rhi::Sampler_Filter::Linear,
+        .filter_mag = rhi::Sampler_Filter::Linear,
+        .filter_mip = rhi::Sampler_Filter::Linear,
+        .address_mode_u = rhi::Image_Sample_Address_Mode::Wrap,
+        .address_mode_v = rhi::Image_Sample_Address_Mode::Wrap,
+        .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
+        .mip_lod_bias = 0.f,
+        .max_anisotropy = 16,
+        .comparison_func = rhi::Comparison_Func::None,
+        .reduction = rhi::Sampler_Reduction_Type::Standard,
+        .border_color = {},
+        .min_lod = .0f,
+        .max_lod = .0f,
+        .anisotropy_enable = true
+    };
+    gpu_resources.linear_sampler = asset_manager.create_sampler(create_info);
+}
+
+void Ocean_Resources::destroy_samplers(Asset_Manager& asset_manager)
+{
+    if (gpu_resources.linear_sampler)
+        asset_manager.destroy_sampler(gpu_resources.linear_sampler);
 }
 
 }

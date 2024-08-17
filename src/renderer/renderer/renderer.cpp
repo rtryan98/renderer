@@ -6,6 +6,8 @@
 #include "renderer/window.hpp"
 #include "renderer/input_codes.hpp"
 
+#include "shared/camera_shared_types.h"
+
 #undef near
 #undef far
 
@@ -27,14 +29,18 @@ Renderer::Renderer(Application& app, Asset_Manager& asset_manager,
     , m_fly_cam{
         .fov_y = 90.f,
         .aspect = calculate_aspect_ratio(app.get_window()),
-        .near = .001f,
+        .near = .01f,
         .far = 1000.f,
-        .sensitivity = 1.f,
-        .movement_speed = 1.f,
+        .sensitivity = .25f,
+        .movement_speed = 10.f,
         .pitch = 0.f,
         .yaw = 0.f,
         .position = { .0f, .0f, .5f }
     }
+    , m_camera_buffer(m_asset_manager.create_buffer({
+        .size = sizeof(GPU_Camera_Data),
+        .heap = rhi::Memory_Heap_Type::GPU
+        }, "Camera Buffer"))
     , m_imgui_renderer(imgui_renderer_create_info)
     , m_ocean_renderer(m_asset_manager, m_shader_library)
 {
@@ -62,6 +68,29 @@ void Renderer::update(const Input_State& input_state, double t, double dt) noexc
     m_fly_cam.update();
 }
 
+void Renderer::overlay_gui()
+{
+    {
+        ImGui::SetNextWindowPos({ 50.f, 50.f });
+        ImGui::SetNextWindowSizeConstraints({ 500.f, 500.f }, { 9999.f, 9999.f });
+        ImGui::Begin("##InvisibleCameraWindow", nullptr,
+              ImGuiWindowFlags_NoDecoration
+            | ImGuiWindowFlags_NoBackground
+            | ImGuiWindowFlags_NoInputs
+            | ImGuiWindowFlags_NoDocking
+            | ImGuiWindowFlags_NoMove);
+        ImGui::Text("Camera Position: %.3f, %.3f, %.3f",
+            m_fly_cam.position.x,
+            m_fly_cam.position.y,
+            m_fly_cam.position.z);
+        ImGui::Text("Camera Direction: %.3f, %.3f, %.3f",
+            m_fly_cam.forward.x,
+            m_fly_cam.forward.y,
+            m_fly_cam.forward.z);
+        ImGui::End();
+    }
+}
+
 void Renderer::setup_frame()
 {
     m_imgui_renderer.next_frame();
@@ -69,6 +98,14 @@ void Renderer::setup_frame()
 
 void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
 {
+    GPU_Camera_Data camera_data = {
+        .view = m_fly_cam.camera_data.view,
+        .proj = m_fly_cam.camera_data.proj,
+        .view_proj = m_fly_cam.camera_data.view_proj,
+        .position = m_fly_cam.camera_data.position
+    };
+    m_app.upload_buffer_data_immediate(m_camera_buffer, &camera_data, sizeof(camera_data), 0);
+
     m_ocean_renderer.simulate(m_app, cmd, dt);
 
     auto swapchain_image_view = m_swapchain.get_current_image_view();
@@ -142,7 +179,15 @@ void Renderer::render_swapchain_pass(rhi::Command_List* cmd)
         .depth_stencil_attachment = {}
     };
 
+    auto& window_data = m_app.get_window().get_window_data();
+    auto scale = m_app.get_window().get_dpi_scale();
     cmd->begin_render_pass(render_pass_info);
+    cmd->set_viewport(0.f, 0.f, float(window_data.width) * scale, float(window_data.height) * scale, 0.f, 1.f);
+    cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);
+    cmd->begin_debug_region("Debug Renderer", 1.f, .75f, .75f);
+    m_ocean_renderer.debug_render_slope(cmd, m_camera_buffer->buffer_view->bindless_index);
+    cmd->end_debug_region();
+    cmd->add_debug_marker("Dear ImGui", .5f, 1.f, .0f);
     m_imgui_renderer.render(cmd);
     cmd->end_render_pass();
 

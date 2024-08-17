@@ -21,6 +21,9 @@ public:
     [[nodiscard]] rhi::Buffer* create_buffer(const rhi::Buffer_Create_Info& create_info, const char* name = nullptr) noexcept;
     void destroy_buffer(rhi::Buffer* buffer) noexcept;
 
+    [[nodiscard]] rhi::Sampler* create_sampler(const rhi::Sampler_Create_Info& create_info) noexcept;
+    void destroy_sampler(rhi::Sampler* sampler) noexcept;
+
     [[nodiscard]] rhi::Image* create_image(const rhi::Image_Create_Info& create_info, const char* name = nullptr) noexcept;
     void destroy_image(rhi::Image* image) noexcept;
 
@@ -45,6 +48,7 @@ private:
     enum class Asset_Deletion_Type
     {
         Buffer,
+        Sampler,
         Image,
         Pipeline,
     };
@@ -56,6 +60,7 @@ private:
         union
         {
             rhi::Buffer* buffer;
+            rhi::Sampler* sampler;
             rhi::Image* image;
             rhi::Pipeline* pipeline;
         };

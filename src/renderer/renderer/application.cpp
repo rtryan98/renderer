@@ -217,6 +217,9 @@ rhi::Command_List* Application::handle_immediate_uploads(Frame& frame) noexcept
 void Application::process_gui() noexcept
 {
     ImGui::NewFrame();
+
+    m_renderer.overlay_gui();
+
     imgui_menubar();
 
     if (m_imgui_data.windows.renderer_settings)

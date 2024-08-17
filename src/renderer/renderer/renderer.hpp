@@ -28,6 +28,7 @@ public:
     std::vector<Settings_Base*> get_settings() noexcept;
 
     void update(const Input_State& input_state, double t, double dt) noexcept;
+    void overlay_gui();
     void setup_frame();
     void render(rhi::Command_List* cmd, double t, double dt) noexcept;
 
@@ -43,6 +44,7 @@ private:
     rhi::Swapchain& m_swapchain;
 
     Fly_Camera m_fly_cam;
+    rhi::Buffer* m_camera_buffer;
     Imgui_Renderer m_imgui_renderer;
     Ocean_Renderer m_ocean_renderer;
 

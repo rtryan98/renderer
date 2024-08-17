@@ -47,6 +47,7 @@ rhi::Buffer* Asset_Manager::create_buffer(const rhi::Buffer_Create_Info& create_
     if (!result.has_value())
     {
         m_logger->critical("Failed to create buffer! Reason: {}", result_to_string(result.error()));
+        if (name != nullptr) m_logger->critical("\tBuffer name: {}", name);
         return nullptr;
     }
     if (name != nullptr) m_device->name_resource(result.value(), name);
@@ -62,12 +63,33 @@ void Asset_Manager::destroy_buffer(rhi::Buffer* buffer) noexcept
         });
 }
 
+rhi::Sampler* Asset_Manager::create_sampler(const rhi::Sampler_Create_Info& create_info) noexcept
+{
+    auto result = m_device->create_sampler(create_info);
+    if (!result.has_value())
+    {
+        m_logger->critical("Failed to create sampler! Reason: {}", result_to_string(result.error()));
+        return nullptr;
+    }
+    return result.value();
+}
+
+void Asset_Manager::destroy_sampler(rhi::Sampler* sampler) noexcept
+{
+    m_deletion_queue.push_back({
+        .frame = get_deletion_frame(),
+        .type = Asset_Deletion_Type::Sampler,
+        .sampler = sampler
+        });
+}
+
 rhi::Image* Asset_Manager::create_image(const rhi::Image_Create_Info& create_info, const char* name) noexcept
 {
     auto result = m_device->create_image(create_info);
     if (!result.has_value())
     {
         m_logger->critical("Failed to create image! Reason: {}", result_to_string(result.error()));
+        if (name != nullptr) m_logger->critical("\tImage name: {}", name);
         return nullptr;
     }
     if (name != nullptr) m_device->name_resource(result.value(), name);

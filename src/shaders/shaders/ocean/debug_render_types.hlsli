@@ -4,7 +4,7 @@
 struct VS_Out
 {
     float4 position : SV_Position;
-    float4 color : SV_COLOR0;
+    float4 color : COLOR0;
 };
 
 typedef VS_Out PS_In;

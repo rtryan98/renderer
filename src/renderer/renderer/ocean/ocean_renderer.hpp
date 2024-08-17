@@ -25,6 +25,8 @@ public:
     void simulate(Application& app, rhi::Command_List* cmd, float dt) noexcept;
     void render(rhi::Command_List* cmd) noexcept;
 
+    void debug_render_slope(rhi::Command_List* cmd, uint32_t camera_buffer_bindless_index) noexcept;
+
 private:
     Asset_Manager& m_asset_manager;
     Shader_Library& m_shader_library;
