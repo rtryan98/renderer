@@ -226,14 +226,14 @@ float dirspread_mitsuyasu(Directional_Spreading_Args args)
 {
     float s = detail::mitsuyasu_s(args);
     float q_s = detail::mitsuyasu_q(s);
-    return q_s * pow(abs(cos(args.theta / 2.)), 2.);
+    return q_s * pow(abs(cos(args.theta / 2.)), 2. * s);
 }
 
 float dirspread_hasselmann(Directional_Spreading_Args args)
 {
     float s = detail::hasselmann_s(args);
     float q_s = detail::mitsuyasu_q(s);
-    return q_s * pow(abs(cos(args.theta / 2.)), 2.);
+    return q_s * pow(abs(cos(args.theta / 2.)), 2. * s);
 }
 
 float dirspread_donelan_banner(Directional_Spreading_Args args)

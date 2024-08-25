@@ -282,7 +282,7 @@ void Ocean_Renderer::debug_render_slope(rhi::Command_List* cmd, uint32_t camera_
         .x_y_z_xdx_tex =       m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,
         .ydx_zdx_ydy_zdy_tex = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index,
         .line_scale =          .5f,
-        .point_dist =          .5f,
+        .point_dist =          2.f,
         .point_field_size =    SIZE
         }, rhi::Pipeline_Bind_Point::Graphics);
     cmd->draw(2 * SIZE * SIZE, 1, 0, 0);
@@ -301,7 +301,7 @@ void Ocean_Renderer::debug_render_normal(rhi::Command_List* cmd, uint32_t camera
         .x_y_z_xdx_tex = m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,
         .ydx_zdx_ydy_zdy_tex = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index,
         .line_scale = 1.f,
-        .point_dist = .5f,
+        .point_dist = 2.f,
         .point_field_size = SIZE
         }, rhi::Pipeline_Bind_Point::Graphics);
     cmd->draw(2 * SIZE * SIZE, 1, 0, 0);
