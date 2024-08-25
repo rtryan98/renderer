@@ -190,7 +190,7 @@ float mitsuyasu_q(float s)
 float hasselmann_s(Directional_Spreading_Args args)
 {
     float s0 = 6.97 * pow(args.omega / args.omega_peak, 4.06);
-    float s1_exp = -2.33 - 1.45 * (((args.u * args.omega_peak) / args.g) - 1.17);
+    float s1_exp = -2.33 - 1.45 * ((args.u * args.omega_peak / args.g) - 1.17);
     float s1 = 9.77 * pow(args.omega / args.omega_peak, s1_exp);
     return args.omega > args.omega_peak
         ? s1
@@ -239,7 +239,7 @@ float dirspread_hasselmann(Directional_Spreading_Args args)
 float dirspread_donelan_banner(Directional_Spreading_Args args)
 {
     float beta_s = detail::donelan_banner_beta_s(args.omega, args.omega_peak);
-    return (beta_s/(2. * tanh(beta_s * PI))) * pow(detail::clmp_sech(beta_s * args.theta), 2.0f);
+    return (beta_s/(2. * tanh(beta_s * PI))) * pow(detail::clmp_sech(beta_s * args.theta), 2.);
 }
 
 float dirspread_flat()

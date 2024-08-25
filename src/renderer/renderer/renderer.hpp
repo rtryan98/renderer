@@ -33,9 +33,11 @@ public:
     void render(rhi::Command_List* cmd, double t, double dt) noexcept;
 
 private:
+    void render_gbuffer_pass(rhi::Command_List* cmd);
+    void render_ocean_pass(rhi::Command_List* cmd);
     void render_swapchain_pass(rhi::Command_List* cmd);
 
-    void init_g_buffer();
+    void init_rendertargets();
 
 private:
     Application& m_app;
@@ -54,5 +56,10 @@ private:
         Render_Attachment* target0;
         Render_Attachment* depth_stencil;
     } m_g_buffer = {};
+    struct
+    {
+        Render_Attachment* color;
+        Render_Attachment* depth_stencil;
+    } m_ocean_rendertargets;
 };
 }

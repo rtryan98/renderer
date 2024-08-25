@@ -15,7 +15,7 @@ Application::Application() noexcept
     , m_input_state(std::make_unique<Input_State>(*m_window))
     , m_device(rhi::Graphics_Device::create({
         .graphics_api = rhi::Graphics_API::D3D12,
-        .enable_validation = false,
+        .enable_validation = true,
         .enable_gpu_validation = false,
         .enable_locking = false
         }))

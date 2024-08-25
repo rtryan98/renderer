@@ -26,6 +26,7 @@ public:
     void render(rhi::Command_List* cmd) noexcept;
 
     void debug_render_slope(rhi::Command_List* cmd, uint32_t camera_buffer_bindless_index) noexcept;
+    void debug_render_normal(rhi::Command_List* cmd, uint32_t camera_buffer_bindless_index) noexcept;
 
 private:
     Asset_Manager& m_asset_manager;

@@ -100,7 +100,9 @@ void main(uint3 id : SV_DispatchThreadID)
 
     float min_wavenumber = sqrt(2.) * ren::TWO_PI / data.length_scales[id.z];
     float max_wavenumber = ren::PI * data.texture_size / data.length_scales[id.z];
-    if (wavenumber < min_wavenumber || wavenumber > max_wavenumber)
+    float max_wavenumber_prev_cascade = id.z <= 0 ? 0.f : ren::PI * data.texture_size / data.length_scales[id.z - 1];
+    bool overlap = wavenumber < max_wavenumber_prev_cascade;
+    if (wavenumber < min_wavenumber || wavenumber > max_wavenumber || overlap)
     {
         directional_spectrum = float2(0.,0.);
     }

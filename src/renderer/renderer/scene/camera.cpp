@@ -6,6 +6,18 @@ namespace ren
 {
 void Fly_Camera::update()
 {
+    forward = {
+        XMScalarCos(XMConvertToRadians(yaw)) * XMScalarCos(XMConvertToRadians(pitch)),
+        XMScalarSin(XMConvertToRadians(yaw)) * XMScalarCos(XMConvertToRadians(pitch)),
+        XMScalarSin(XMConvertToRadians(pitch)),
+    };
+    XMStoreFloat3(&forward,
+        XMVector3Normalize(XMLoadFloat3(&forward)));
+    XMStoreFloat3(&right,
+        XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&WORLD_UP), XMLoadFloat3(&forward))));
+    XMStoreFloat3(&up,
+        XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&forward), XMLoadFloat3(&right))));
+
     XMStoreFloat4x4(&camera_data.proj, XMMatrixPerspectiveFovRH(
         XMConvertToRadians(fov_y), aspect, near, far));
     XMStoreFloat4x4(&camera_data.view, XMMatrixLookAtRH(
@@ -42,17 +54,6 @@ void Fly_Camera::update_rotation(const Input_State& input_state)
         pitch -= sensitivity * mouse_delta.y;
         pitch = XMMax(XMMin(pitch, 89.0f), -89.0f);
     }
-    forward = {
-        XMScalarCos(XMConvertToRadians(yaw)) * XMScalarCos(XMConvertToRadians(pitch)),
-        XMScalarSin(XMConvertToRadians(yaw)) * XMScalarCos(XMConvertToRadians(pitch)),
-        XMScalarSin(XMConvertToRadians(pitch)),
-    };
-    XMStoreFloat3(&forward,
-        XMVector3Normalize(XMLoadFloat3(&forward)));
-    XMStoreFloat3(&right,
-        XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&forward), XMLoadFloat3(&WORLD_UP))));
-    XMStoreFloat3(&up,
-        XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&right), XMLoadFloat3(&forward))));
 }
 
 void Fly_Camera::update_position(const Input_State& input_state, float dt)

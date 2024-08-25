@@ -86,15 +86,19 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
 {
     m_resources.data.total_time += dt;
 
+    app.upload_buffer_data_immediate(
+        m_resources.gpu_resources.initial_spectrum_data,
+        &m_resources.data.initial_spectrum_data, sizeof(Ocean_Initial_Spectrum_Data), 0);
+
     cmd->begin_debug_region("Ocean Simulation", 0.5f, 0.5f, 1.f);
 
     rhi::Image_Barrier_Info initial_spectrum_barrier_info = {
         .stage_before = rhi::Barrier_Pipeline_Stage::None,
         .stage_after = rhi::Barrier_Pipeline_Stage::Compute_Shader,
         .access_before = rhi::Barrier_Access::None,
-        .access_after = rhi::Barrier_Access::Shader_Write,
+        .access_after = rhi::Barrier_Access::Unordered_Access_Write,
         .layout_before = rhi::Barrier_Image_Layout::Undefined,
-        .layout_after = rhi::Barrier_Image_Layout::General,
+        .layout_after = rhi::Barrier_Image_Layout::Unordered_Access,
         .image = m_resources.gpu_resources.initial_spectrum_texture,
         .subresource_range = {
             .first_mip_level = 0,
@@ -118,9 +122,6 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
         cmd->barrier(barrier);
     }
 
-    app.upload_buffer_data_immediate(
-        m_resources.gpu_resources.initial_spectrum_data,
-        &m_resources.data.initial_spectrum_data, sizeof(Ocean_Initial_Spectrum_Data), 0);
     cmd->begin_debug_region("Initial Spectrum", 0.25f, 0.0f, 1.0f);
     cmd->set_pipeline(m_resources.gpu_resources.initial_spectrum_pipeline);
     uint32_t tex_dispatch_size_xy =
@@ -139,18 +140,21 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
     auto ydx_zdx_ydy_zdy_barrier_info = initial_spectrum_barrier_info;
     ydx_zdx_ydy_zdy_barrier_info.image = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture;
 
+    initial_spectrum_barrier_info.discard
+        = angular_frequency_barrier_info.discard
+        = false;
     initial_spectrum_barrier_info.stage_before
         = angular_frequency_barrier_info.stage_before
         = rhi::Barrier_Pipeline_Stage::Compute_Shader;
     initial_spectrum_barrier_info.access_before
         = angular_frequency_barrier_info.access_before
-        = rhi::Barrier_Access::Shader_Write;
+        = rhi::Barrier_Access::Unordered_Access_Write;
     initial_spectrum_barrier_info.access_after
         = angular_frequency_barrier_info.access_after
         = rhi::Barrier_Access::Shader_Read;
     initial_spectrum_barrier_info.layout_before
         = angular_frequency_barrier_info.layout_before
-        = rhi::Barrier_Image_Layout::General;
+        = rhi::Barrier_Image_Layout::Unordered_Access;
     initial_spectrum_barrier_info.layout_after
         = angular_frequency_barrier_info.layout_after
         = rhi::Barrier_Image_Layout::Shader_Read_Only;
@@ -165,6 +169,10 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
         rhi::Barrier_Info barrier = { .image_barriers = image_barriers };
         cmd->barrier(barrier);
     }
+
+    x_y_z_xdx_barrier_info.discard
+        = ydx_zdx_ydy_zdy_barrier_info.discard
+        = false;
 
     cmd->begin_debug_region("Time Dependent Spectrum", 0.25f, 0.25f, 1.0f);
     cmd->set_pipeline(m_resources.gpu_resources.time_dependent_spectrum_pipeline);
@@ -184,13 +192,13 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
         = rhi::Barrier_Pipeline_Stage::Compute_Shader;
     x_y_z_xdx_barrier_info.access_before
         = ydx_zdx_ydy_zdy_barrier_info.access_before
-        = rhi::Barrier_Access::Shader_Write;
+        = rhi::Barrier_Access::Unordered_Access_Write;
     x_y_z_xdx_barrier_info.access_after
         = ydx_zdx_ydy_zdy_barrier_info.access_after
-        = rhi::Barrier_Access::Shader_Read;
+        = rhi::Barrier_Access::Unordered_Access_Read;
     x_y_z_xdx_barrier_info.layout_before
         = ydx_zdx_ydy_zdy_barrier_info.layout_before
-        = rhi::Barrier_Image_Layout::General;
+        = rhi::Barrier_Image_Layout::Unordered_Access;
 
     {
         auto image_barriers = std::to_array({
@@ -236,6 +244,9 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
     x_y_z_xdx_barrier_info.stage_after
         = ydx_zdx_ydy_zdy_barrier_info.stage_after
         = rhi::Barrier_Pipeline_Stage::Vertex_Shader;
+    x_y_z_xdx_barrier_info.access_after
+        = ydx_zdx_ydy_zdy_barrier_info.access_after
+        = rhi::Barrier_Access::Shader_Read;
     x_y_z_xdx_barrier_info.layout_after
         = ydx_zdx_ydy_zdy_barrier_info.layout_after
         = rhi::Barrier_Image_Layout::Shader_Read_Only;
@@ -262,7 +273,7 @@ void Ocean_Renderer::debug_render_slope(rhi::Command_List* cmd, uint32_t camera_
 {
     cmd->add_debug_marker("Ocean Debug Render - Slopes", .2f, .2f, 1.f);
     cmd->set_pipeline(m_resources.gpu_resources.debug_render_slopes_pipeline);
-    constexpr auto SIZE = 64;
+    constexpr auto SIZE = 128;
     const auto length_scales = m_resources.data.initial_spectrum_data.length_scales;
     cmd->set_push_constants<Ocean_Render_Debug_Push_Constants>({
         .length_scales =       { length_scales[0],length_scales[1],length_scales[2],length_scales[3] },
@@ -273,6 +284,25 @@ void Ocean_Renderer::debug_render_slope(rhi::Command_List* cmd, uint32_t camera_
         .line_scale =          .5f,
         .point_dist =          .5f,
         .point_field_size =    SIZE
+        }, rhi::Pipeline_Bind_Point::Graphics);
+    cmd->draw(2 * SIZE * SIZE, 1, 0, 0);
+}
+
+void Ocean_Renderer::debug_render_normal(rhi::Command_List* cmd, uint32_t camera_buffer_bindless_index) noexcept
+{
+    cmd->add_debug_marker("Ocean Debug Render - Normals", .2f, .2f, 1.f);
+    cmd->set_pipeline(m_resources.gpu_resources.debug_render_normals_pipeline);
+    constexpr auto SIZE = 128;
+    const auto length_scales = m_resources.data.initial_spectrum_data.length_scales;
+    cmd->set_push_constants<Ocean_Render_Debug_Push_Constants>({
+        .length_scales = { length_scales[0],length_scales[1],length_scales[2],length_scales[3] },
+        .tex_sampler = m_resources.gpu_resources.linear_sampler->bindless_index,
+        .camera = camera_buffer_bindless_index,
+        .x_y_z_xdx_tex = m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,
+        .ydx_zdx_ydy_zdy_tex = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index,
+        .line_scale = 1.f,
+        .point_dist = .5f,
+        .point_field_size = SIZE
         }, rhi::Pipeline_Bind_Point::Graphics);
     cmd->draw(2 * SIZE * SIZE, 1, 0, 0);
 }
