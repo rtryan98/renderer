@@ -115,7 +115,7 @@ Shader_Library::Shader_Library(std::shared_ptr<Logger> logger, rhi::Graphics_Dev
 {
 
     m_logger->info("Loading shaders.");
-    m_logger->trace("Constructing dependency trees.");
+    // m_logger->trace("Constructing dependency trees.");
 
     auto prefix_path = get_shader_source_prefix_path();
     m_logger->debug("Shader source prefix path is '{}'", prefix_path.c_str());
@@ -137,29 +137,29 @@ Shader_Library::Shader_Library(std::shared_ptr<Logger> logger, rhi::Graphics_Dev
         const auto& shader = shader_metadata[i];
         shader_sources.insert(shader.source_path);
     }
-    for (const auto& shader_source : shader_sources)
-    {
-        m_logger->trace("Processing '{}'.", shader_source);
-        // TODO: parse includes recursively
-    }
+    // for (const auto& shader_source : shader_sources)
+    // {
+    //     m_logger->trace("Processing '{}'.", shader_source);
+    //     // TODO: parse includes recursively
+    // }
     for (auto i = 0; i < shader_metadata.size(); ++i)
     {
         const auto& shader = shader_metadata[i];
-        m_logger->info("Loading shader '{}'", shader.name);
 
         bool shader_binary_outdated = true;
         bool shader_binary_does_not_exist = true;
 
         bool requires_compile = false;
 
+        // TODO: caching
         if (shader_binary_does_not_exist)
         {
-            m_logger->info("Cached binary '{}' does not exist. Compile required.", shader.binary_path);
+            // m_logger->info("Cached binary '{}' does not exist. Compile required.", shader.binary_path);
             requires_compile = true;
         }
         else if (shader_binary_outdated)
         {
-            m_logger->info("Cached binary '{}' is outdated. Recompile required.", shader.binary_path);
+            // m_logger->info("Cached binary '{}' is outdated. Recompile required.", shader.binary_path);
             requires_compile = true;
         }
         if (shader_binary_does_not_exist || shader_binary_outdated)

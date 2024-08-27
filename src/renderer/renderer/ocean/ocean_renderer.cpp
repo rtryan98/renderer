@@ -84,7 +84,8 @@ Ocean_Settings* Ocean_Renderer::get_settings() noexcept
 
 void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt) noexcept
 {
-    m_resources.data.total_time += dt;
+    if (m_resources.data.update_time)
+        m_resources.data.total_time += dt;
 
     app.upload_buffer_data_immediate(
         m_resources.gpu_resources.initial_spectrum_data,
@@ -269,14 +270,42 @@ void Ocean_Renderer::render(rhi::Command_List* cmd) noexcept
     cmd->draw_indexed(0,1,0,0,0);
 }
 
+void Ocean_Renderer::render_patch(rhi::Command_List* cmd, uint32_t camera_buffer_bindless_index) noexcept
+{
+    cmd->add_debug_marker("Ocean Render - Single Patch", .2f, .2f, 1.f);
+    cmd->set_pipeline(m_resources.gpu_resources.render_patch_pipeline);
+    constexpr auto SIZE = 1024;
+    cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
+        .length_scales = m_resources.data.initial_spectrum_data.length_scales,
+        .tex_sampler = m_resources.gpu_resources.linear_sampler->bindless_index,
+        .camera = camera_buffer_bindless_index,
+        .x_y_z_xdx_tex = m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,
+        .ydx_zdx_ydy_zdy_tex = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index,
+        .vertex_position_dist = .25f,
+        .field_size = SIZE
+        }, rhi::Pipeline_Bind_Point::Graphics);
+    cmd->draw(6 * SIZE * SIZE, 1, 0, 0);
+}
+
+void Ocean_Renderer::render_composite(rhi::Command_List* cmd, uint32_t color_image_bindless_index) noexcept
+{
+    cmd->set_pipeline(m_resources.gpu_resources.render_composite_pipeline);
+    cmd->set_push_constants<Ocean_Render_Composition_Push_Constants>({
+        .rt_color_tex = color_image_bindless_index,
+        .tex_sampler = m_resources.gpu_resources.linear_sampler->bindless_index
+        }, rhi::Pipeline_Bind_Point::Graphics);
+    cmd->draw(3,1,0,0);
+}
+
 void Ocean_Renderer::debug_render_slope(rhi::Command_List* cmd, uint32_t camera_buffer_bindless_index) noexcept
 {
+    if (!m_resources.data.debug_render_slope) return;
+
     cmd->add_debug_marker("Ocean Debug Render - Slopes", .2f, .2f, 1.f);
     cmd->set_pipeline(m_resources.gpu_resources.debug_render_slopes_pipeline);
     constexpr auto SIZE = 128;
-    const auto length_scales = m_resources.data.initial_spectrum_data.length_scales;
     cmd->set_push_constants<Ocean_Render_Debug_Push_Constants>({
-        .length_scales =       { length_scales[0],length_scales[1],length_scales[2],length_scales[3] },
+        .length_scales =       m_resources.data.initial_spectrum_data.length_scales,
         .tex_sampler =         m_resources.gpu_resources.linear_sampler->bindless_index,
         .camera =              camera_buffer_bindless_index,
         .x_y_z_xdx_tex =       m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,
@@ -290,12 +319,13 @@ void Ocean_Renderer::debug_render_slope(rhi::Command_List* cmd, uint32_t camera_
 
 void Ocean_Renderer::debug_render_normal(rhi::Command_List* cmd, uint32_t camera_buffer_bindless_index) noexcept
 {
+    if (!m_resources.data.debug_render_normal) return;
+
     cmd->add_debug_marker("Ocean Debug Render - Normals", .2f, .2f, 1.f);
     cmd->set_pipeline(m_resources.gpu_resources.debug_render_normals_pipeline);
     constexpr auto SIZE = 128;
-    const auto length_scales = m_resources.data.initial_spectrum_data.length_scales;
     cmd->set_push_constants<Ocean_Render_Debug_Push_Constants>({
-        .length_scales = { length_scales[0],length_scales[1],length_scales[2],length_scales[3] },
+        .length_scales = m_resources.data.initial_spectrum_data.length_scales,
         .tex_sampler = m_resources.gpu_resources.linear_sampler->bindless_index,
         .camera = camera_buffer_bindless_index,
         .x_y_z_xdx_tex = m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,

@@ -16,7 +16,7 @@ void main(uint3 id : SV_DispatchThreadID)
     float4 spectrum_k = initial_spectrum_tex.load_2d_array_uniform<float4>(id.xyz);
     float2 spectrum = spectrum_k.xy;
     float2 k = spectrum_k.zw;
-    float rec_wavenumber = 1. / max(0.0001, length(k));
+    float rec_wavenumber = rcp(max(0.0001, length(k)));
     float2 spectrum_minus_k = ren::cconjugate(initial_spectrum_tex.load_2d_array_uniform<float4>(uint3((pc.texture_size - id.x) % pc.texture_size, (pc.texture_size - id.y) % pc.texture_size, id.z)).xy);
     float omega_k = angular_frequency_tex.load_2d_array_uniform<float>(id);
 

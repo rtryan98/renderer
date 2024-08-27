@@ -5,6 +5,8 @@
 
 DECLARE_PUSH_CONSTANTS(Ocean_Initial_Spectrum_Push_Constants, pc);
 
+static const float MAX_LENGTHSCALE = 100000.;
+
 float pcgnoise(int3 a)
 {
     return ren::box_muller_12(1.0/float(0xffffffffu) * float2(ren::pcg3d(a).xy));
@@ -74,6 +76,16 @@ float2 calculate_spectrum(float wavenumber, float delta_k, float theta, float g,
     return float2(spectrum_data.contribution * directional_spread * spectrum, omega);
 }
 
+float calculate_min_wavenumber(float length_scale)
+{
+    return sqrt(2.) * ren::TWO_PI / length_scale;
+}
+
+float calculate_max_wavenumber(float length_scale, float texture_size)
+{
+    return ren::PI * texture_size / length_scale;
+}
+
 [numthreads(32, 32, 1)]
 void main(uint3 id : SV_DispatchThreadID)
 {
@@ -98,13 +110,15 @@ void main(uint3 id : SV_DispatchThreadID)
     float2 noise = float2(pcgnoise(id), pcgnoise(id + uint3(0,0,4)));
     float2 directional_spectrum = 1. / sqrt(2.) * noise * spectrum * float(data.active_cascades[id.z]);
 
-    float min_wavenumber = sqrt(2.) * ren::TWO_PI / data.length_scales[id.z];
-    float max_wavenumber = ren::PI * data.texture_size / data.length_scales[id.z];
-    float max_wavenumber_prev_cascade = id.z <= 0 ? 0.f : ren::PI * data.texture_size / data.length_scales[id.z - 1];
-    bool overlap = wavenumber < max_wavenumber_prev_cascade;
-    if (wavenumber < min_wavenumber || wavenumber > max_wavenumber || overlap)
+    float min_wavenumber = calculate_min_wavenumber(data.length_scales[id.z]);
+    float max_wavenumber = calculate_max_wavenumber(data.length_scales[id.z], data.texture_size);
+    // float min_wavenumber_next_cascade = id.z > 3 ? MAX_LENGTHSCALE : calculate_min_wavenumber(data.length_scales[id.z + 1]);
+    float max_wavenumber_prev_cascade = id.z <= 0 ? 0.f : calculate_max_wavenumber(data.length_scales[id.z - 1], data.texture_size);
+    bool overlap_low = wavenumber < max_wavenumber_prev_cascade;
+    if (wavenumber < min_wavenumber || wavenumber > max_wavenumber || overlap_low)
     {
         directional_spectrum = float2(0.,0.);
+        omega = 0.0;
     }
 
     spectrum_tex.store_2d_array_uniform(id, float4(directional_spectrum, k));

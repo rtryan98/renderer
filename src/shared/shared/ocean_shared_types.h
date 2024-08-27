@@ -36,8 +36,8 @@ struct Ocean_Spectrum_Data
 struct SHADER_STRUCT_ALIGN Ocean_Initial_Spectrum_Data
 {
     Ocean_Spectrum_Data spectra[2];
-    uint active_cascades[4];
-    float length_scales[4];
+    uint4 active_cascades;
+    float4 length_scales;
     uint texture_size;
     float g;
     float h;
@@ -70,6 +70,23 @@ struct SHADER_STRUCT_ALIGN Ocean_Render_Debug_Push_Constants
     float line_scale;
     float point_dist;
     uint point_field_size;
+};
+
+struct SHADER_STRUCT_ALIGN Ocean_Render_Patch_Push_Constants
+{
+    float4 length_scales;
+    SHADER_HANDLE_TYPE tex_sampler;
+    SHADER_HANDLE_TYPE camera;
+    SHADER_HANDLE_TYPE x_y_z_xdx_tex;
+    SHADER_HANDLE_TYPE ydx_zdx_ydy_zdy_tex;
+    float vertex_position_dist;
+    uint field_size;
+};
+
+struct SHADER_STRUCT_ALIGN Ocean_Render_Composition_Push_Constants
+{
+    SHADER_HANDLE_TYPE rt_color_tex;
+    SHADER_HANDLE_TYPE tex_sampler;
 };
 
 #endif

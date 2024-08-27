@@ -1,0 +1,5 @@
+{
+    "name": "surface_patch_render_ocean",
+    "shader_type": "vs",
+    "entry_point": "main"
+}

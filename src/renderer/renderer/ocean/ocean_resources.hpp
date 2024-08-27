@@ -26,6 +26,9 @@ struct Ocean_Resources
     {
         Ocean_Initial_Spectrum_Data initial_spectrum_data;
         float total_time;
+        bool update_time = true;
+        bool debug_render_slope;
+        bool debug_render_normal;
     } data;
     struct GPU_Resources
     {
@@ -46,6 +49,9 @@ struct Ocean_Resources
 
         rhi::Pipeline* debug_render_slopes_pipeline;
         rhi::Pipeline* debug_render_normals_pipeline;
+        rhi::Pipeline* render_patch_pipeline;
+
+        rhi::Pipeline* render_composite_pipeline;
     } gpu_resources;
 
     void create_buffers(Asset_Manager& asset_manager);

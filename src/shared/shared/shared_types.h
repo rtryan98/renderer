@@ -29,6 +29,15 @@
     #ifndef float4
         #define float4 DirectX::XMFLOAT4
     #endif
+    #ifndef uint2
+        #define uint2 DirectX::XMUINT2
+    #endif
+    #ifndef uint3
+        #define uint3 alignas(DirectX::XMUINT4) DirectX::XMUINT3
+    #endif
+    #ifndef uint4
+        #define uint4 DirectX::XMUINT4
+    #endif
     // Matrices
     #ifndef float3x3
         #define float3x3 DirectX::XMFLOAT3X3

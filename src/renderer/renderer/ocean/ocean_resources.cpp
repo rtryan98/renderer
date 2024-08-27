@@ -103,6 +103,48 @@ void Ocean_Resources::create_graphics_pipelines(Asset_Manager& asset_manager, Sh
     gpu_resources.debug_render_normals_pipeline = asset_manager.create_pipeline(debug_ci);
     debug_ci.vs = shader_library.get_shader(Shaders::debug_render_ocean_slope_vs);
     gpu_resources.debug_render_slopes_pipeline = asset_manager.create_pipeline(debug_ci);
+
+    auto graphics_ci = rhi::Graphics_Pipeline_Create_Info{
+        .vs = shader_library.get_shader(Shaders::surface_patch_render_ocean_vs),
+        .ps = shader_library.get_shader(Shaders::surface_render_ocean_ps),
+        .blend_state_info = {
+            .independent_blend_enable = false,
+            .color_attachments = {
+                rhi::Pipeline_Color_Attachment_Blend_Info {
+                .blend_enable = false,
+                .logic_op_enable = false,
+                .color_write_mask = rhi::Color_Component::Enable_All
+                }
+            }
+        },
+        .rasterizer_state_info = {
+            .fill_mode = rhi::Fill_Mode::Solid,
+            .cull_mode = rhi::Cull_Mode::None,
+            .winding_order = rhi::Winding_Order::Front_Face_CCW
+        },
+        .depth_stencil_info = {
+            .depth_enable = true,
+            .depth_write_enable = true,
+            .comparison_func = rhi::Comparison_Func::Less,
+            .stencil_enable = false
+        },
+        .primitive_topology = rhi::Primitive_Topology_Type::Triangle,
+        .color_attachment_count = 1,
+        .color_attachment_formats = { rhi::Image_Format::R8G8B8A8_UNORM },
+        .depth_stencil_format = rhi::Image_Format::D32_SFLOAT
+    };
+
+    auto patch_ci = graphics_ci;
+    // patch_ci.rasterizer_state_info.fill_mode = rhi::Fill_Mode::Wireframe;
+    gpu_resources.render_patch_pipeline = asset_manager.create_pipeline(patch_ci);
+
+    auto composite_ci = graphics_ci;
+    composite_ci.vs = shader_library.get_shader(Shaders::fullscreen_triangle_vs);
+    composite_ci.ps = shader_library.get_shader(Shaders::compose_ocean_ps);
+    composite_ci.depth_stencil_info.depth_enable = false;
+    composite_ci.depth_stencil_info.depth_write_enable = false;
+    composite_ci.depth_stencil_format = rhi::Image_Format::Undefined;
+    gpu_resources.render_composite_pipeline = asset_manager.create_pipeline(composite_ci);
 }
 
 void Ocean_Resources::destroy_graphics_pipelines(Asset_Manager& asset_manager)
@@ -111,6 +153,10 @@ void Ocean_Resources::destroy_graphics_pipelines(Asset_Manager& asset_manager)
         asset_manager.destroy_pipeline(gpu_resources.debug_render_normals_pipeline);
     if (gpu_resources.debug_render_slopes_pipeline)
         asset_manager.destroy_pipeline(gpu_resources.debug_render_slopes_pipeline);
+    if (gpu_resources.render_patch_pipeline)
+        asset_manager.destroy_pipeline(gpu_resources.render_patch_pipeline);
+    if (gpu_resources.render_composite_pipeline)
+        asset_manager.destroy_pipeline(gpu_resources.render_composite_pipeline);
 }
 
 void Ocean_Resources::create_compute_pipelines(Asset_Manager& asset_manager, Shader_Library& shader_library)

@@ -158,7 +158,7 @@ void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
     render_ocean_pass(cmd);
 
     auto swapchain_image_view = m_swapchain.get_current_image_view();
-    /* Transition Swapchain to Color Attachment layout */ {
+    /* Transition Swapchain to Color Attachment layout and Ocean Color to Shader Resource */ {
         rhi::Image_Barrier_Info swapchain_layout_barrier = {
             .stage_before = rhi::Barrier_Pipeline_Stage::None,
             .stage_after = rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
@@ -172,9 +172,23 @@ void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
             .subresource_range = RT_DEFAULT_SUBRESOURCE_RANGE,
             .discard = true
         };
+        rhi::Image_Barrier_Info ocean_color_barrier = {
+            .stage_before = rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
+            .stage_after = rhi::Barrier_Pipeline_Stage::Pixel_Shader,
+            .access_before = rhi::Barrier_Access::Color_Attachment_Write,
+            .access_after = rhi::Barrier_Access::Shader_Sampled_Read,
+            .layout_before = rhi::Barrier_Image_Layout::Color_Attachment,
+            .layout_after = rhi::Barrier_Image_Layout::Shader_Read_Only,
+            .queue_type_ownership_transfer_target_queue = rhi::Queue_Type::Graphics,
+            .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
+            .image = m_ocean_rendertargets.color->image,
+            .subresource_range = RT_DEFAULT_SUBRESOURCE_RANGE,
+            .discard = false
+        };
+        auto barriers = std::to_array({ swapchain_layout_barrier, ocean_color_barrier });
         cmd->barrier({
             .buffer_barriers = {},
-            .image_barriers = { &swapchain_layout_barrier, 1 },
+            .image_barriers = barriers,
             .memory_barriers = {}
             });
     }
@@ -229,12 +243,17 @@ void Renderer::render_ocean_pass(rhi::Command_List* cmd)
             .stencil_load_op = rhi::Render_Pass_Attachment_Load_Op::No_Access,
             .stencil_store_op = rhi::Render_Pass_Attachment_Store_Op::No_Access,
             .clear_value = {
-                .depth_stencil = { 0.0f, 0 }
+                .depth_stencil = { 1.0f, 0 }
             }
         }
     };
-    cmd->begin_render_pass(render_pass_info);
 
+    cmd->begin_render_pass(render_pass_info);
+    auto& window_data = m_app.get_window().get_window_data();
+    auto scale = m_app.get_window().get_dpi_scale();
+    cmd->set_viewport(0.f, 0.f, float(window_data.width) * scale, float(window_data.height) * scale, 0.f, 1.f);
+    cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);
+    m_ocean_renderer.render_patch(cmd, m_camera_buffer->buffer_view->bindless_index);
     cmd->end_render_pass();
 
     cmd->end_debug_region();
@@ -264,10 +283,15 @@ void Renderer::render_swapchain_pass(rhi::Command_List* cmd)
     cmd->begin_render_pass(render_pass_info);
     cmd->set_viewport(0.f, 0.f, float(window_data.width) * scale, float(window_data.height) * scale, 0.f, 1.f);
     cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);
+
+    cmd->add_debug_marker("Ocean Composite", .5f, .5f, 1.f);
+    m_ocean_renderer.render_composite(cmd, m_ocean_rendertargets.color->image->image_view->bindless_index);
+
     cmd->begin_debug_region("Debug Renderer", 1.f, .75f, .75f);
     m_ocean_renderer.debug_render_slope(cmd, m_camera_buffer->buffer_view->bindless_index);
     m_ocean_renderer.debug_render_normal(cmd, m_camera_buffer->buffer_view->bindless_index);
     cmd->end_debug_region();
+
     cmd->add_debug_marker("Dear ImGui", .5f, 1.f, .0f);
     m_imgui_renderer.render(cmd);
     cmd->end_render_pass();
@@ -300,7 +324,7 @@ void Renderer::init_rendertargets()
 
     auto ocean_color_info = default_info;
     ocean_color_info.name = "ocean_color";
-    ocean_color_info.format = rhi::Image_Format::R16G16B16A16_SFLOAT;
+    ocean_color_info.format = rhi::Image_Format::R8G8B8A8_UNORM;
     ocean_color_info.create_srv = true;
     auto ocean_ds_info = default_info;
     ocean_ds_info.name = "ocean_ds";

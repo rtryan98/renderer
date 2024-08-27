@@ -5,4 +5,7 @@ target_sources(
     debug_render.ps.json
     debug_render_normal.vs.json
     debug_render_slope.vs.json
+    patch.vs.json
+    surface.ps.json
+    compose.ps.json
 )

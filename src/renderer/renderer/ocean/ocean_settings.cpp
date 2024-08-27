@@ -70,6 +70,20 @@ void Ocean_Settings::process_gui()
 {
     process_gui_options();
     process_gui_simulation_settings();
+
+    ImGui::SeparatorText("Debug");
+    {
+        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::Checkbox("Update Time", &m_resources.data.update_time);
+    }
+    {
+        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::Checkbox("Debug Render Slopes", &m_resources.data.debug_render_slope);
+    }
+    {
+        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::Checkbox("Debug Render Normals", &m_resources.data.debug_render_normal);
+    }
 }
 
 void Ocean_Settings::process_gui_options()
@@ -170,11 +184,17 @@ void Ocean_Settings::process_gui_simulation_settings()
     ImGui::SliderFloat("Gravity", &data.initial_spectrum_data.g, .001f, 100.f);
     imutil::help_marker(OCEAN_HELP_TEXT_GRAVITY);
 
+    auto length_scales = std::to_array({
+        &data.initial_spectrum_data.length_scales.x,
+        &data.initial_spectrum_data.length_scales.y,
+        &data.initial_spectrum_data.length_scales.z,
+        &data.initial_spectrum_data.length_scales.w,
+        });
     for (auto i = 0; i < 4; ++i)
     {
         auto lengthscale_str = std::string("Lengthscale ") + std::to_string(i + 1);
         ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
-        ImGui::SliderFloat(lengthscale_str.c_str(), &data.initial_spectrum_data.length_scales[i], .001f, 10000.f);
+        ImGui::SliderFloat(lengthscale_str.c_str(), length_scales[i], .001f, 10000.f);
         imutil::help_marker(OCEAN_HELP_TEXT_LENGTHSCALE);
     }
 
