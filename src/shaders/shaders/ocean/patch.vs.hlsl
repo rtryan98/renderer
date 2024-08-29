@@ -36,8 +36,8 @@ VS_Out main(uint vertex_id : SV_VertexID)
     float4 ydx_zdx_ydy_zdy = float4(0.,0.,0.,0.);
     for (uint i = 0; i < 4; ++i)
     {
-        x_y_z_xdx += rhi::Texture(pc.x_y_z_xdx_tex).sample_level_2d_array_uniform<float4>(tex_sampler, uvs[i], 0, 0);
-        ydx_zdx_ydy_zdy += rhi::Texture(pc.ydx_zdx_ydy_zdy_tex).sample_level_2d_array_uniform<float4>(tex_sampler, uvs[i], 0, 0);
+        x_y_z_xdx += rhi::Texture(pc.x_y_z_xdx_tex).sample_level_2d_array_uniform<float4>(tex_sampler, uvs[i], 0, i);
+        ydx_zdx_ydy_zdy += rhi::Texture(pc.ydx_zdx_ydy_zdy_tex).sample_level_2d_array_uniform<float4>(tex_sampler, uvs[i], 0, i);
     }
 
     float3 displacement = float3(x_y_z_xdx.x, x_y_z_xdx.y, x_y_z_xdx.z);

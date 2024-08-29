@@ -23,8 +23,8 @@ PS_Out main(PS_In ps_in)
     float4 ydx_zdx_ydy_zdy = float4(0.,0.,0.,0.);
     for (uint i = 0; i < 4; ++i)
     {
-        x_y_z_xdx += rhi::Texture(pc.x_y_z_xdx_tex).sample_level_2d_array_uniform<float4>(tex_sampler, ps_in.uvs[i], 0, 0);
-        ydx_zdx_ydy_zdy += rhi::Texture(pc.ydx_zdx_ydy_zdy_tex).sample_level_2d_array_uniform<float4>(tex_sampler, ps_in.uvs[i], 0, 0);
+        x_y_z_xdx += rhi::Texture(pc.x_y_z_xdx_tex).sample_level_2d_array_uniform<float4>(tex_sampler, ps_in.uvs[i], 0, 1);
+        ydx_zdx_ydy_zdy += rhi::Texture(pc.ydx_zdx_ydy_zdy_tex).sample_level_2d_array_uniform<float4>(tex_sampler, ps_in.uvs[i], 0, 1);
     }
 
     float x_dx = x_y_z_xdx[3];
@@ -38,7 +38,7 @@ PS_Out main(PS_In ps_in)
     float ndotl = saturate(dot(normal, light_dir));
     
     float3 color = float3(0, 0.08866, 0.29177);
-    float3 ambient = 0.65 * color;
+    float3 ambient = 0.55 * color;
     float3 diffuse = ndotl * color;
 
     PS_Out result = { float4(saturate(ambient + diffuse),1.) };

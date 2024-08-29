@@ -203,6 +203,72 @@ void Ocean_Settings::process_gui_simulation_settings()
     ImGui::SliderFloat(depth_str.c_str(), &data.initial_spectrum_data.h, .001f, 1000.f);
     imutil::help_marker(OCEAN_HELP_TEXT_DEPTH);
 
+    constexpr static auto spectrum_values = std::to_array({
+        Ocean_Spectrum::Phillips,
+        Ocean_Spectrum::Pierson_Moskowitz,
+        Ocean_Spectrum::Generalized_A_B,
+        Ocean_Spectrum::Jonswap,
+        Ocean_Spectrum::TMA });
+    constexpr static auto spectrum_value_texts = std::to_array({
+        "Phillips",
+        "Pierson_Moskowitz",
+        "Generalized A,B",
+        "Jonswap",
+        "TMA" });
+
+    auto spectrum_text_idx = 0;
+    for (auto i = 0; i < spectrum_value_texts.size(); ++i)
+    {
+        if (uint32_t(spectrum_values[i]) == data.initial_spectrum_data.spectrum) spectrum_text_idx = i;
+    }
+    ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+    if (ImGui::BeginCombo("Oceanographic Spectrum", spectrum_value_texts[spectrum_text_idx]))
+    {
+        for (auto i = 0; i < spectrum_values.size(); ++i)
+        {
+            bool selected = data.initial_spectrum_data.spectrum == uint32_t(spectrum_values[i]);
+            if (ImGui::Selectable(spectrum_value_texts[i], selected, ImGuiSelectableFlags_None))
+            {
+                data.initial_spectrum_data.spectrum = uint32_t(spectrum_values[i]);
+            }
+        }
+        ImGui::EndCombo();
+    }
+    imutil::help_marker(OCEAN_HELP_TEXT_SPECTRUM);
+
+    constexpr static auto dirspread_values = std::to_array({
+        Ocean_Directional_Spreading_Function::Positive_Cosine_Squared,
+        Ocean_Directional_Spreading_Function::Mitsuyasu,
+        Ocean_Directional_Spreading_Function::Hasselmann,
+        Ocean_Directional_Spreading_Function::Donelan_Banner,
+        Ocean_Directional_Spreading_Function::Flat });
+    constexpr static auto dirspread_value_texts = std::to_array({
+        "Positive Cosine Squared",
+        "Mitsuyasu",
+        "Hasselmann",
+        "Donelan Banner",
+        "Flat" });
+
+    auto dirspread_text_idx = 0;
+    for (auto i = 0; i < dirspread_value_texts.size(); ++i)
+    {
+        if (uint32_t(dirspread_values[i]) == data.initial_spectrum_data.directional_spreading_function) dirspread_text_idx = i;
+    }
+    ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+    if (ImGui::BeginCombo("Directional Spread", dirspread_value_texts[dirspread_text_idx]))
+    {
+        for (auto i = 0; i < dirspread_values.size(); ++i)
+        {
+            bool selected = data.initial_spectrum_data.directional_spreading_function == uint32_t(dirspread_values[i]);
+            if (ImGui::Selectable(dirspread_value_texts[i], selected, ImGuiSelectableFlags_None))
+            {
+                data.initial_spectrum_data.directional_spreading_function = uint32_t(dirspread_values[i]);
+            }
+        }
+        ImGui::EndCombo();
+    }
+    imutil::help_marker(OCEAN_HELP_TEXT_DIRECTIONAL_SPREAD);
+
     uint32_t spectrum_count = 0;
     for (auto& spectrum : data.initial_spectrum_data.spectra)
     {
@@ -214,74 +280,6 @@ void Ocean_Settings::process_gui_simulation_settings()
         {
             ImGui::SeparatorText("Second spectrum options");
         }
-
-        constexpr static auto spectrum_values = std::to_array({
-            Ocean_Spectrum::Phillips,
-            Ocean_Spectrum::Pierson_Moskowitz,
-            Ocean_Spectrum::Generalized_A_B,
-            Ocean_Spectrum::Jonswap,
-            Ocean_Spectrum::TMA });
-        constexpr static auto spectrum_value_texts = std::to_array({
-            "Phillips",
-            "Pierson_Moskowitz",
-            "Generalized A,B",
-            "Jonswap",
-            "TMA" });
-
-        auto spectrum_text_idx = 0;
-        for (auto i = 0; i < spectrum_value_texts.size(); ++i)
-        {
-            if (uint32_t(spectrum_values[i]) == spectrum.spectrum) spectrum_text_idx = i;
-        }
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
-        auto spectrum_combo_str = std::string("Oceanographic Spectrum##") + std::to_string(spectrum_count);
-        if (ImGui::BeginCombo(spectrum_combo_str.c_str(), spectrum_value_texts[spectrum_text_idx]))
-        {
-            for (auto i = 0; i < spectrum_values.size(); ++i)
-            {
-                bool selected = spectrum.spectrum == uint32_t(spectrum_values[i]);
-                if (ImGui::Selectable(spectrum_value_texts[i], selected, ImGuiSelectableFlags_None))
-                {
-                    spectrum.spectrum = uint32_t(spectrum_values[i]);
-                }
-            }
-            ImGui::EndCombo();
-        }
-        imutil::help_marker(OCEAN_HELP_TEXT_SPECTRUM);
-
-        constexpr static auto dirspread_values = std::to_array({
-            Ocean_Directional_Spreading_Function::Positive_Cosine_Squared,
-            Ocean_Directional_Spreading_Function::Mitsuyasu,
-            Ocean_Directional_Spreading_Function::Hasselmann,
-            Ocean_Directional_Spreading_Function::Donelan_Banner,
-            Ocean_Directional_Spreading_Function::Flat });
-        constexpr static auto dirspread_value_texts = std::to_array({
-            "Positive Cosine Squared",
-            "Mitsuyasu",
-            "Hasselmann",
-            "Donelan Banner",
-            "Flat" });
-
-        auto dirspread_text_idx = 0;
-        for (auto i = 0; i < dirspread_value_texts.size(); ++i)
-        {
-            if (uint32_t(dirspread_values[i]) == spectrum.directional_spreading_function) dirspread_text_idx = i;
-        }
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
-        auto dirspread_combo_str = std::string("Directional Spread##") + std::to_string(spectrum_count);
-        if (ImGui::BeginCombo(dirspread_combo_str.c_str(), dirspread_value_texts[dirspread_text_idx]))
-        {
-            for (auto i = 0; i < dirspread_values.size(); ++i)
-            {
-                bool selected = spectrum.directional_spreading_function == uint32_t(dirspread_values[i]);
-                if (ImGui::Selectable(dirspread_value_texts[i], selected, ImGuiSelectableFlags_None))
-                {
-                    spectrum.directional_spreading_function = uint32_t(dirspread_values[i]);
-                }
-            }
-            ImGui::EndCombo();
-        }
-        imutil::help_marker(OCEAN_HELP_TEXT_DIRECTIONAL_SPREAD);
 
         auto wind_speed_str = std::string("Wind Speed##") + std::to_string(spectrum_count);
         ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);

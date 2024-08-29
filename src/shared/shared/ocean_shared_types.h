@@ -22,8 +22,6 @@ enum SHADER_ENUM_CLASS Ocean_Directional_Spreading_Function
 
 struct Ocean_Spectrum_Data
 {
-    uint spectrum;
-    uint directional_spreading_function;
     float u;
     float f;
     float phillips_alpha;
@@ -38,6 +36,8 @@ struct SHADER_STRUCT_ALIGN Ocean_Initial_Spectrum_Data
     Ocean_Spectrum_Data spectra[2];
     uint4 active_cascades;
     float4 length_scales;
+    uint spectrum;
+    uint directional_spreading_function;
     uint texture_size;
     float g;
     float h;
