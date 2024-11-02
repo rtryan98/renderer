@@ -41,9 +41,9 @@ VS_Out main(uint vertex_id : SV_VertexID)
     }
 
     float3 displacement = float3(x_y_z_xdx.x, x_y_z_xdx.y, x_y_z_xdx.z);
-    float4 pos = float4(vertex_pos.x + displacement.x, vertex_pos.y + displacement.y, displacement.z, 1.);
+    float4 pos_ws = float4(vertex_pos.x + displacement.x, vertex_pos.y + displacement.y, displacement.z, 1.);
 
-    pos = mul(pos, camera.view_proj);
-    VS_Out result = { pos, uvs };
+    float4 pos = mul(pos_ws, camera.view_proj);
+    VS_Out result = { pos, uvs, pos_ws, camera.position };
     return result;
 }

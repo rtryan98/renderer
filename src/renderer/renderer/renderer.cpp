@@ -43,6 +43,7 @@ Renderer::Renderer(Application& app, Asset_Manager& asset_manager,
         }, "Camera Buffer"))
     , m_imgui_renderer(imgui_renderer_create_info)
     , m_ocean_renderer(m_asset_manager, m_shader_library)
+    , m_should_display_overlay(false)
 {
     init_rendertargets();
     m_imgui_renderer.create_fonts_texture();
@@ -70,6 +71,7 @@ void Renderer::update(const Input_State& input_state, double t, double dt) noexc
 
 void Renderer::overlay_gui()
 {
+    if (m_should_display_overlay)
     {
         ImGui::SetNextWindowPos({ 50.f, 50.f });
         ImGui::SetNextWindowSizeConstraints({ 500.f, 500.f }, { 9999.f, 9999.f });

@@ -15,6 +15,11 @@ float3 calculate_normals(float2 slope)
     return normalize(float3(-slope.x, -slope.y, 1.0));
 }
 
+float schlick_fresnel(float f0, float VdotH)
+{
+    return f0 + (1. - f0) * pow(1 - VdotH, 5.);
+}
+
 PS_Out main(PS_In ps_in)
 {
     SamplerState tex_sampler = rhi::Sampler(pc.tex_sampler).get_nuri();
@@ -33,14 +38,21 @@ PS_Out main(PS_In ps_in)
     float y_dy = ydx_zdx_ydy_zdy[2];
     float z_dy = ydx_zdx_ydy_zdy[3];
 
-    float3 normal = calculate_normals(calculate_slope(z_dx, z_dy, x_dx, y_dy));
-    float3 light_dir = float3(0.,-1.,0.);
-    float ndotl = saturate(dot(normal, light_dir));
+    float3 N = calculate_normals(calculate_slope(z_dx, z_dy, x_dx, y_dy));
+    float3 V = normalize(ps_in.position_camera - ps_in.position_ws).xyz;
+    float3 L = float3(0.,-1.,0.);
+    float3 H = normalize(L + V);
+
+    float NdotL = saturate(dot(N, L));
+    float NdotH = saturate(dot(N, H));
+
+    float fresnel = schlick_fresnel(0.04, NdotH);
     
     float3 color = float3(0, 0.08866, 0.29177);
     float3 ambient = 0.55 * color;
-    float3 diffuse = ndotl * color;
+    float3 diffuse = NdotL * color;
 
-    PS_Out result = { float4(saturate(ambient + diffuse),1.) };
+    //PS_Out result = { float4(saturate(ambient + diffuse),1.) };
+    PS_Out result = { float4(fresnel,fresnel,fresnel,1.) };
     return result;
 }

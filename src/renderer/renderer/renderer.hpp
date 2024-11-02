@@ -61,5 +61,7 @@ private:
         Render_Attachment* color;
         Render_Attachment* depth_stencil;
     } m_ocean_rendertargets;
+
+    bool m_should_display_overlay;
 };
 }
