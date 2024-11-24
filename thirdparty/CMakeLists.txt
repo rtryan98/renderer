@@ -21,3 +21,5 @@ target_include_directories(
     imgui PUBLIC
     imgui
 )
+
+add_subdirectory(fastgltf)

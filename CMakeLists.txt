@@ -21,6 +21,7 @@ target_link_libraries(
     rhi_dxc_lib
     imgui
     Shcore.lib
+    fastgltf
 )
 target_include_directories(
     renderer PUBLIC

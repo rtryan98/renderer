@@ -7,3 +7,6 @@
 [submodule "thirdparty/spdlog"]
 	path = thirdparty/spdlog
 	url = https://github.com/gabime/spdlog
+[submodule "thirdparty/fastgltf"]
+	path = thirdparty/fastgltf
+	url = https://github.com/spnda/fastgltf
