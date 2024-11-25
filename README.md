@@ -19,4 +19,4 @@ The steps are:
 
 ## Features
 - Fast Fourier Transform based Ocean Simulation
-    - Utilizes oceanographic spectra presented in C. Horvath's 'Empirical directional wave spectra for computer graphics' [\[DOI\]]([DOI](https://dl.acm.org/doi/10.1145/2791261.2791267)).
+    - Utilizes oceanographic spectra presented in C. Horvath's 'Empirical directional wave spectra for computer graphics' [\[DOI\]](https://dl.acm.org/doi/10.1145/2791261.2791267).
