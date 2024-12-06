@@ -98,6 +98,7 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
         .access_after = rhi::Barrier_Access::Unordered_Access_Write,
         .layout_before = rhi::Barrier_Image_Layout::Undefined,
         .layout_after = rhi::Barrier_Image_Layout::Unordered_Access,
+        .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
         .image = m_resources.gpu_resources.initial_spectrum_texture,
         .subresource_range = {
             .first_mip_level = 0,
