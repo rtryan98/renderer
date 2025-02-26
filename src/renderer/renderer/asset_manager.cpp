@@ -116,7 +116,12 @@ Render_Attachment* Asset_Manager::create_render_attachment(const Render_Attachme
     };
     auto image_create_info = make_render_attachment_image_create_info(render_attachment_image_create_info);
     auto render_attachment = m_render_attachments.acquire();
+    render_attachment->name = create_info.name;
+    render_attachment->scaling_mode = create_info.scaling_mode;
+    render_attachment->scaling_factor = create_info.scaling_factor;
+    render_attachment->create_srv = create_info.create_srv;
     render_attachment->image = create_image(image_create_info, create_info.name.c_str());
+
     return render_attachment;
 }
 
