@@ -33,6 +33,17 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
         size.y = 144;
         break;
     }
+    case WM_SIZE:
+    {
+        if (data)
+        {
+            RECT rect;
+            GetClientRect(hwnd, &rect);
+            data->width = rect.right;
+            data->height = rect.bottom;
+        }
+        break;
+    }
     default:
         break;
     }
