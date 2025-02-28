@@ -1,5 +1,6 @@
 add_subdirectory(asset)
 add_subdirectory(cbt)
+add_subdirectory(filesystem)
 add_subdirectory(imgui)
 add_subdirectory(ocean)
 add_subdirectory(scene)
