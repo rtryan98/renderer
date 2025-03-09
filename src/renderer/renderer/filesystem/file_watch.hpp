@@ -2,7 +2,6 @@
 
 #include <filesystem>
 #include <memory>
-#include <optional>
 #include <vector>
 
 namespace ren
@@ -29,6 +28,6 @@ public:
     static std::unique_ptr<File_Watch> create(const std::filesystem::path& path);
     virtual ~File_Watch() = default;
 
-    virtual std::optional<std::vector<File_Watch_Notification>> poll_for_changes() = 0;
+    virtual std::vector<File_Watch_Notification> poll_for_changes() = 0;
 };
 }

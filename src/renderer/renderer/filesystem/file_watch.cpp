@@ -62,9 +62,9 @@ public:
         }
     }
 
-    virtual std::optional<std::vector<File_Watch_Notification>> poll_for_changes() override
+    virtual std::vector<File_Watch_Notification> poll_for_changes() override
     {
-        if (m_dir_handle == INVALID_HANDLE_VALUE) return std::nullopt;
+        if (m_dir_handle == INVALID_HANDLE_VALUE) return {};
 
         if (WaitForSingleObject(m_overlapped.hEvent, 0) == WAIT_OBJECT_0)
         {
@@ -97,8 +97,6 @@ public:
                 return notifications;
             }
         }
-
-        return std::nullopt;
     }
 
 private:
