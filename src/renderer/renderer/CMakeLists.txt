@@ -16,8 +16,6 @@ target_sources(
     logger.cpp
     logger.hpp
     main.cpp
-    render_pass.cpp
-    render_pass.hpp
     renderer.cpp
     renderer.hpp
     shader_manager.cpp
