@@ -73,15 +73,15 @@ void Ocean_Settings::process_gui()
 
     ImGui::SeparatorText("Debug");
     {
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::Checkbox("Update Time", &m_resources.data.update_time);
     }
     {
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::Checkbox("Debug Render Slopes", &m_resources.data.debug_render_slope);
     }
     {
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::Checkbox("Debug Render Normals", &m_resources.data.debug_render_normal);
     }
 }
@@ -101,7 +101,7 @@ void Ocean_Settings::process_gui_options()
         {
             if (size_values[i] == options.size) size_text_idx = i;
         }
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         if (ImGui::BeginCombo("Size", size_value_texts[size_text_idx]))
         {
             for (auto i = 0; i < size_values.size(); ++i)
@@ -125,7 +125,7 @@ void Ocean_Settings::process_gui_options()
         {
             if (cascade_values[i] == options.cascade_count) cascade_text_idx = i;
         }
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         if (ImGui::BeginCombo("Cascade count", cascade_value_texts[cascade_text_idx]))
         {
             for (auto i = 0; i < cascade_values.size(); ++i)
@@ -141,12 +141,12 @@ void Ocean_Settings::process_gui_options()
         imutil::help_marker(OCEAN_HELP_TEXT_CASCADES);
     }
     {
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::Checkbox("Use fp16 textures", &options.use_fp16_textures);
         imutil::help_marker(OCEAN_HELP_TEXT_FP16_TEXTURES);
     }
     {
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::Checkbox("Use fp16 maths", &options.use_fp16_maths);
         imutil::help_marker(OCEAN_HELP_TEXT_FP16_MATH);
     }
@@ -180,7 +180,7 @@ void Ocean_Settings::process_gui_simulation_settings()
 
     auto& data = m_resources.data;
 
-    ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+    ImGui::PushItemWidth(get_pad_scale());
     ImGui::SliderFloat("Gravity", &data.initial_spectrum_data.g, .001f, 100.f);
     imutil::help_marker(OCEAN_HELP_TEXT_GRAVITY);
 
@@ -193,13 +193,13 @@ void Ocean_Settings::process_gui_simulation_settings()
     for (auto i = 0; i < 4; ++i)
     {
         auto lengthscale_str = std::string("Lengthscale ") + std::to_string(i + 1);
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::SliderFloat(lengthscale_str.c_str(), length_scales[i], .001f, 10000.f);
         imutil::help_marker(OCEAN_HELP_TEXT_LENGTHSCALE);
     }
 
     auto depth_str = std::string("Depth");
-    ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+    ImGui::PushItemWidth(get_pad_scale());
     ImGui::SliderFloat(depth_str.c_str(), &data.initial_spectrum_data.h, .001f, 1000.f);
     imutil::help_marker(OCEAN_HELP_TEXT_DEPTH);
 
@@ -221,7 +221,7 @@ void Ocean_Settings::process_gui_simulation_settings()
     {
         if (uint32_t(spectrum_values[i]) == data.initial_spectrum_data.spectrum) spectrum_text_idx = i;
     }
-    ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+    ImGui::PushItemWidth(get_pad_scale());
     if (ImGui::BeginCombo("Oceanographic Spectrum", spectrum_value_texts[spectrum_text_idx]))
     {
         for (auto i = 0; i < spectrum_values.size(); ++i)
@@ -254,7 +254,7 @@ void Ocean_Settings::process_gui_simulation_settings()
     {
         if (uint32_t(dirspread_values[i]) == data.initial_spectrum_data.directional_spreading_function) dirspread_text_idx = i;
     }
-    ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+    ImGui::PushItemWidth(get_pad_scale());
     if (ImGui::BeginCombo("Directional Spread", dirspread_value_texts[dirspread_text_idx]))
     {
         for (auto i = 0; i < dirspread_values.size(); ++i)
@@ -282,32 +282,32 @@ void Ocean_Settings::process_gui_simulation_settings()
         }
 
         auto wind_speed_str = std::string("Wind Speed##") + std::to_string(spectrum_count);
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::SliderFloat(wind_speed_str.c_str(), &spectrum.u, .001f, 100.f);
         imutil::help_marker(OCEAN_HELP_TEXT_WIND_SPEED);
 
         auto fetch_str = std::string("Fetch##") + std::to_string(spectrum_count);
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::SliderFloat(fetch_str.c_str(), &spectrum.f, .001f, 1000.f);
         imutil::help_marker(OCEAN_HELP_TEXT_FETCH);
 
         auto phillips_alpha_str = std::string("Phillips Coefficient Alpha##") + std::to_string(spectrum_count);
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::SliderFloat(phillips_alpha_str.c_str(), &spectrum.phillips_alpha, .001f, 100.f);
         imutil::help_marker(OCEAN_HELP_TEXT_PHILLIPS_ALPHA);
 
         auto generalized_a_str = std::string("Generalized Coefficient A##") + std::to_string(spectrum_count);
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::SliderFloat(generalized_a_str.c_str(), &spectrum.generalized_a, .001f, 100.f);
         imutil::help_marker(OCEAN_HELP_TEXT_GENERALIZED_A);
 
         auto generalized_b_str = std::string("Generalized Coefficient B##") + std::to_string(spectrum_count);
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::SliderFloat(generalized_b_str.c_str(), &spectrum.generalized_b, .001f, 100.f);
         imutil::help_marker(OCEAN_HELP_TEXT_GENERALIZED_B);
 
         auto contribution_str = std::string("Contribution##") + std::to_string(spectrum_count);
-        ImGui::PushItemWidth(CONTENT_NEGATIVE_PAD);
+        ImGui::PushItemWidth(get_pad_scale());
         ImGui::SliderFloat(contribution_str.c_str(), &spectrum.contribution, .0f, 1.f);
         imutil::help_marker(OCEAN_HELP_TEXT_CONTRIBUTION);
 

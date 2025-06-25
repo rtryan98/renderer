@@ -23,3 +23,4 @@ target_include_directories(
 )
 
 add_subdirectory(fastgltf)
+add_subdirectory(unordered_dense)

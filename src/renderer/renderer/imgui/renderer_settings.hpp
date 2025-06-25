@@ -8,7 +8,8 @@ namespace ren
 class Settings_Base
 {
 public:
-    constexpr static auto CONTENT_NEGATIVE_PAD = -225.f;
+    static void set_pad_scale(float scale);
+    static float get_pad_scale() { return s_content_negative_pad; }
 
     virtual ~Settings_Base() noexcept = default;
 
@@ -20,6 +21,7 @@ protected:
 
 private:
     std::string m_name;
+    static float s_content_negative_pad;
 };
 
 class Renderer_Settings

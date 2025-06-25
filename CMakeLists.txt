@@ -22,6 +22,7 @@ target_link_libraries(
     imgui
     Shcore.lib
     fastgltf
+    unordered_dense
 )
 target_include_directories(
     renderer PUBLIC

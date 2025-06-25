@@ -8,14 +8,15 @@ namespace ren
 Application::Application() noexcept
     : m_logger(std::make_shared<Logger>())
     , m_window(Window::create({
-        .width = 1920,
-        .height = 1080,
-        .title = "Renderer"
+        .width = 2560,
+        .height = 1440,
+        .title = "Renderer",
+        .dpi_aware_size = false
         }))
     , m_input_state(std::make_unique<Input_State>(*m_window))
     , m_device(rhi::Graphics_Device::create({
         .graphics_api = rhi::Graphics_API::D3D12,
-        .enable_validation = true,
+        .enable_validation = false,
         .enable_gpu_validation = false,
         .enable_locking = false
         }))
@@ -330,6 +331,10 @@ void Application::imgui_setup_style() noexcept
     style.GrabRounding = 3;
     style.LogSliderDeadzone = 4;
     style.TabRounding = 4;
+
+    style.ScaleAllSizes(m_window->get_dpi_scale());
+    ImGui::GetIO().FontGlobalScale = m_window->get_dpi_scale();
+    Settings_Base::set_pad_scale(m_window->get_dpi_scale());
 }
 
 void imgui_menu_toggle_window(const char* name, bool& window_open)

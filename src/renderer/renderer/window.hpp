@@ -16,6 +16,7 @@ struct Window_Create_Info
     uint32_t width;
     uint32_t height;
     const char* title;
+    bool dpi_aware_size;
 };
 
 struct Window_Data
@@ -23,6 +24,7 @@ struct Window_Data
     uint32_t width;
     uint32_t height;
     bool is_alive;
+    bool dpi_aware_size;
 };
 
 class Window

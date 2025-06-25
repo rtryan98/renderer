@@ -59,10 +59,11 @@ public:
         , m_data{
             .width = create_info.width,
             .height = create_info.height,
-            .is_alive = true
+            .is_alive = true,
+            .dpi_aware_size = create_info.dpi_aware_size
         }
     {
-        auto dpi_scale = get_dpi_scale();
+        auto dpi_scale = m_data.dpi_aware_size ? get_dpi_scale() : 1.f;
         RECT wr = {
             .left = LONG((GetSystemMetrics(SM_CXSCREEN) - dpi_scale * create_info.width) / 2),
             .top = LONG((GetSystemMetrics(SM_CYSCREEN) - dpi_scale * create_info.height) / 2),

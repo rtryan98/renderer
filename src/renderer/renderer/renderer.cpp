@@ -252,7 +252,7 @@ void Renderer::render_ocean_pass(rhi::Command_List* cmd)
 
     cmd->begin_render_pass(render_pass_info);
     auto& window_data = m_app.get_window().get_window_data();
-    auto scale = m_app.get_window().get_dpi_scale();
+    auto scale = 1.f; // m_app.get_window().get_dpi_scale();
     cmd->set_viewport(0.f, 0.f, float(window_data.width) * scale, float(window_data.height) * scale, 0.f, 1.f);
     cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);
     m_ocean_renderer.render_patch(cmd, m_camera_buffer->buffer_view->bindless_index);
@@ -281,7 +281,7 @@ void Renderer::render_swapchain_pass(rhi::Command_List* cmd)
     };
 
     auto& window_data = m_app.get_window().get_window_data();
-    auto scale = m_app.get_window().get_dpi_scale();
+    auto scale = 1.f; // m_app.get_window().get_dpi_scale();
     cmd->begin_render_pass(render_pass_info);
     cmd->set_viewport(0.f, 0.f, float(window_data.width) * scale, float(window_data.height) * scale, 0.f, 1.f);
     cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);

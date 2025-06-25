@@ -9,6 +9,14 @@ Settings_Base::Settings_Base(const std::string_view name) noexcept
     : m_name(name)
 {}
 
+constexpr static auto CONTENT_NEGATIVE_PAD = -225.f;
+float Settings_Base::s_content_negative_pad = CONTENT_NEGATIVE_PAD;
+
+void Settings_Base::set_pad_scale(float scale)
+{
+    s_content_negative_pad = CONTENT_NEGATIVE_PAD * scale;
+}
+
 const std::string& Settings_Base::get_name() noexcept
 {
     return m_name;

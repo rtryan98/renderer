@@ -10,3 +10,6 @@
 [submodule "thirdparty/fastgltf"]
 	path = thirdparty/fastgltf
 	url = https://github.com/spnda/fastgltf
+[submodule "thirdparty/unordered_dense"]
+	path = thirdparty/unordered_dense
+	url = https://github.com/martinus/unordered_dense
