@@ -74,7 +74,7 @@ private:
     std::unique_ptr<Input_State> m_input_state;
     std::unique_ptr<rhi::Graphics_Device> m_device;
     std::unique_ptr<rhi::Swapchain> m_swapchain;
-    Shader_Library m_shader_library;
+    Shader_Library_Legacy m_shader_library;
     Asset_Manager m_asset_manager;
     Renderer m_renderer;
     std::array<Frame, FRAME_IN_FLIGHT_COUNT> m_frames;

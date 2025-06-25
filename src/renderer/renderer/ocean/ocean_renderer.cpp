@@ -10,7 +10,7 @@
 
 namespace ren
 {
-Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library& shader_library)
+Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library_Legacy& shader_library)
     : m_asset_manager(asset_manager)
     , m_shader_library(shader_library)
     , m_resources()

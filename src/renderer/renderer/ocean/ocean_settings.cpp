@@ -59,7 +59,7 @@ constexpr const char* OCEAN_HELP_TEXT_LENGTHSCALE =
 Ocean_Settings::Ocean_Settings(
     Ocean_Resources& resources,
     Asset_Manager& asset_manager,
-    Shader_Library& shader_library)
+    Shader_Library_Legacy& shader_library)
     : Settings_Base("Ocean")
     , m_resources(resources)
     , m_asset_manager(asset_manager)

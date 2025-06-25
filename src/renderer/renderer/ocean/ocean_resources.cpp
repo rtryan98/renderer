@@ -67,7 +67,7 @@ void Ocean_Resources::destroy_textures(Asset_Manager& asset_manager)
         asset_manager.destroy_image(gpu_resources.ydx_zdx_ydy_zdy_texture);
 }
 
-void Ocean_Resources::create_graphics_pipelines(Asset_Manager& asset_manager, Shader_Library& shader_library)
+void Ocean_Resources::create_graphics_pipelines(Asset_Manager& asset_manager, Shader_Library_Legacy& shader_library)
 {
     destroy_graphics_pipelines(asset_manager);
 
@@ -159,7 +159,7 @@ void Ocean_Resources::destroy_graphics_pipelines(Asset_Manager& asset_manager)
         asset_manager.destroy_pipeline(gpu_resources.render_composite_pipeline);
 }
 
-void Ocean_Resources::create_compute_pipelines(Asset_Manager& asset_manager, Shader_Library& shader_library)
+void Ocean_Resources::create_compute_pipelines(Asset_Manager& asset_manager, Shader_Library_Legacy& shader_library)
 {
     destroy_compute_pipelines(asset_manager);
 

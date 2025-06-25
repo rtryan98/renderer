@@ -23,6 +23,7 @@ target_link_libraries(
     Shcore.lib
     fastgltf
     unordered_dense
+    nlohmann_json
 )
 target_include_directories(
     renderer PUBLIC

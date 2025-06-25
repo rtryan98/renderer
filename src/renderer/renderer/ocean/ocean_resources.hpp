@@ -7,7 +7,7 @@
 namespace ren
 {
 class Asset_Manager;
-class Shader_Library;
+class Shader_Library_Legacy;
 
 struct Ocean_Resources
 {
@@ -58,9 +58,9 @@ struct Ocean_Resources
     void destroy_buffers(Asset_Manager& asset_manager);
     void create_textures(Asset_Manager& asset_manager);
     void destroy_textures(Asset_Manager& asset_manager);
-    void create_graphics_pipelines(Asset_Manager& asset_manager, Shader_Library& shader_library);
+    void create_graphics_pipelines(Asset_Manager& asset_manager, Shader_Library_Legacy& shader_library);
     void destroy_graphics_pipelines(Asset_Manager& asset_manager);
-    void create_compute_pipelines(Asset_Manager& asset_manager, Shader_Library& shader_library);
+    void create_compute_pipelines(Asset_Manager& asset_manager, Shader_Library_Legacy& shader_library);
     void destroy_compute_pipelines(Asset_Manager& asset_manager);
     void create_samplers(Asset_Manager& asset_manager);
     void destroy_samplers(Asset_Manager& asset_manager);

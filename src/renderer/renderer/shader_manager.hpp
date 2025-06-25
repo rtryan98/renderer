@@ -10,11 +10,11 @@
 
 namespace ren
 {
-class Shader_Library
+class Shader_Library_Legacy
 {
 public:
-    Shader_Library(std::shared_ptr<Logger> logger, rhi::Graphics_Device* device);
-    ~Shader_Library();
+    Shader_Library_Legacy(std::shared_ptr<Logger> logger, rhi::Graphics_Device* device);
+    ~Shader_Library_Legacy();
 
     rhi::Shader_Blob* get_shader(Shaders shader) const;
 

@@ -20,7 +20,7 @@ float calculate_aspect_ratio(const Window& window)
 }
 
 Renderer::Renderer(Application& app, Asset_Manager& asset_manager,
-    Shader_Library& shader_library, rhi::Swapchain& swapchain,
+    Shader_Library_Legacy& shader_library, rhi::Swapchain& swapchain,
     const Imgui_Renderer_Create_Info& imgui_renderer_create_info)
     : m_app(app)
     , m_asset_manager(asset_manager)

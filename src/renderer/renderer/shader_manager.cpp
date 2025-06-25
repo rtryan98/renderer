@@ -9,13 +9,13 @@ namespace ren
 {
 std::string get_shader_source_prefix_path()
 {
-    constexpr auto shader_source_prefix_paths = std::to_array({
+    constexpr static auto SHADER_SOURCE_PREFIX_PATHS = std::to_array({
        "../../src/shaders/",   // Standalone from build directory
        "./"                    // Standalone deploy
        "../src/shaders/",      // VS Debugger
         });
 
-    for (const auto prefix_path : shader_source_prefix_paths)
+    for (const auto prefix_path : SHADER_SOURCE_PREFIX_PATHS)
     {
         std::filesystem::path path = std::string(prefix_path);
         if (std::filesystem::exists(path))
@@ -26,7 +26,7 @@ std::string get_shader_source_prefix_path()
     return "";
 }
 
-struct Shader_Library::Shader_Compiler
+struct Shader_Library_Legacy::Shader_Compiler
 {
     Shader_Compiler() = default;
     ~Shader_Compiler() = default;
@@ -108,7 +108,7 @@ std::vector<uint8_t> load_file_binary(const char* path, std::shared_ptr<Logger>&
     return result;
 }
 
-Shader_Library::Shader_Library(std::shared_ptr<Logger> logger, rhi::Graphics_Device* device)
+Shader_Library_Legacy::Shader_Library_Legacy(std::shared_ptr<Logger> logger, rhi::Graphics_Device* device)
     : m_logger(logger)
     , m_compiler(std::make_unique<Shader_Compiler>())
     , m_device(device)
@@ -209,10 +209,10 @@ Shader_Library::Shader_Library(std::shared_ptr<Logger> logger, rhi::Graphics_Dev
     m_logger->info("Finished loading {} shaders.", shader_metadata.size());
 }
 
-Shader_Library::~Shader_Library()
+Shader_Library_Legacy::~Shader_Library_Legacy()
 {}
 
-rhi::Shader_Blob* Shader_Library::get_shader(Shaders shader) const
+rhi::Shader_Blob* Shader_Library_Legacy::get_shader(Shaders shader) const
 {
     auto shader_idx = std::to_underlying(shader);
     return m_predefined_shaders[shader_idx];
