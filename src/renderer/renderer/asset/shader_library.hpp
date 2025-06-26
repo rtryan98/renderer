@@ -13,13 +13,19 @@ namespace ren
 struct Pipeline_Library;
 struct Compute_Library;
 
+struct Named_Shader
+{
+    std::string name;
+    rhi::Shader_Blob* blob;
+};
+
 struct Shader_Library
 {
-    std::vector<std::pair<std::string, rhi::Shader_Blob*>> shaders;
+    std::vector<Named_Shader> shaders;
     std::vector<Pipeline_Library*> referenced_pipeline_libraries;
-    std::vector<Compute_Library*> referenced_compute_libraries;
+    Compute_Library* referenced_compute_library;
 
     // TODO: If there are a lot of shaders this should be a map and not a vector with linear search. However, right now this suffices
-    rhi::Shader_Blob* get_shader(const std::string_view name) const;
+    [[nodiscard]] rhi::Shader_Blob* get_shader(const std::string_view& name) const;
 };
 }

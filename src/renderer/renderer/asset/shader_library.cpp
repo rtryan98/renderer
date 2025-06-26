@@ -2,7 +2,7 @@
 
 namespace ren
 {
-rhi::Shader_Blob* Shader_Library::get_shader(const std::string_view name) const
+rhi::Shader_Blob* Shader_Library::get_shader(const std::string_view& name) const
 {
     for (const auto& [shader_name, shader] : shaders)
     {

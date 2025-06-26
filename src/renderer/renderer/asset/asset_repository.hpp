@@ -6,6 +6,11 @@
 #include <rhi/common/array_vector.hpp>
 #include "renderer/logger.hpp"
 
+namespace rhi
+{
+    class Graphics_Device;
+}
+
 namespace ren
 {
 struct Asset_Repository_Paths
@@ -17,19 +22,23 @@ struct Asset_Repository_Paths
 class Asset_Repository
 {
 public:
-    Asset_Repository(std::shared_ptr<Logger> logger, const Asset_Repository_Paths& paths);
+    Asset_Repository(std::shared_ptr<Logger> logger, rhi::Graphics_Device* graphics_device,
+        Asset_Repository_Paths&& paths);
     ~Asset_Repository();
 
-    Shader_Library* get_shader_library(std::string_view name) const;
-    Compute_Library* get_compute_library(std::string_view name) const;
-    Pipeline_Library* get_pipeline_library(std::string_view name) const;
+    [[nodiscard]] Shader_Library* get_shader_library(std::string_view name) const;
+    [[nodiscard]] Compute_Library* get_compute_library(std::string_view name) const;
+    [[nodiscard]] Pipeline_Library* get_pipeline_library(std::string_view name) const;
 
 private:
     void compile_shader_library(std::string_view hlsl_path, std::string_view json_path);
 
-private:
+    [[nodiscard]] Compute_Library* get_or_create_compute_library(std::string_view name) const;
+    [[nodiscard]] Pipeline_Library* get_or_create_pipeline_library(std::string_view name) const;
 
+private:
     std::shared_ptr<Logger> m_logger;
+    rhi::Graphics_Device* m_graphics_device;
     Asset_Repository_Paths m_paths;
 
     class Shader_Compiler;

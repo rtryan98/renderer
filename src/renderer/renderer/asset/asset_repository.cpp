@@ -3,6 +3,8 @@
 #include <nlohmann/json.hpp>
 #include <fstream>
 
+#include "rhi/graphics_device.hpp"
+
 namespace ren
 {
 class Asset_Repository::Shader_Compiler
@@ -25,20 +27,35 @@ private:
     rhi::dxc::Shader_Compiler m_compiler;
 };
 
-Asset_Repository::Asset_Repository(std::shared_ptr<Logger> logger, const Asset_Repository_Paths& paths)
+Asset_Repository::Asset_Repository(
+    std::shared_ptr<Logger> logger, rhi::Graphics_Device* graphics_device,
+    Asset_Repository_Paths&& paths)
     : m_logger(std::move(logger))
-    , m_paths(paths)
+    , m_graphics_device(graphics_device)
+    , m_paths(std::move(paths))
     , m_shader_compiler(std::make_unique<Shader_Compiler>())
 {
-    // TODO: FOR TESTING ONLY
+    ankerl::unordered_dense::set<std::string> shader_set;
+    for (const auto& shader_path : std::filesystem::recursive_directory_iterator(std::filesystem::path(m_paths.shaders)))
     {
-        auto hlsl_path = m_paths.shaders + "shaders/fft.cs.hlsl";
-        auto json_path = m_paths.shaders + "shaders/fft.cs.json";
+        const auto& path = shader_path.path();
+        auto extension = path.extension();
+        if (extension == ".hlsl" || extension == ".json")
+        {
+            auto full_path = (path.parent_path() / path.stem()).string();
+            shader_set.insert(full_path);
+        }
+    }
+    for (const auto& shader : shader_set)
+    {
+        m_logger->debug("Processing shader {}", shader);
+        auto hlsl_path = std::string(shader) + ".hlsl";
+        auto json_path = std::string(shader) + ".json";
 
-        m_logger->debug("Current working directory: '{}'", std::filesystem::current_path().string());
-        m_logger->debug("hlsl_path '{}'", hlsl_path);
-        m_logger->debug("json_path '{}'", json_path);
-
+        if (!std::filesystem::exists(hlsl_path) || !std::filesystem::exists(json_path))
+        {
+            continue;
+        }
         compile_shader_library(hlsl_path, json_path);
     }
 }
@@ -74,6 +91,47 @@ Shader_Type shader_type_from_string(std::string_view type)
     return Shader_Type::Unknown;
 }
 
+std::wstring shader_model_from_shader_type(Shader_Type type)
+{
+    switch (type)
+    {
+    case ren::Shader_Type::Vertex:
+        return L"vs_6_8";
+    case ren::Shader_Type::Pixel:
+        return L"ps_6_8";
+    case ren::Shader_Type::Compute:
+        return L"cs_6_8";
+    case ren::Shader_Type::Task:
+        return L"as_6_8";
+    case ren::Shader_Type::Mesh:
+        return L"ms_6_8";
+    case ren::Shader_Type::Library:
+        return L"lib_6_8";
+    case ren::Shader_Type::Unknown:
+        std::unreachable();
+    default:
+        std::unreachable();
+    }
+}
+
+std::vector<uint8_t> load_file_binary_unsafe(const char* path)
+{
+    std::vector<uint8_t> result;
+    std::ifstream file(path, std::ios::binary);
+    file.unsetf(std::ios::skipws);
+    std::streampos file_size;
+    file.seekg(0, std::ios::end);
+    file_size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    result.reserve(file_size);
+    result.insert(
+        result.begin(),
+        std::istream_iterator<uint8_t>(file),
+        std::istream_iterator<uint8_t>());
+    file.close();
+    return result;
+}
+
 void Asset_Repository::compile_shader_library(std::string_view hlsl_path, std::string_view json_path)
 {
     // parse the json file
@@ -98,7 +156,8 @@ void Asset_Repository::compile_shader_library(std::string_view hlsl_path, std::s
     m_logger->debug("Parsing shader library '{}'", json_path);
 
     auto name = shader_json["name"].get<std::string>();
-    auto shader_type = shader_type_from_string(shader_json["shader_type"].get<std::string>());
+    auto shader_type_string = shader_json["shader_type"].get<std::string>();
+    auto shader_type = shader_type_from_string(shader_type_string);
     auto entry_point = shader_json["entry_point"].get<std::string>();
 
     struct Shader_Permutation_Group
@@ -261,31 +320,67 @@ void Asset_Repository::compile_shader_library(std::string_view hlsl_path, std::s
 
             permutation_name = name;
             permutation_name.append(postfix);
+
+            m_logger->info("Created shader variant: '{}'", permutation_name);
         }
     }
 
-    rhi::dxc::Shader_Compile_Info compile_info = {};
-    rhi::dxc::Shader_Compiler_Settings settings = {};
-    if (!define_lists.empty())
+    std::vector<Named_Shader> named_shaders;
+    // Compile all shader permutations
     {
+        auto file = load_file_binary_unsafe(std::string(hlsl_path).c_str());
+        rhi::dxc::Shader_Compile_Info compile_info = {
+            .data = file.data(),
+            .data_size = file.size(),
+            .entrypoint = std::wstring(entry_point.begin(), entry_point.end()),
+            .shader_model = shader_model_from_shader_type(shader_type)
+        };
+        rhi::dxc::Shader_Compiler_Settings settings = {
+            .include_dirs = {}
+        };
+
+        if (define_lists.empty())
+        {
+            define_lists.emplace_back( name, std::vector<std::wstring>{} );
+        }
+        auto is_dx12 = m_graphics_device->get_graphics_api() == rhi::Graphics_API::D3D12;
         for (auto& [name, define_list] : define_lists)
         {
+            m_logger->info("Compiling shader: '{}'", name);
             // compile using defines
             settings.defines = std::move(define_list);
-
-            // auto shader = m_shader_compiler->compile_from_memory(settings, compile_info);
-            m_logger->info("Listed permutation '{}'", name);
+            auto shader = m_shader_compiler->compile_from_memory(settings, compile_info);
+            rhi::Shader_Blob_Create_Info create_info = {
+                .data = is_dx12 ? shader.dxil.data() : shader.spirv.data(),
+                .data_size = is_dx12 ? shader.dxil.size() : shader.spirv.size(),
+                .groups_x = shader.reflection.workgroups_x,
+                .groups_y = shader.reflection.workgroups_y,
+                .groups_z = shader.reflection.workgroups_z
+            };
+            named_shaders.emplace_back( name, m_graphics_device->create_shader_blob(create_info).value_or(nullptr) );
         }
     }
-    else // no defines specified
-    {
 
-    }
-
-    if (!m_shader_library_ptrs.contains(name))
+    auto shader_library_lookup_name = name + "." + shader_type_string;
+    if (!m_shader_library_ptrs.contains(shader_library_lookup_name))
     {
-        m_shader_library_ptrs.insert(std::make_pair(name, m_shader_libraries.acquire()));
+        m_shader_library_ptrs.insert(std::make_pair(shader_library_lookup_name, m_shader_libraries.acquire()));
     }
-    auto& shader_library = m_shader_library_ptrs[name];
+    auto* shader_library = m_shader_library_ptrs[shader_library_lookup_name];
+    shader_library->shaders = std::move(named_shaders);
+    m_logger->info("Successfully created shader library '{}'", shader_library_lookup_name);
+
+    if (shader_type == Shader_Type::Compute)
+    {
+        m_logger->debug("Creating or updating associated compute library.");
+        if (!m_compute_library_ptrs.contains(name))
+        {
+            m_compute_library_ptrs.insert(std::make_pair(name, m_compute_libraries.acquire()));
+        }
+        auto* compute_library = m_compute_library_ptrs[name];
+        shader_library->referenced_compute_library = compute_library;
+        compute_library->create_pipelines(m_graphics_device, shader_library);
+        m_logger->info("Successfully created compute library '{}'", name);
+    }
 }
 }

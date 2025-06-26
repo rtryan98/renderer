@@ -26,7 +26,10 @@ Application::Application() noexcept
         .image_count = FRAME_IN_FLIGHT_COUNT + 1,
         .present_mode = rhi::Present_Mode::Immediate
         }))
-    , m_asset_repository(std::make_unique<Asset_Repository>(m_logger, Asset_Repository_Paths {
+    , m_asset_repository(std::make_unique<Asset_Repository>(
+        m_logger,
+        m_device.get(),
+        Asset_Repository_Paths {
         .shaders = "../../src/shaders/", // From build directory
         .pipelines = "assets/pipelines/", // unused for now
         }))
