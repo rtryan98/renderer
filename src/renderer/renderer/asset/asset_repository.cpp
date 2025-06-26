@@ -35,6 +35,10 @@ Asset_Repository::Asset_Repository(
     , m_paths(std::move(paths))
     , m_shader_compiler(std::make_unique<Shader_Compiler>())
 {
+    std::vector<std::wstring> shader_include_dirs;
+    shader_include_dirs.emplace_back(m_paths.shaders.begin(), m_paths.shaders.end());
+    shader_include_dirs.emplace_back(shader_include_dirs[0] + L"/../shared/");
+    shader_include_dirs.emplace_back(shader_include_dirs[0] + L"/../../thirdparty/rhi/src/shaders/");
     ankerl::unordered_dense::set<std::string> shader_set;
     for (const auto& shader_path : std::filesystem::recursive_directory_iterator(std::filesystem::path(m_paths.shaders)))
     {
@@ -56,12 +60,17 @@ Asset_Repository::Asset_Repository(
         {
             continue;
         }
-        compile_shader_library(hlsl_path, json_path);
+        compile_shader_library(hlsl_path, json_path, shader_include_dirs);
     }
 }
 
 Asset_Repository::~Asset_Repository()
 {}
+
+Compute_Pipeline Asset_Repository::get_compute_pipeline(const std::string_view& name) const
+{
+    return Compute_Pipeline(m_compute_library_ptrs.at(std::string(name)));
+}
 
 enum class Shader_Type
 {
@@ -132,7 +141,10 @@ std::vector<uint8_t> load_file_binary_unsafe(const char* path)
     return result;
 }
 
-void Asset_Repository::compile_shader_library(std::string_view hlsl_path, std::string_view json_path)
+void Asset_Repository::compile_shader_library(
+    std::string_view hlsl_path,
+    std::string_view json_path,
+    const std::vector<std::wstring>& include_dirs)
 {
     // parse the json file
     auto shader_json = nlohmann::json::parse(std::ifstream(std::string(json_path)));
@@ -336,7 +348,7 @@ void Asset_Repository::compile_shader_library(std::string_view hlsl_path, std::s
             .shader_model = shader_model_from_shader_type(shader_type)
         };
         rhi::dxc::Shader_Compiler_Settings settings = {
-            .include_dirs = {}
+            .include_dirs = include_dirs
         };
 
         if (define_lists.empty())

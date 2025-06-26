@@ -10,12 +10,13 @@ void Compute_Library::create_pipelines(rhi::Graphics_Device* device, Shader_Libr
     destroy_pipelines(device);
     for (const auto& [name, blob] : shader_library->shaders)
     {
-        auto& pipeline = *pipelines.acquire();
-        pipeline.name = name;
+        auto* pipeline = pipelines.acquire();
+        pipeline->name = name;
         rhi::Compute_Pipeline_Create_Info create_info = {
             blob
         };
-        pipeline.pipeline = device->create_pipeline(create_info).value_or(nullptr);
+        pipeline->pipeline = device->create_pipeline(create_info).value_or(nullptr);
+        pipeline_ptrs.push_back(pipeline);
     }
 }
 
@@ -26,5 +27,6 @@ void Compute_Library::destroy_pipelines(rhi::Graphics_Device* device)
         device->destroy_pipeline(wrapper.pipeline);
         pipelines.release(&wrapper);
     }
+    pipeline_ptrs.clear();
 }
 }

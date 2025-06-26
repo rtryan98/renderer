@@ -7,6 +7,8 @@ target_sources(
     compute_library.hpp
     gltf_loader.cpp
     gltf_loader.hpp
+    pipeline.cpp
+    pipeline.hpp
     pipeline_library.cpp
     pipeline_library.hpp
     shader_library.cpp

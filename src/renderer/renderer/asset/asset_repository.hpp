@@ -5,6 +5,7 @@
 #include "renderer/asset/pipeline_library.hpp"
 #include <rhi/common/array_vector.hpp>
 #include "renderer/logger.hpp"
+#include "renderer/asset/pipeline.hpp"
 
 namespace rhi
 {
@@ -26,12 +27,14 @@ public:
         Asset_Repository_Paths&& paths);
     ~Asset_Repository();
 
-    [[nodiscard]] Shader_Library* get_shader_library(std::string_view name) const;
-    [[nodiscard]] Compute_Library* get_compute_library(std::string_view name) const;
+    [[nodiscard]] Compute_Pipeline get_compute_pipeline(const std::string_view& name) const;
     [[nodiscard]] Pipeline_Library* get_pipeline_library(std::string_view name) const;
 
 private:
-    void compile_shader_library(std::string_view hlsl_path, std::string_view json_path);
+    void compile_shader_library(
+        std::string_view hlsl_path,
+        std::string_view json_path,
+        const std::vector<std::wstring>& include_dirs);
 
     [[nodiscard]] Compute_Library* get_or_create_compute_library(std::string_view name) const;
     [[nodiscard]] Pipeline_Library* get_or_create_pipeline_library(std::string_view name) const;
