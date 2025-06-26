@@ -1,26 +1,37 @@
 #pragma once
-#include <span>
 #include <ankerl/unordered_dense.h>
 #include "renderer/asset/shader_library.hpp"
 #include "renderer/asset/compute_library.hpp"
 #include "renderer/asset/pipeline_library.hpp"
 #include <rhi/common/array_vector.hpp>
+#include "renderer/logger.hpp"
 
 namespace ren
 {
+struct Asset_Repository_Paths
+{
+    std::string shaders;
+    std::string pipelines;
+};
+
 class Asset_Repository
 {
 public:
-    Asset_Repository(const std::initializer_list<const std::string_view>& paths);
+    Asset_Repository(std::shared_ptr<Logger> logger, const Asset_Repository_Paths& paths);
+    ~Asset_Repository();
 
     Shader_Library* get_shader_library(std::string_view name) const;
     Compute_Library* get_compute_library(std::string_view name) const;
     Pipeline_Library* get_pipeline_library(std::string_view name) const;
 
 private:
-    void compile_and_add_shader_library(std::string_view hlsl_path, std::string_view json_path);
+    void compile_shader_library(std::string_view hlsl_path, std::string_view json_path);
 
 private:
+
+    std::shared_ptr<Logger> m_logger;
+    Asset_Repository_Paths m_paths;
+
     class Shader_Compiler;
     std::unique_ptr<Shader_Compiler> m_shader_compiler;
 

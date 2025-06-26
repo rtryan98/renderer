@@ -26,6 +26,10 @@ Application::Application() noexcept
         .image_count = FRAME_IN_FLIGHT_COUNT + 1,
         .present_mode = rhi::Present_Mode::Immediate
         }))
+    , m_asset_repository(std::make_unique<Asset_Repository>(m_logger, Asset_Repository_Paths {
+        .shaders = "../../src/shaders/", // From build directory
+        .pipelines = "assets/pipelines/", // unused for now
+        }))
     , m_shader_library(m_logger, m_device.get())
     , m_asset_manager(m_logger, m_device.get(), FRAME_IN_FLIGHT_COUNT, *m_window)
     , m_renderer(*this, m_asset_manager, m_shader_library, *m_swapchain, Imgui_Renderer_Create_Info{

@@ -8,6 +8,7 @@
 #include "renderer/imgui/renderer_settings.hpp"
 #include "renderer/ocean/ocean_renderer.hpp"
 #include "renderer/renderer.hpp"
+#include "renderer/asset/asset_repository.hpp"
 
 #include <rhi/graphics_device.hpp>
 #include <rhi/swapchain.hpp>
@@ -74,6 +75,7 @@ private:
     std::unique_ptr<Input_State> m_input_state;
     std::unique_ptr<rhi::Graphics_Device> m_device;
     std::unique_ptr<rhi::Swapchain> m_swapchain;
+    std::unique_ptr<Asset_Repository> m_asset_repository;
     Shader_Library_Legacy m_shader_library;
     Asset_Manager m_asset_manager;
     Renderer m_renderer;
