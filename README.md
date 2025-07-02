@@ -9,7 +9,6 @@ Research / Toy Renderer
 ## Building
 Building Renderer requires the following:
 - Windows 11
-- Python 3.11
 - CMake 3.28
 
 The steps for Visual Studio 2022 are:
