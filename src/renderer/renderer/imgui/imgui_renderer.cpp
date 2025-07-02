@@ -1,9 +1,6 @@
 #include "renderer/imgui/imgui_renderer.hpp"
 
-#include "renderer/generated/imgui.vs.dxil.hpp"
-#include "renderer/generated/imgui.vs.spv.hpp"
-#include "renderer/generated/imgui.ps.dxil.hpp"
-#include "renderer/generated/imgui.ps.spv.hpp"
+#include "renderer/asset/asset_repository.hpp"
 
 namespace ren
 {
@@ -21,13 +18,12 @@ struct alignas(4 * sizeof(uint32_t)) Imgui_Push_Constants
     uint32_t vertex_offset;
 };
 
-Imgui_Renderer::Imgui_Renderer(const Imgui_Renderer_Create_Info& create_info)
+Imgui_Renderer::Imgui_Renderer(const Imgui_Renderer_Create_Info& create_info, Asset_Repository& asset_repository)
     : m_device(create_info.device)
+    , m_asset_repository(asset_repository)
     , m_vertex_buffers()
     , m_index_buffers()
     , m_images()
-    , m_vertex_shader(nullptr)
-    , m_pixel_shader(nullptr)
     , m_pipeline(nullptr)
     , m_sampler(nullptr)
     , m_frames_in_flight(create_info.frames_in_flight)
@@ -42,30 +38,12 @@ Imgui_Renderer::Imgui_Renderer(const Imgui_Renderer_Create_Info& create_info)
     m_vertex_buffers.resize(create_info.frames_in_flight);
     m_index_buffers.resize(create_info.frames_in_flight);
 
-    bool is_d3d12 = m_device->get_graphics_api() == rhi::Graphics_API::D3D12;
-    rhi::Shader_Blob_Create_Info vertex_shader_create_info = {
-        .data = static_cast<void*>(is_d3d12 ? imgui_vs_dxil.data() : imgui_vs_spv.data()),
-        .data_size = uint32_t(is_d3d12 ? imgui_vs_dxil.size() : imgui_vs_spv.size()),
-        .groups_x = 0,
-        .groups_y = 0,
-        .groups_z = 0
-    };
-    m_vertex_shader = m_device->create_shader_blob(vertex_shader_create_info).value_or(nullptr);
-    rhi::Shader_Blob_Create_Info pixel_shader_create_info = {
-        .data = static_cast<void*>(is_d3d12 ? imgui_ps_dxil.data() : imgui_ps_spv.data()),
-        .data_size = uint32_t(is_d3d12 ? imgui_ps_dxil.size() : imgui_ps_spv.size()),
-        .groups_x = 0,
-        .groups_y = 0,
-        .groups_z = 0
-    };
-    m_pixel_shader = m_device->create_shader_blob(pixel_shader_create_info).value_or(nullptr);
-
     rhi::Graphics_Pipeline_Create_Info pipeline_create_info = {
-        .vs = m_vertex_shader,
+        .vs = m_asset_repository.get_shader_blob("imgui.vs"),
         .hs = nullptr,
         .ds = nullptr,
         .gs = nullptr,
-        .ps = m_pixel_shader,
+        .ps = m_asset_repository.get_shader_blob("imgui.ps"),
         .blend_state_info = {
             .independent_blend_enable = false,
             .color_attachments = {
@@ -141,8 +119,6 @@ Imgui_Renderer::~Imgui_Renderer() noexcept
     }
     m_device->destroy_sampler(m_sampler);
     m_device->destroy_pipeline(m_pipeline);
-    m_device->destroy_shader_blob(m_vertex_shader);
-    m_device->destroy_shader_blob(m_pixel_shader);
     auto& io = ImGui::GetIO();
     io.BackendRendererUserData = nullptr;
 }

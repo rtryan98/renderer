@@ -5,6 +5,8 @@
 
 namespace ren
 {
+class Asset_Repository;
+
 struct Imgui_Renderer_Create_Info
 {
     rhi::Graphics_Device* device;
@@ -15,7 +17,7 @@ struct Imgui_Renderer_Create_Info
 class Imgui_Renderer
 {
 public:
-    Imgui_Renderer(const Imgui_Renderer_Create_Info& create_info);
+    Imgui_Renderer(const Imgui_Renderer_Create_Info& create_info, Asset_Repository& asset_repository);
     ~Imgui_Renderer() noexcept;
 
     Imgui_Renderer(const Imgui_Renderer& other) = delete;
@@ -35,11 +37,10 @@ private:
 
 private:
     rhi::Graphics_Device* m_device;
+    Asset_Repository& m_asset_repository;
     std::vector<rhi::Buffer*> m_vertex_buffers;
     std::vector<rhi::Buffer*> m_index_buffers;
     std::vector<rhi::Image*> m_images;
-    rhi::Shader_Blob* m_vertex_shader;
-    rhi::Shader_Blob* m_pixel_shader;
     rhi::Pipeline* m_pipeline;
     rhi::Sampler* m_sampler;
     uint32_t m_frames_in_flight;

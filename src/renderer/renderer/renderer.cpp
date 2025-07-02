@@ -39,7 +39,7 @@ Renderer::Renderer(Application& app, Asset_Manager& asset_manager, rhi::Swapchai
         .size = sizeof(GPU_Camera_Data),
         .heap = rhi::Memory_Heap_Type::GPU
         }, "Camera Buffer"))
-    , m_imgui_renderer(imgui_renderer_create_info)
+    , m_imgui_renderer(imgui_renderer_create_info, m_app.get_asset_repository())
     , m_ocean_renderer(m_asset_manager, m_app.get_asset_repository())
     , m_should_display_overlay(false)
 {
