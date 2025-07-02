@@ -4,7 +4,6 @@
 #include "renderer/window.hpp"
 #include "renderer/asset_manager.hpp"
 #include "renderer/cbt/cbt_cpu.hpp"
-#include "renderer/shader_manager.hpp"
 #include "renderer/imgui/renderer_settings.hpp"
 #include "renderer/ocean/ocean_renderer.hpp"
 #include "renderer/renderer.hpp"
@@ -35,7 +34,8 @@ public:
     ~Application() noexcept;
 
     void run();
-    Window& get_window() const { return *m_window; };
+    [[nodiscard]] Window& get_window() const { return *m_window; };
+    [[nodiscard]] Asset_Repository& get_asset_repository() const { return *m_asset_repository; };
 
     void upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, uint64_t size, uint64_t offset) noexcept;
 
@@ -58,6 +58,8 @@ private:
         uint64_t size;
     };
 
+    std::string init_asset_path() const;
+
     void setup_frame(Frame& frame) noexcept;
     void render_frame(Frame& frame, double t, double dt) noexcept;
     rhi::Command_List* handle_immediate_uploads(Frame& frame) noexcept;
@@ -71,12 +73,12 @@ private:
 
 private:
     std::shared_ptr<Logger> m_logger;
+    std::string m_asset_path;
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Input_State> m_input_state;
     std::unique_ptr<rhi::Graphics_Device> m_device;
     std::unique_ptr<rhi::Swapchain> m_swapchain;
     std::unique_ptr<Asset_Repository> m_asset_repository;
-    Shader_Library_Legacy m_shader_library;
     Asset_Manager m_asset_manager;
     Renderer m_renderer;
     std::array<Frame, FRAME_IN_FLIGHT_COUNT> m_frames;

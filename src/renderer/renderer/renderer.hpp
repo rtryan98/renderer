@@ -14,15 +14,13 @@ namespace ren
 {
 class Application;
 class Asset_Manager;
-class Shader_Library_Legacy;
 class Input_State;
 struct Render_Attachment;
 
 class Renderer
 {
 public:
-    Renderer(Application& app, Asset_Manager& asset_manager,
-        Shader_Library_Legacy& shader_library, rhi::Swapchain& swapchain,
+    Renderer(Application& app, Asset_Manager& asset_manager, rhi::Swapchain& swapchain,
         const Imgui_Renderer_Create_Info& imgui_renderer_create_info);
 
     std::vector<Settings_Base*> get_settings() noexcept;
@@ -42,7 +40,6 @@ private:
 private:
     Application& m_app;
     Asset_Manager& m_asset_manager;
-    Shader_Library_Legacy& m_shader_library;
     rhi::Swapchain& m_swapchain;
 
     Fly_Camera m_fly_cam;

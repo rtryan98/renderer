@@ -6,8 +6,9 @@
 
 namespace ren
 {
+class Application;
 class Asset_Manager;
-class Shader_Library_Legacy;
+class Asset_Repository;
 
 struct Ocean_Resources
 {
@@ -43,10 +44,6 @@ struct Ocean_Resources
         rhi::Buffer* vertex_buffer;
         rhi::Buffer* index_buffer;
 
-        rhi::Pipeline* initial_spectrum_pipeline;
-        rhi::Pipeline* time_dependent_spectrum_pipeline;
-        rhi::Pipeline* fft_pipeline;
-
         rhi::Pipeline* debug_render_slopes_pipeline;
         rhi::Pipeline* debug_render_normals_pipeline;
         rhi::Pipeline* render_patch_pipeline;
@@ -58,10 +55,8 @@ struct Ocean_Resources
     void destroy_buffers(Asset_Manager& asset_manager);
     void create_textures(Asset_Manager& asset_manager);
     void destroy_textures(Asset_Manager& asset_manager);
-    void create_graphics_pipelines(Asset_Manager& asset_manager, Shader_Library_Legacy& shader_library);
+    void create_graphics_pipelines(Asset_Manager& asset_manager, Asset_Repository& asset_repository);
     void destroy_graphics_pipelines(Asset_Manager& asset_manager);
-    void create_compute_pipelines(Asset_Manager& asset_manager, Shader_Library_Legacy& shader_library);
-    void destroy_compute_pipelines(Asset_Manager& asset_manager);
     void create_samplers(Asset_Manager& asset_manager);
     void destroy_samplers(Asset_Manager& asset_manager);
 };

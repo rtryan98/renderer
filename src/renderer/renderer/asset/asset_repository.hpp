@@ -2,7 +2,7 @@
 #include <ankerl/unordered_dense.h>
 #include "renderer/asset/shader_library.hpp"
 #include "renderer/asset/compute_library.hpp"
-#include "renderer/asset/pipeline_library.hpp"
+#include "renderer/asset/graphics_pipeline_library.hpp"
 #include <rhi/common/array_vector.hpp>
 #include "renderer/logger.hpp"
 #include "renderer/asset/pipeline.hpp"
@@ -18,6 +18,7 @@ struct Asset_Repository_Paths
 {
     std::string shaders;
     std::string pipelines;
+    std::vector<std::string> shader_include_paths;
 };
 
 class Asset_Repository
@@ -27,8 +28,10 @@ public:
         Asset_Repository_Paths&& paths);
     ~Asset_Repository();
 
+    [[nodiscard]] rhi::Shader_Blob* get_shader_blob(const std::string_view& name, const std::string_view& variant) const;
+    [[nodiscard]] rhi::Shader_Blob* get_shader_blob(const std::string_view& name) const;
     [[nodiscard]] Compute_Pipeline get_compute_pipeline(const std::string_view& name) const;
-    [[nodiscard]] Pipeline_Library* get_pipeline_library(std::string_view name) const;
+    [[nodiscard]] Graphics_Pipeline get_graphics_pipeline(const std::string_view& name) const;
 
 private:
     void compile_shader_library(
@@ -36,8 +39,10 @@ private:
         std::string_view json_path,
         const std::vector<std::wstring>& include_dirs);
 
-    [[nodiscard]] Compute_Library* get_or_create_compute_library(std::string_view name) const;
-    [[nodiscard]] Pipeline_Library* get_or_create_pipeline_library(std::string_view name) const;
+    void compile_graphics_pipeline_library(const std::string_view& json_path);
+
+    void create_shader_and_compute_libraries();
+    void create_graphics_pipeline_libraries();
 
 private:
     std::shared_ptr<Logger> m_logger;
@@ -60,7 +65,7 @@ private:
     String_Map<Compute_Library*> m_compute_library_ptrs = {};
     rhi::Array_Vector<Compute_Library, ARRAY_VECTOR_SIZE> m_compute_libraries = {};
 
-    String_Map<Pipeline_Library*> m_pipeline_library_ptrs = {};
-    rhi::Array_Vector<Pipeline_Library, ARRAY_VECTOR_SIZE> m_pipeline_libraries = {};
+    String_Map<Graphics_Pipeline_Library*> m_pipeline_library_ptrs = {};
+    rhi::Array_Vector<Graphics_Pipeline_Library, ARRAY_VECTOR_SIZE> m_pipeline_libraries = {};
 };
 }

@@ -1,7 +1,8 @@
 #include "renderer/ocean/ocean_resources.hpp"
 
+#include "renderer/application.hpp"
 #include "renderer/asset_manager.hpp"
-#include "renderer/shader_manager.hpp"
+#include "renderer/asset/asset_repository.hpp"
 
 namespace ren
 {
@@ -67,13 +68,13 @@ void Ocean_Resources::destroy_textures(Asset_Manager& asset_manager)
         asset_manager.destroy_image(gpu_resources.ydx_zdx_ydy_zdy_texture);
 }
 
-void Ocean_Resources::create_graphics_pipelines(Asset_Manager& asset_manager, Shader_Library_Legacy& shader_library)
+void Ocean_Resources::create_graphics_pipelines(Asset_Manager& asset_manager, Asset_Repository& asset_repository)
 {
     destroy_graphics_pipelines(asset_manager);
 
     auto debug_ci = rhi::Graphics_Pipeline_Create_Info {
-        .vs = shader_library.get_shader(Shaders::debug_render_ocean_normal_vs),
-        .ps = shader_library.get_shader(Shaders::debug_render_ocean_ps),
+        .vs = asset_repository.get_shader_blob("debug_render_ocean_normal.vs"),
+        .ps = asset_repository.get_shader_blob("debug_render_ocean.ps"),
         .blend_state_info = {
             .independent_blend_enable = false,
             .color_attachments = {
@@ -101,12 +102,12 @@ void Ocean_Resources::create_graphics_pipelines(Asset_Manager& asset_manager, Sh
     };
 
     gpu_resources.debug_render_normals_pipeline = asset_manager.create_pipeline(debug_ci);
-    debug_ci.vs = shader_library.get_shader(Shaders::debug_render_ocean_slope_vs);
+    debug_ci.vs = asset_repository.get_shader_blob("debug_render_ocean_slope.vs");
     gpu_resources.debug_render_slopes_pipeline = asset_manager.create_pipeline(debug_ci);
 
     auto graphics_ci = rhi::Graphics_Pipeline_Create_Info{
-        .vs = shader_library.get_shader(Shaders::surface_patch_render_ocean_vs),
-        .ps = shader_library.get_shader(Shaders::surface_render_ocean_ps),
+        .vs = asset_repository.get_shader_blob("surface_patch_render_ocean.vs"),
+        .ps = asset_repository.get_shader_blob("surface_render_ocean.ps"),
         .blend_state_info = {
             .independent_blend_enable = false,
             .color_attachments = {
@@ -139,8 +140,8 @@ void Ocean_Resources::create_graphics_pipelines(Asset_Manager& asset_manager, Sh
     gpu_resources.render_patch_pipeline = asset_manager.create_pipeline(patch_ci);
 
     auto composite_ci = graphics_ci;
-    composite_ci.vs = shader_library.get_shader(Shaders::fullscreen_triangle_vs);
-    composite_ci.ps = shader_library.get_shader(Shaders::compose_ocean_ps);
+    composite_ci.vs = asset_repository.get_shader_blob("fullscreen_triangle.vs");
+    composite_ci.ps = asset_repository.get_shader_blob("compose_ocean.ps");
     composite_ci.depth_stencil_info.depth_enable = false;
     composite_ci.depth_stencil_info.depth_write_enable = false;
     composite_ci.depth_stencil_format = rhi::Image_Format::Undefined;
@@ -157,32 +158,6 @@ void Ocean_Resources::destroy_graphics_pipelines(Asset_Manager& asset_manager)
         asset_manager.destroy_pipeline(gpu_resources.render_patch_pipeline);
     if (gpu_resources.render_composite_pipeline)
         asset_manager.destroy_pipeline(gpu_resources.render_composite_pipeline);
-}
-
-void Ocean_Resources::create_compute_pipelines(Asset_Manager& asset_manager, Shader_Library_Legacy& shader_library)
-{
-    destroy_compute_pipelines(asset_manager);
-
-    gpu_resources.initial_spectrum_pipeline = asset_manager.create_pipeline({
-        .cs = shader_library.get_shader(Shaders::initial_spectrum_cs)});
-    gpu_resources.time_dependent_spectrum_pipeline = asset_manager.create_pipeline({
-        .cs = shader_library.get_shader(Shaders::time_dependent_spectrum_cs)});
-    gpu_resources.fft_pipeline = asset_manager.create_pipeline({
-        .cs = shader_library.get_shader(
-            select_fft_shader(
-                options.size,
-                options.use_fp16_maths,
-                true))});
-}
-
-void Ocean_Resources::destroy_compute_pipelines(Asset_Manager& asset_manager)
-{
-    if (gpu_resources.initial_spectrum_pipeline)
-        asset_manager.destroy_pipeline(gpu_resources.initial_spectrum_pipeline);
-    if (gpu_resources.time_dependent_spectrum_pipeline)
-        asset_manager.destroy_pipeline(gpu_resources.time_dependent_spectrum_pipeline);
-    if (gpu_resources.fft_pipeline)
-        asset_manager.destroy_pipeline(gpu_resources.fft_pipeline);
 }
 
 void Ocean_Resources::create_samplers(Asset_Manager& asset_manager)

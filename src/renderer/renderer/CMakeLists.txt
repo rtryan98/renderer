@@ -18,8 +18,6 @@ target_sources(
     main.cpp
     renderer.cpp
     renderer.hpp
-    shader_manager.cpp
-    shader_manager.hpp
     window.cpp
     window.hpp
 )

@@ -2,7 +2,6 @@
 
 #include "renderer/application.hpp"
 #include "renderer/asset_manager.hpp"
-#include "renderer/shader_manager.hpp"
 
 #include <rhi/command_list.hpp>
 #include <shared/fft_shared_types.h>
@@ -10,19 +9,18 @@
 
 namespace ren
 {
-Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library_Legacy& shader_library)
+Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Asset_Repository& asset_repository)
     : m_asset_manager(asset_manager)
-    , m_shader_library(shader_library)
+    , m_asset_repository(asset_repository)
     , m_resources()
-    , m_settings(m_resources, m_asset_manager, m_shader_library)
+    , m_settings(m_resources, m_asset_manager, m_asset_repository)
 {
     m_resources.create_buffers(m_asset_manager);
     m_resources.create_textures(m_asset_manager);
-    m_resources.create_compute_pipelines(m_asset_manager, m_shader_library);
-    m_resources.create_graphics_pipelines(m_asset_manager, m_shader_library);
+    m_resources.create_graphics_pipelines(m_asset_manager, m_asset_repository);
     m_resources.create_samplers(m_asset_manager);
 
-    float larges_lengthscale = 1024.f;
+    float largest_lengthscale = 1024.f;
     auto calc_lengthscale = [](float lengthscale, uint32_t factor) {
         for (auto i = 0; i < factor; ++i)
         {
@@ -53,10 +51,10 @@ Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library_Lega
         },
         .active_cascades = { true, true, true, true },
         .length_scales = {
-            larges_lengthscale,
-            calc_lengthscale(larges_lengthscale, 1),
-            calc_lengthscale(larges_lengthscale, 4),
-            calc_lengthscale(larges_lengthscale, 6)
+            largest_lengthscale,
+            calc_lengthscale(largest_lengthscale, 1),
+            calc_lengthscale(largest_lengthscale, 4),
+            calc_lengthscale(largest_lengthscale, 6)
         },
         .spectrum = uint32_t(Ocean_Spectrum::TMA),
         .directional_spreading_function = uint32_t(Ocean_Directional_Spreading_Function::Donelan_Banner),
@@ -70,7 +68,6 @@ Ocean_Renderer::~Ocean_Renderer()
 {
     m_resources.destroy_buffers(m_asset_manager);
     m_resources.destroy_textures(m_asset_manager);
-    m_resources.destroy_compute_pipelines(m_asset_manager);
     m_resources.destroy_graphics_pipelines(m_asset_manager);
     m_resources.destroy_samplers(m_asset_manager);
 }
@@ -122,11 +119,12 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
         cmd->barrier(barrier);
     }
 
+    rhi::Pipeline* initial_spectrum_pipeline = app.get_asset_repository().get_compute_pipeline("initial_spectrum");
     cmd->begin_debug_region("Initial Spectrum", 0.25f, 0.0f, 1.0f);
-    cmd->set_pipeline(m_resources.gpu_resources.initial_spectrum_pipeline);
+    cmd->set_pipeline(initial_spectrum_pipeline);
     uint32_t tex_dispatch_size_xy =
         m_resources.options.size /
-        m_resources.gpu_resources.initial_spectrum_pipeline->compute_shading_info.cs->groups_x;
+        initial_spectrum_pipeline->compute_shading_info.cs->groups_x;
     cmd->set_push_constants<Ocean_Initial_Spectrum_Push_Constants>({
         m_resources.gpu_resources.initial_spectrum_data->buffer_view->bindless_index,
         m_resources.gpu_resources.initial_spectrum_texture->image_view->bindless_index,
@@ -175,7 +173,7 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
         = false;
 
     cmd->begin_debug_region("Time Dependent Spectrum", 0.25f, 0.25f, 1.0f);
-    cmd->set_pipeline(m_resources.gpu_resources.time_dependent_spectrum_pipeline);
+    cmd->set_pipeline(app.get_asset_repository().get_compute_pipeline("time_dependent_spectrum"));
     cmd->set_push_constants<Ocean_Time_Dependent_Spectrum_Push_Constants>({
         m_resources.gpu_resources.initial_spectrum_texture->image_view->bindless_index,
         m_resources.gpu_resources.angular_frequency_texture->image_view->bindless_index,
@@ -209,8 +207,18 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
         cmd->barrier(barrier);
     }
 
+    auto select_fft = [&]()
+    {
+        std::stringstream ss;
+        ss << "fft_";
+        ss << std::to_string(m_resources.options.size);
+        if (m_resources.options.use_fp16_maths) ss << "_fp16";
+        ss << "_float4";
+        return ss.str();
+    };
+
     cmd->begin_debug_region("IFFT", 0.25f, 0.5f, 1.0f);
-    cmd->set_pipeline(m_resources.gpu_resources.fft_pipeline);
+    cmd->set_pipeline(app.get_asset_repository().get_compute_pipeline("fft").set_variant(select_fft()));
     cmd->add_debug_marker("IFFT-Vertical", 0.25f, 0.5f, 1.0f);
     cmd->set_push_constants<FFT_Push_Constants>(
         { m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index, FFT_VERTICAL, true },

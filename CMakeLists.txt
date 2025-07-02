@@ -11,9 +11,6 @@ add_subdirectory(thirdparty)
 include(scripts/shaders.cmake)
 add_custom_target(renderer_builtin_resources)
 
-include(scripts/generate_compute_pso_library.cmake)
-add_custom_target(renderer_compute_pipeline_library)
-
 add_executable(renderer)
 target_link_libraries(
     renderer PUBLIC
@@ -38,7 +35,6 @@ set_target_properties(
 add_dependencies(
     renderer
     renderer_builtin_resources
-    renderer_compute_pipeline_library
 )
 
 add_subdirectory(src)
@@ -82,7 +78,7 @@ add_custom_command(
     COMMAND ${RENDERER_BUILTIN_RESOURCES_COMMAND} echo on #hack for last &&
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
-generate_compute_pipeline_library(renderer renderer_compute_pipeline_library ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders ./shaders ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer/renderer/generated/compute_pipeline_library ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer)
+# generate_compute_pipeline_library(renderer renderer_compute_pipeline_library ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders ./shaders ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer/renderer/generated/compute_pipeline_library ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer)
 
 set_property(DIRECTORY ${CMAKE_CURRENT_LIST_DIR} PROPERTY VS_STARTUP_PROJECT renderer)
 

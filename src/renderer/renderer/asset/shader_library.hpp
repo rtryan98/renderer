@@ -10,7 +10,7 @@ struct Shader_Blob;
 
 namespace ren
 {
-struct Pipeline_Library;
+struct Graphics_Pipeline_Library;
 struct Compute_Library;
 
 struct Named_Shader
@@ -22,7 +22,7 @@ struct Named_Shader
 struct Shader_Library
 {
     std::vector<Named_Shader> shaders;
-    std::vector<Pipeline_Library*> referenced_pipeline_libraries;
+    std::vector<Graphics_Pipeline_Library*> referenced_pipeline_libraries;
     Compute_Library* referenced_compute_library;
 
     // TODO: If there are a lot of shaders this should be a map and not a vector with linear search. However, right now this suffices

@@ -35,41 +35,49 @@ Asset_Repository::Asset_Repository(
     , m_paths(std::move(paths))
     , m_shader_compiler(std::make_unique<Shader_Compiler>())
 {
-    std::vector<std::wstring> shader_include_dirs;
-    shader_include_dirs.emplace_back(m_paths.shaders.begin(), m_paths.shaders.end());
-    shader_include_dirs.emplace_back(shader_include_dirs[0] + L"/../shared/");
-    shader_include_dirs.emplace_back(shader_include_dirs[0] + L"/../../thirdparty/rhi/src/shaders/");
-    ankerl::unordered_dense::set<std::string> shader_set;
-    for (const auto& shader_path : std::filesystem::recursive_directory_iterator(std::filesystem::path(m_paths.shaders)))
+    m_logger->info("Asset repository created with the following asset paths:");
+    m_logger->info("Shaders: '{}'", m_paths.shaders);
+    m_logger->info("Pipelines: '{}'", m_paths.pipelines);
+    m_logger->info("Asset repository uses the following include dirs for shader compilation:");
+    for (auto& path : m_paths.shader_include_paths)
     {
-        const auto& path = shader_path.path();
-        auto extension = path.extension();
-        if (extension == ".hlsl" || extension == ".json")
-        {
-            auto full_path = (path.parent_path() / path.stem()).string();
-            shader_set.insert(full_path);
-        }
+        m_logger->info("Include path: '{}'", path);
     }
-    for (const auto& shader : shader_set)
-    {
-        m_logger->debug("Processing shader {}", shader);
-        auto hlsl_path = std::string(shader) + ".hlsl";
-        auto json_path = std::string(shader) + ".json";
 
-        if (!std::filesystem::exists(hlsl_path) || !std::filesystem::exists(json_path))
-        {
-            continue;
-        }
-        compile_shader_library(hlsl_path, json_path, shader_include_dirs);
-    }
+    create_shader_and_compute_libraries();
 }
 
 Asset_Repository::~Asset_Repository()
 {}
 
+rhi::Shader_Blob* Asset_Repository::get_shader_blob(const std::string_view& name, const std::string_view& variant) const
+{
+    if (!m_shader_library_ptrs.contains(std::string(name)))
+    {
+        m_logger->error("Asset repository does not contain shader blob '{}'", name);
+        return nullptr;
+    }
+    return m_shader_library_ptrs.at(std::string(name))->get_shader(variant);
+}
+
+rhi::Shader_Blob* Asset_Repository::get_shader_blob(const std::string_view& name) const
+{
+    if (!m_shader_library_ptrs.contains(std::string(name)))
+    {
+        m_logger->error("Asset repository does not contain shader blob '{}'", name);
+        return nullptr;
+    }
+    return m_shader_library_ptrs.at(std::string(name))->shaders.at(0).blob;
+}
+
 Compute_Pipeline Asset_Repository::get_compute_pipeline(const std::string_view& name) const
 {
     return Compute_Pipeline(m_compute_library_ptrs.at(std::string(name)));
+}
+
+Graphics_Pipeline Asset_Repository::get_graphics_pipeline(const std::string_view& name) const
+{
+    return Graphics_Pipeline(m_pipeline_library_ptrs.at(std::string(name)));
 }
 
 enum class Shader_Type
@@ -393,6 +401,606 @@ void Asset_Repository::compile_shader_library(
         shader_library->referenced_compute_library = compute_library;
         compute_library->create_pipelines(m_graphics_device, shader_library);
         m_logger->info("Successfully created compute library '{}'", name);
+    }
+}
+
+rhi::Image_Format image_format_from_string(std::string_view str)
+{
+    constexpr static auto IMAGE_FORMATS =
+        std::to_array<std::pair<const std::string_view, const rhi::Image_Format>>(
+        {
+            {"Undefined", rhi::Image_Format::Undefined},
+            {"R8_UNORM", rhi::Image_Format::R8_UNORM},
+            {"R8_SNORM",rhi::Image_Format::R8_SNORM},
+            {"R8_UINT", rhi::Image_Format::R8_UINT},
+            {"R8_SINT", rhi::Image_Format::R8_SINT},
+            {"R8G8_UNORM", rhi::Image_Format::R8G8_UNORM},
+            {"R8G8_SNORM", rhi::Image_Format::R8G8_SNORM},
+            {"R8G8_UINT", rhi::Image_Format::R8G8_UINT},
+            {"R8G8_SINT", rhi::Image_Format::R8G8_SINT},
+            {"R8G8B8A8_UNORM", rhi::Image_Format::R8G8B8A8_UNORM},
+            {"R8G8B8A8_SNORM", rhi::Image_Format::R8G8B8A8_SNORM},
+            {"R8G8B8A8_UINT", rhi::Image_Format::R8G8B8A8_UINT},
+            {"R8G8B8A8_SINT", rhi::Image_Format::R8G8B8A8_SINT},
+            {"R8G8B8A8_SRGB", rhi::Image_Format::R8G8B8A8_SRGB},
+            {"B8G8R8A8_UNORM", rhi::Image_Format::B8G8R8A8_UNORM},
+            {"B8G8R8A8_SNORM", rhi::Image_Format::B8G8R8A8_SNORM},
+            {"B8G8R8A8_UINT", rhi::Image_Format::B8G8R8A8_UINT},
+            {"B8G8R8A8_SINT", rhi::Image_Format::B8G8R8A8_SINT},
+            {"B8G8R8A8_SRGB", rhi::Image_Format::B8G8R8A8_SRGB},
+            {"A2R10G10B10_UNORM_PACK32", rhi::Image_Format::A2R10G10B10_UNORM_PACK32},
+            {"R16_UNORM", rhi::Image_Format::R16_UNORM},
+            {"R16_SNORM", rhi::Image_Format::R16_SNORM},
+            {"R16_UINT", rhi::Image_Format::R16_UINT},
+            {"R16_SINT", rhi::Image_Format::R16_SINT},
+            {"R16_SFLOAT", rhi::Image_Format::R16_SFLOAT},
+            {"R16G16_UNORM", rhi::Image_Format::R16G16_UNORM},
+            {"R16G16_SNORM", rhi::Image_Format::R16G16_SNORM},
+            {"R16G16_UINT", rhi::Image_Format::R16G16_UINT},
+            {"R16G16_SINT", rhi::Image_Format::R16G16_SINT},
+            {"R16G16_SFLOAT", rhi::Image_Format::R16G16_SFLOAT},
+            {"R16G16B16A16_UNORM", rhi::Image_Format::R16G16B16A16_UNORM},
+            {"R16G16B16A16_SNORM", rhi::Image_Format::R16G16B16A16_SNORM},
+            {"R16G16B16A16_UINT", rhi::Image_Format::R16G16B16A16_UINT},
+            {"R16G16B16A16_SINT", rhi::Image_Format::R16G16B16A16_SINT},
+            {"R16G16B16A16_SFLOAT", rhi::Image_Format::R16G16B16A16_SFLOAT},
+            {"R32_UINT", rhi::Image_Format::R32_UINT},
+            {"R32_SINT", rhi::Image_Format::R32_SINT},
+            {"R32_SFLOAT", rhi::Image_Format::R32_SFLOAT},
+            {"R32G32_UINT", rhi::Image_Format::R32G32_UINT},
+            {"R32G32_SINT", rhi::Image_Format::R32G32_SINT},
+            {"R32G32_SFLOAT", rhi::Image_Format::R32G32_SFLOAT},
+            {"R32G32B32A32_UINT", rhi::Image_Format::R32G32B32A32_UINT},
+            {"R32G32B32A32_SINT", rhi::Image_Format::R32G32B32A32_SINT},
+            {"R32G32B32A32_SFLOAT", rhi::Image_Format::R32G32B32A32_SFLOAT},
+            {"B10G11R11_UFLOAT_PACK32", rhi::Image_Format::B10G11R11_UFLOAT_PACK32},
+            {"E5B9G9R9_UFLOAT_PACK32", rhi::Image_Format::E5B9G9R9_UFLOAT_PACK32},
+            {"D16_UNORM", rhi::Image_Format::D16_UNORM},
+            {"D32_SFLOAT", rhi::Image_Format::D32_SFLOAT},
+            {"D24_UNORM_S8_UINT", rhi::Image_Format::D24_UNORM_S8_UINT},
+            {"D32_SFLOAT_S8_UINT", rhi::Image_Format::D32_SFLOAT_S8_UINT},
+            {"BC1_RGB_UNORM_BLOCK", rhi::Image_Format::BC1_RGB_UNORM_BLOCK},
+            {"BC1_RGB_SRGB_BLOCK", rhi::Image_Format::BC1_RGB_SRGB_BLOCK},
+            {"BC1_RGBA_UNORM_BLOCK", rhi::Image_Format::BC1_RGBA_UNORM_BLOCK},
+            {"BC1_RGBA_SRGB_BLOCK", rhi::Image_Format::BC1_RGBA_SRGB_BLOCK},
+            {"BC2_UNORM_BLOCK", rhi::Image_Format::BC2_UNORM_BLOCK},
+            {"BC2_SRGB_BLOCK", rhi::Image_Format::BC2_SRGB_BLOCK},
+            {"BC3_UNORM_BLOCK", rhi::Image_Format::BC3_UNORM_BLOCK},
+            {"BC3_SRGB_BLOCK", rhi::Image_Format::BC3_SRGB_BLOCK},
+            {"BC4_UNORM_BLOCK", rhi::Image_Format::BC4_UNORM_BLOCK},
+            {"BC4_SNORM_BLOCK", rhi::Image_Format::BC4_SNORM_BLOCK},
+            {"BC5_UNORM_BLOCK", rhi::Image_Format::BC5_UNORM_BLOCK},
+            {"BC5_SNORM_BLOCK", rhi::Image_Format::BC5_SNORM_BLOCK},
+            {"BC6H_UFLOAT_BLOCK", rhi::Image_Format::BC6H_UFLOAT_BLOCK},
+            {"BC6H_SFLOAT_BLOCK", rhi::Image_Format::BC6H_SFLOAT_BLOCK},
+            {"BC7_UNORM_BLOCK", rhi::Image_Format::BC7_UNORM_BLOCK},
+            {"BC7_SRGB_BLOCK", rhi::Image_Format::BC7_SRGB_BLOCK}
+        });
+        for (const auto& [string_val, enum_val] : IMAGE_FORMATS)
+        {
+            if (string_val == str)
+                return enum_val;
+        }
+        return rhi::Image_Format::Undefined;
+}
+
+rhi::Blend_Factor blend_factor_from_string(std::string_view str)
+{
+    constexpr static auto BLEND_FACTORS =
+        std::to_array<std::pair<const std::string_view, const rhi::Blend_Factor>>(
+        {
+            {"Zero", rhi::Blend_Factor::Zero},
+            {"One", rhi::Blend_Factor::One},
+            {"Src_Color", rhi::Blend_Factor::Src_Color},
+            {"One_Minus_Src_Color", rhi::Blend_Factor::One_Minus_Src_Color},
+            {"Dst_Color", rhi::Blend_Factor::Dst_Color},
+            {"One_Minus_Dst_Color", rhi::Blend_Factor::One_Minus_Dst_Color},
+            {"Src_Alpha", rhi::Blend_Factor::Src_Alpha},
+            {"One_Minus_Src_Alpha", rhi::Blend_Factor::One_Minus_Src_Alpha},
+            {"Dst_Alpha", rhi::Blend_Factor::Dst_Alpha},
+            {"One_Minus_Dst_Alpha", rhi::Blend_Factor::One_Minus_Dst_Alpha},
+            {"Constant_Color", rhi::Blend_Factor::Constant_Color},
+            {"One_Minus_Constant_Color", rhi::Blend_Factor::One_Minus_Constant_Color},
+            {"Constant_Alpha", rhi::Blend_Factor::Constant_Alpha},
+            {"One_Minus_Constant_Alpha", rhi::Blend_Factor::One_Minus_Constant_Alpha},
+            {"Src1_Color", rhi::Blend_Factor::Src1_Color},
+            {"One_Minus_Src1_Color", rhi::Blend_Factor::One_Minus_Src1_Color},
+            {"Src1_Alpha", rhi::Blend_Factor::Src1_Alpha},
+            {"One_Minus_Src1_Alpha", rhi::Blend_Factor::One_Minus_Src1_Alpha}
+        });
+    for (const auto& [string_val, enum_val] : BLEND_FACTORS)
+    {
+        if (string_val == str)
+            return enum_val;
+    }
+    return rhi::Blend_Factor::Zero;
+}
+
+rhi::Blend_Op blend_op_from_string(std::string_view str)
+{
+    constexpr static auto BLEND_OPS =
+        std::to_array<std::pair<const std::string_view, const rhi::Blend_Op>>(
+        {
+            {"Add", rhi::Blend_Op::Add},
+            {"Sub", rhi::Blend_Op::Sub},
+            {"Reverse_Sub", rhi::Blend_Op::Reverse_Sub},
+            {"Min", rhi::Blend_Op::Min},
+            {"Max", rhi::Blend_Op::Max},
+        });
+    for (const auto& [string_val, enum_val] : BLEND_OPS)
+    {
+        if (string_val == str)
+            return enum_val;
+    }
+    return rhi::Blend_Op::Add;
+}
+
+rhi::Logic_Op logic_op_from_string(std::string_view str)
+{
+    constexpr static auto LOGIC_OPS =
+        std::to_array<std::pair<const std::string_view, const rhi::Logic_Op>>(
+        {
+            {"Clear", rhi::Logic_Op::Clear},
+            {"Set", rhi::Logic_Op::Set},
+            {"Copy", rhi::Logic_Op::Copy},
+            {"Copy_Inverted", rhi::Logic_Op::Copy_Inverted},
+            {"Noop", rhi::Logic_Op::Noop},
+            {"Invert", rhi::Logic_Op::Invert},
+            {"AND", rhi::Logic_Op::AND},
+            {"NAND", rhi::Logic_Op::NAND},
+            {"OR", rhi::Logic_Op::OR},
+            {"NOR", rhi::Logic_Op::NOR},
+            {"XOR", rhi::Logic_Op::XOR},
+            {"Equiv", rhi::Logic_Op::Equiv},
+            {"AND_Reverse", rhi::Logic_Op::AND_Reverse},
+            {"AND_Inverted", rhi::Logic_Op::AND_Inverted},
+            {"OR_Reverse", rhi::Logic_Op::OR_Reverse},
+            {"OR_Inverted", rhi::Logic_Op::OR_Inverted},
+        });
+    for (const auto& [string_val, enum_val] : LOGIC_OPS)
+    {
+        if (string_val == str)
+            return enum_val;
+    }
+    return rhi::Logic_Op::Clear;
+}
+
+rhi::Color_Component color_component_from_string(std::string_view str)
+{
+    rhi::Color_Component components{0};
+    if (str.contains('R') || str.contains('r') ) components = components | rhi::Color_Component::R_Bit;
+    if (str.contains('G') || str.contains('g') ) components = components | rhi::Color_Component::G_Bit;
+    if (str.contains('B') || str.contains('b') ) components = components | rhi::Color_Component::B_Bit;
+    if (str.contains('A') || str.contains('a') ) components = components | rhi::Color_Component::A_Bit;
+    return components;
+}
+
+rhi::Comparison_Func comparison_func_from_string(const std::string_view str)
+{
+    constexpr static auto COMPARISON_FUNCS =
+        std::to_array<std::pair<const std::string_view, const rhi::Comparison_Func>>(
+        {
+            {"None", rhi::Comparison_Func::None},
+            {"Never", rhi::Comparison_Func::Never},
+            {"Less", rhi::Comparison_Func::Less},
+            {"Equal", rhi::Comparison_Func::Equal},
+            {"Less_Equal", rhi::Comparison_Func::Less_Equal},
+            {"Greater", rhi::Comparison_Func::Greater},
+            {"Not_Equal", rhi::Comparison_Func::Not_Equal},
+            {"Greater_Equal", rhi::Comparison_Func::Greater_Equal},
+            {"Always", rhi::Comparison_Func::Always},
+        });
+    for (const auto& [string_val, enum_val] : COMPARISON_FUNCS)
+    {
+        if (string_val == str)
+            return enum_val;
+    }
+    return rhi::Comparison_Func::None;
+}
+
+rhi::Stencil_Op stencil_op_from_string(const std::string_view str)
+{
+    constexpr static auto STENCIL_OPS =
+        std::to_array<std::pair<const std::string_view, const rhi::Stencil_Op>>(
+        {
+            {"Keep", rhi::Stencil_Op::Keep},
+            {"Zero", rhi::Stencil_Op::Zero},
+            {"Replace", rhi::Stencil_Op::Replace},
+            {"Incr_Sat", rhi::Stencil_Op::Incr_Sat},
+            {"Decr_Sat", rhi::Stencil_Op::Decr_Sat},
+            {"Invert", rhi::Stencil_Op::Invert},
+            {"Incr", rhi::Stencil_Op::Incr},
+            {"Decr", rhi::Stencil_Op::Decr},
+        });
+    for (const auto& [string_val, enum_val] : STENCIL_OPS)
+    {
+        if (string_val == str)
+            return enum_val;
+    }
+    return rhi::Stencil_Op::Keep;
+}
+
+rhi::Depth_Bounds_Test_Mode depth_bounds_test_mode_from_string(const std::string_view str)
+{
+    constexpr static auto DEPTH_BOUNDS_TEST_MODES =
+        std::to_array<std::pair<const std::string_view, const rhi::Depth_Bounds_Test_Mode>>(
+        {
+            {"Disabled", rhi::Depth_Bounds_Test_Mode::Disabled},
+            {"Static", rhi::Depth_Bounds_Test_Mode::Static},
+            {"Dynamic", rhi::Depth_Bounds_Test_Mode::Dynamic},
+        });
+    for (const auto& [string_val, enum_val] : DEPTH_BOUNDS_TEST_MODES)
+    {
+        if (string_val == str)
+            return enum_val;
+    }
+    return rhi::Depth_Bounds_Test_Mode::Disabled;
+}
+
+rhi::Cull_Mode cull_mode_from_string(const std::string_view str)
+{
+    constexpr static auto CULL_MODES =
+        std::to_array<std::pair<const std::string_view, const rhi::Cull_Mode>>(
+        {
+            {"None", rhi::Cull_Mode::None},
+            {"Front", rhi::Cull_Mode::Front},
+            {"Back", rhi::Cull_Mode::Back},
+        });
+    for (const auto& [string_val, enum_val] : CULL_MODES)
+    {
+        if (string_val == str)
+            return enum_val;
+    }
+    return rhi::Cull_Mode::None;
+}
+
+rhi::Primitive_Topology_Type primitive_topology_from_string(const std::string_view str)
+{
+    constexpr static auto PRIMITIVE_TOPOLOGY_TYPES =
+        std::to_array<std::pair<const std::string_view, const rhi::Primitive_Topology_Type>>(
+        {
+            {"Point", rhi::Primitive_Topology_Type::Point},
+            {"Line", rhi::Primitive_Topology_Type::Line},
+            {"Triangle", rhi::Primitive_Topology_Type::Triangle},
+            {"Patch", rhi::Primitive_Topology_Type::Patch},
+        });
+    for (const auto& [string_val, enum_val] : PRIMITIVE_TOPOLOGY_TYPES)
+    {
+        if (string_val == str)
+            return enum_val;
+    }
+    return rhi::Primitive_Topology_Type::Triangle;
+}
+
+void Asset_Repository::compile_graphics_pipeline_library(const std::string_view& json_path)
+{
+    // parse the json file
+    auto pipeline_json = nlohmann::json::parse(std::ifstream(std::string(json_path)));
+
+    // TODO: add permutations?
+    bool is_mesh_shading = false;
+
+    rhi::Shader_Blob* ts;
+    rhi::Shader_Blob* ms;
+    rhi::Shader_Blob* vs;
+    rhi::Shader_Blob* ps;
+    rhi::Pipeline_Blend_State_Info blend_state_info{};
+    rhi::Primitive_Topology_Type primitive_topology;
+    rhi::Pipeline_Rasterization_State_Info rasterizer_state_info{};
+    rhi::Pipeline_Depth_Stencil_State_Info depth_stencil_info{};
+    std::array<rhi::Image_Format, rhi::PIPELINE_COLOR_ATTACHMENTS_MAX> color_attachments{};
+    uint32_t color_attachment_count = 0;
+    rhi::Image_Format depth_stencil_format;
+
+    if (pipeline_json.contains("vs"))
+    {
+        if (pipeline_json["vs"].contains("name"))
+        {
+            if (pipeline_json["vs"].contains("variant"))
+            {
+                auto vs_name = pipeline_json["vs"]["name"].get<std::string>();
+                auto variant_name = pipeline_json["vs"]["variant"].get<std::string>();
+                vs = m_shader_library_ptrs[vs_name]->get_shader(variant_name);
+            }
+            else
+            {
+                auto vs_name = pipeline_json["vs"]["name"].get<std::string>();
+                vs = m_shader_library_ptrs[vs_name]->shaders[0].blob;
+            }
+        }
+    }
+
+    auto set_shader = [&](auto& shader, const std::string_view type)
+    {
+        if (pipeline_json.contains(type))
+        {
+            if (pipeline_json[type].contains("name"))
+            {
+                auto name = pipeline_json[type]["name"].get<std::string>();
+                auto variant_name = pipeline_json[type].contains("variant")
+                    ? pipeline_json[type]["name"]["variant"].get<std::string>()
+                    : "";
+                auto shader_lib = m_shader_library_ptrs[name];
+                if (!variant_name.empty())
+                {
+                    shader = shader_lib->get_shader(variant_name);
+                }
+                else
+                {
+                    shader = shader_lib->shaders[0].blob;
+                    variant_name = shader_lib->shaders[0].name;
+                }
+                return std::make_pair(m_shader_library_ptrs[name], variant_name);
+            }
+        }
+    };
+
+    auto [ts_lib, ts_variant] = set_shader(ts, "ts");
+    auto [ms_lib, ms_variant] = set_shader(ms, "ms");
+    auto [vs_lib, vs_variant] = set_shader(vs, "vs");
+    auto [ps_lib, ps_variant] = set_shader(ps, "ps");
+
+    blend_state_info.independent_blend_enable = pipeline_json.contains("independent_blend_enable")
+            ? pipeline_json["independent_blend_enable"].get<bool>()
+            : false;
+
+    if (pipeline_json.contains("color_attachments"))
+    {
+        for (const auto& color_attachment_json : pipeline_json["color_attachments"])
+        {
+            auto& ca_blend = blend_state_info.color_attachments[color_attachment_count];
+            ca_blend.blend_enable = color_attachment_json.contains("blend_enable")
+                ? color_attachment_json["blend_enable"].get<bool>()
+                : false;
+            ca_blend.logic_op_enable = color_attachment_json.contains("logic_op_enable")
+                ? color_attachment_json["logic_op_enable"].get<bool>()
+                : false;
+            ca_blend.color_src_blend = color_attachment_json.contains("color_src_blend")
+                ? blend_factor_from_string(color_attachment_json["color_src_blend"].get<std::string>())
+                : rhi::Blend_Factor::Zero;
+            ca_blend.color_dst_blend = color_attachment_json.contains("color_dst_blend")
+                ? blend_factor_from_string(color_attachment_json["color_dst_blend"].get<std::string>())
+                : rhi::Blend_Factor::Zero;
+            ca_blend.color_blend_op = color_attachment_json.contains("color_blend_op")
+                ? blend_op_from_string(color_attachment_json["color_blend_op"].get<std::string>())
+                : rhi::Blend_Op::Add;
+            ca_blend.alpha_src_blend = color_attachment_json.contains("alpha_src_blend")
+                ? blend_factor_from_string(color_attachment_json["alpha_src_blend"].get<std::string>())
+                : rhi::Blend_Factor::Zero;
+            ca_blend.alpha_dst_blend = color_attachment_json.contains("alpha_dst_blend")
+                ? blend_factor_from_string(color_attachment_json["alpha_dst_blend"].get<std::string>())
+                : rhi::Blend_Factor::Zero;
+            ca_blend.alpha_blend_op = color_attachment_json.contains("alpha_blend_op")
+                ? blend_op_from_string(color_attachment_json["alpha_blend_op"].get<std::string>())
+                : rhi::Blend_Op::Add;
+            ca_blend.logic_op = color_attachment_json.contains("logic_op")
+                ? logic_op_from_string(color_attachment_json["logic_op"].get<std::string>())
+                : rhi::Logic_Op::Clear;
+            ca_blend.color_write_mask = color_attachment_json.contains("color_write_mask")
+                ? color_component_from_string(color_attachment_json["color_write_mask"].get<std::string>())
+                : rhi::Color_Component::Enable_All;
+
+            auto& ca_format = color_attachments[color_attachment_count];
+            ca_format = color_attachment_json.contains("format")
+                ? image_format_from_string(color_attachment_json["format"].get<std::string>())
+                : rhi::Image_Format::Undefined;
+
+            color_attachment_count += 1;
+        }
+    }
+
+    if (pipeline_json.contains("depth_stencil"))
+    {
+        auto& depth_stencil_json = pipeline_json["depth_stencil"];
+
+        depth_stencil_format = depth_stencil_json.contains("format")
+            ? image_format_from_string(depth_stencil_json["format"].get<std::string>())
+            : rhi::Image_Format::Undefined;
+
+        depth_stencil_info.depth_enable = depth_stencil_json.contains("depth_enable")
+            ? depth_stencil_json["depth_enable"].get<bool>()
+            : false;
+        depth_stencil_info.depth_write_enable = depth_stencil_json.contains("depth_write_enable")
+            ? depth_stencil_json["depth_write_enable"].get<bool>()
+            : false;
+        depth_stencil_info.comparison_func = depth_stencil_json.contains("comparison_func")
+            ? comparison_func_from_string(depth_stencil_json["comparison_func"].get<std::string>())
+            : rhi::Comparison_Func::None;
+        depth_stencil_info.stencil_enable = depth_stencil_json.contains("stencil_enable")
+            ? depth_stencil_json["stencil_enable"].get<bool>()
+            : false;
+
+        auto set_stencil_info = [&](auto& stencil_face_info, const std::string_view stencil_info_str)
+        {
+            if (!depth_stencil_json.contains(stencil_info_str))
+                return;
+            auto& stencil_json = depth_stencil_json[stencil_info_str];
+            stencil_face_info.fail = depth_stencil_json.contains("fail")
+                ? stencil_op_from_string(stencil_json["fail"].get<std::string>())
+                : rhi::Stencil_Op::Keep;
+            stencil_face_info.depth_fail = depth_stencil_json.contains("depth_fail")
+                ? stencil_op_from_string(stencil_json["depth_fail"].get<std::string>())
+                : rhi::Stencil_Op::Keep;
+            stencil_face_info.pass = depth_stencil_json.contains("pass")
+                ? stencil_op_from_string(stencil_json["pass"].get<std::string>())
+                : rhi::Stencil_Op::Keep;
+            stencil_face_info.comparison_func = depth_stencil_json.contains("comparison_func")
+                ? comparison_func_from_string(depth_stencil_json["comparison_func"].get<std::string>())
+                : rhi::Comparison_Func::None;
+            stencil_face_info.stencil_read_mask = depth_stencil_json.contains("stencil_read_mask")
+                ? uint8_t(stencil_json["stencil_read_mask"].get<uint32_t>())
+                : 0;
+            stencil_face_info.stencil_write_mask = depth_stencil_json.contains("stencil_write_mask")
+                ? uint8_t(stencil_json["stencil_write_mask"].get<uint32_t>())
+                : 0;
+        };
+        set_stencil_info(depth_stencil_info.stencil_front_face, "stencil_front_face");
+        set_stencil_info(depth_stencil_info.stencil_back_face, "stencil_back_face");
+
+        depth_stencil_info.depth_bounds_test_mode = depth_stencil_json.contains("depth_bounds_test_mode")
+            ? depth_bounds_test_mode_from_string(depth_stencil_json["depth_bounds_test_mode"].get<std::string>())
+            : rhi::Depth_Bounds_Test_Mode::Disabled;
+        depth_stencil_info.depth_bounds_min = depth_stencil_json.contains("depth_bounds_min")
+            ? depth_stencil_json["depth_bounds_min"].get<float>()
+            : 0.f;
+        depth_stencil_info.depth_bounds_max = depth_stencil_json.contains("depth_bounds_max")
+            ? depth_stencil_json["depth_bounds_max"].get<float>()
+            : 0.f;
+    }
+
+    if (pipeline_json.contains("rasterizer_state"))
+    {
+        auto& rasterizer_json = pipeline_json["rasterizer_state"];;
+        rasterizer_state_info.fill_mode = rasterizer_json.contains("wireframe")
+            ? static_cast<rhi::Fill_Mode>(rasterizer_json["wireframe"].get<bool>())
+            : rhi::Fill_Mode::Solid;
+        rasterizer_state_info.cull_mode = rasterizer_json.contains("cull_mode")
+            ? cull_mode_from_string(rasterizer_json["cull_mode"].get<std::string>())
+            : rhi::Cull_Mode::None;
+        rasterizer_state_info.winding_order = rasterizer_json.contains("front_face_cw")
+            ? static_cast<rhi::Winding_Order>(rasterizer_json["front_face_cw"].get<bool>())
+            : rhi::Winding_Order::Front_Face_CCW;
+        rasterizer_state_info.depth_bias = rasterizer_json.contains("depth_bias")
+            ? rasterizer_json["depth_bias"].get<float>()
+            : 0.f;
+        rasterizer_state_info.depth_bias_clamp = rasterizer_json.contains("depth_bias_clamp")
+            ? rasterizer_json["depth_bias_clamp"].get<float>()
+            : 0.f;
+        rasterizer_state_info.depth_bias_slope_scale = rasterizer_json.contains("depth_bias_slope_scale")
+            ? rasterizer_json["depth_bias_slope_scale"].get<float>()
+            : 0.f;
+        rasterizer_state_info.depth_clip_enable = rasterizer_json.contains("depth_clip_enable")
+            ? rasterizer_json["depth_clip_enable"].get<bool>()
+            : true;
+    }
+
+    primitive_topology = pipeline_json.contains("primitive_topology")
+        ? primitive_topology_from_string(pipeline_json["primitive_topology"].get<std::string>())
+        : rhi::Primitive_Topology_Type::Triangle;
+
+    rhi::Pipeline* pipeline = nullptr;
+    if (is_mesh_shading)
+    {
+        rhi::Mesh_Shading_Pipeline_Create_Info create_info =
+        {
+            .ts = ts,
+            .ms = ms,
+            .blend_state_info = blend_state_info,
+            .rasterizer_state_info = rasterizer_state_info,
+            .depth_stencil_info = depth_stencil_info,
+            .primitive_topology = primitive_topology,
+            .color_attachment_count = color_attachment_count,
+            .color_attachment_formats = color_attachments,
+            .depth_stencil_format = depth_stencil_format
+        };
+        pipeline = m_graphics_device->create_pipeline(create_info).value_or(nullptr);
+    }
+    else
+    {
+        rhi::Graphics_Pipeline_Create_Info create_info =
+        {
+            .vs = ts,
+            .ps = ms,
+            .blend_state_info = blend_state_info,
+            .rasterizer_state_info = rasterizer_state_info,
+            .depth_stencil_info = depth_stencil_info,
+            .primitive_topology = primitive_topology,
+            .color_attachment_count = color_attachment_count,
+            .color_attachment_formats = color_attachments,
+            .depth_stencil_format = depth_stencil_format
+        };
+        pipeline = m_graphics_device->create_pipeline(create_info).value_or(nullptr);
+    }
+
+    auto name = pipeline_json["name"].get<std::string>();
+    if (!m_pipeline_library_ptrs.contains(name))
+    {
+        m_pipeline_library_ptrs[name] = m_pipeline_libraries.acquire();
+    }
+
+    auto& pipeline_library = *m_pipeline_library_ptrs[name];
+
+    // Bookkeeping
+    auto register_pipeline_to_shader_lib = [&pipeline_library](Shader_Library* shader_library)
+    {
+        if (shader_library)
+            shader_library->referenced_pipeline_libraries.push_back(&pipeline_library);
+    };
+
+    pipeline_library.pipeline = pipeline;
+
+    pipeline_library.ts = ts_lib;
+    pipeline_library.ts_variant = ts_variant;
+    register_pipeline_to_shader_lib(ts_lib);
+    pipeline_library.ms = ms_lib;
+    pipeline_library.ms_variant = ms_variant;
+    register_pipeline_to_shader_lib(ms_lib);
+    pipeline_library.vs = vs_lib;
+    pipeline_library.vs_variant = vs_variant;
+    register_pipeline_to_shader_lib(vs_lib);
+    pipeline_library.ps = ps_lib;
+    pipeline_library.ps_variant = ps_variant;
+    register_pipeline_to_shader_lib(ps_lib);
+    pipeline_library.blend_state_info = blend_state_info;
+    pipeline_library.primitive_topology = primitive_topology;
+    pipeline_library.rasterizer_state_info = rasterizer_state_info;
+    pipeline_library.depth_stencil_info = depth_stencil_info;
+    pipeline_library.color_attachments = color_attachments;
+    pipeline_library.color_attachment_count = color_attachment_count;
+    pipeline_library.depth_stencil_format = depth_stencil_format;
+}
+
+void Asset_Repository::create_shader_and_compute_libraries()
+{
+    std::vector<std::wstring> shader_include_dirs;
+    shader_include_dirs.reserve(m_paths.shader_include_paths.size() + 1);
+    shader_include_dirs.emplace_back(m_paths.shaders.begin(), m_paths.shaders.end());
+    for (auto& shader_include_path : m_paths.shader_include_paths)
+    {
+        shader_include_dirs.emplace_back(
+            shader_include_dirs[0] + std::wstring(shader_include_path.begin(), shader_include_path.end()));
+    }
+    ankerl::unordered_dense::set<std::string> shader_set;
+    for (const auto& shader_path : std::filesystem::recursive_directory_iterator(std::filesystem::path(m_paths.shaders)))
+    {
+        const auto& path = shader_path.path();
+        auto extension = path.extension();
+        if (extension == ".hlsl" || extension == ".json")
+        {
+            auto full_path = (path.parent_path() / path.stem()).string();
+            shader_set.insert(full_path);
+        }
+    }
+    for (const auto& shader : shader_set)
+    {
+        m_logger->debug("Processing shader {}", shader);
+        auto hlsl_path = std::string(shader) + ".hlsl";
+        auto json_path = std::string(shader) + ".json";
+
+        if (!std::filesystem::exists(hlsl_path) || !std::filesystem::exists(json_path))
+        {
+            continue;
+        }
+        compile_shader_library(hlsl_path, json_path, shader_include_dirs);
+    }
+}
+
+void Asset_Repository::create_graphics_pipeline_libraries()
+{
+    ankerl::unordered_dense::set<std::string> graphics_pipeline_library_set;
+    for (const auto& graphics_pipeline_library_path : std::filesystem::recursive_directory_iterator(std::filesystem::path(m_paths.shaders)))
+    {
+        const auto& path = graphics_pipeline_library_path.path();
+        auto extension = path.extension();
+        if (extension == ".json")
+        {
+            auto full_path = (path.parent_path() / path.stem()).string();
+            graphics_pipeline_library_set.insert(full_path);
+        }
+    }
+    for (const auto& graphics_pipeline_library : graphics_pipeline_library_set)
+    {
+        compile_graphics_pipeline_library(graphics_pipeline_library);
     }
 }
 }

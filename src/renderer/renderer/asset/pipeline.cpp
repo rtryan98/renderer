@@ -1,5 +1,8 @@
 #include "renderer/asset/pipeline.hpp"
+
+#include "graphics_pipeline_library.hpp"
 #include "renderer/asset/compute_library.hpp"
+#include "renderer/asset/graphics_pipeline_library.hpp"
 
 namespace ren
 {
@@ -24,5 +27,15 @@ Compute_Pipeline& Compute_Pipeline::set_variant(std::string_view name)
         }
     }
     return *this;
+}
+
+Graphics_Pipeline::Graphics_Pipeline(Graphics_Pipeline_Library* graphics_pipeline_library)
+    : m_graphics_pipeline_library(graphics_pipeline_library)
+    , m_active_pipeline(m_graphics_pipeline_library->pipeline)
+{}
+
+Graphics_Pipeline::operator rhi::Pipeline*() const
+{
+    return m_active_pipeline;
 }
 }

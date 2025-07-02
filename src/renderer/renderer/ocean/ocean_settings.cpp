@@ -1,7 +1,6 @@
 #include "renderer/ocean/ocean_settings.hpp"
 #include "renderer/ocean/ocean_resources.hpp"
 #include "renderer/asset_manager.hpp"
-#include "renderer/shader_manager.hpp"
 #include "renderer/imgui/imgui_util.hpp"
 
 #include <array>
@@ -59,11 +58,11 @@ constexpr const char* OCEAN_HELP_TEXT_LENGTHSCALE =
 Ocean_Settings::Ocean_Settings(
     Ocean_Resources& resources,
     Asset_Manager& asset_manager,
-    Shader_Library_Legacy& shader_library)
+    Asset_Repository& asset_repository)
     : Settings_Base("Ocean")
     , m_resources(resources)
     , m_asset_manager(asset_manager)
-    , m_shader_library(shader_library)
+    , m_asset_repository(asset_repository)
 {}
 
 void Ocean_Settings::process_gui()
@@ -163,14 +162,6 @@ void Ocean_Settings::process_gui_options()
     if (recreate_textures)
     {
         m_resources.create_textures(m_asset_manager);
-    }
-
-    bool recreate_pipelines =
-        options_before.use_fp16_maths != options.use_fp16_maths ||
-        options_before.size != options.size;
-    if (recreate_pipelines)
-    {
-        m_resources.create_compute_pipelines(m_asset_manager, m_shader_library);
     }
 }
 

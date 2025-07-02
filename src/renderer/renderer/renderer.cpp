@@ -19,12 +19,10 @@ float calculate_aspect_ratio(const Window& window)
     return float(window_data.width) / float(window_data.height);
 }
 
-Renderer::Renderer(Application& app, Asset_Manager& asset_manager,
-    Shader_Library_Legacy& shader_library, rhi::Swapchain& swapchain,
+Renderer::Renderer(Application& app, Asset_Manager& asset_manager, rhi::Swapchain& swapchain,
     const Imgui_Renderer_Create_Info& imgui_renderer_create_info)
     : m_app(app)
     , m_asset_manager(asset_manager)
-    , m_shader_library(shader_library)
     , m_swapchain(swapchain)
     , m_fly_cam{
         .fov_y = 90.f,
@@ -42,7 +40,7 @@ Renderer::Renderer(Application& app, Asset_Manager& asset_manager,
         .heap = rhi::Memory_Heap_Type::GPU
         }, "Camera Buffer"))
     , m_imgui_renderer(imgui_renderer_create_info)
-    , m_ocean_renderer(m_asset_manager, m_shader_library)
+    , m_ocean_renderer(m_asset_manager, m_app.get_asset_repository())
     , m_should_display_overlay(false)
 {
     init_rendertargets();

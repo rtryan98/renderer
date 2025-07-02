@@ -1,12 +1,14 @@
 #include "renderer/application.hpp"
 
 #include <chrono>
+#include <filesystem>
 #include <imgui.h>
 
 namespace ren
 {
 Application::Application() noexcept
     : m_logger(std::make_shared<Logger>())
+    , m_asset_path(init_asset_path())
     , m_window(Window::create({
         .width = 2560,
         .height = 1440,
@@ -30,12 +32,15 @@ Application::Application() noexcept
         m_logger,
         m_device.get(),
         Asset_Repository_Paths {
-        .shaders = "../../src/shaders/", // From build directory
-        .pipelines = "assets/pipelines/", // unused for now
-        }))
-    , m_shader_library(m_logger, m_device.get())
+        .shaders = m_asset_path + "/shaders/",
+        .pipelines = m_asset_path + "/pipelines/",
+        .shader_include_paths = {
+            "../",
+            "../../src/shared/",
+            "../../thirdparty/rhi/src/shaders/"
+        }}))
     , m_asset_manager(m_logger, m_device.get(), FRAME_IN_FLIGHT_COUNT, *m_window)
-    , m_renderer(*this, m_asset_manager, m_shader_library, *m_swapchain, Imgui_Renderer_Create_Info{
+    , m_renderer(*this, m_asset_manager, *m_swapchain, Imgui_Renderer_Create_Info{
         .device = m_device.get(),
         .frames_in_flight = FRAME_IN_FLIGHT_COUNT,
         .swapchain_image_format = m_swapchain->get_image_format()})
@@ -142,6 +147,20 @@ void Application::upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, 
         .dst = buffer,
         .offset = offset,
         .size = size });
+}
+
+std::string Application::init_asset_path() const
+{
+    auto dir = std::filesystem::path();
+    for (uint32_t back_search = 0; back_search < 5; ++back_search)
+    {
+        if (auto path_marker = dir / "assets" / "meta"; std::filesystem::exists(path_marker))
+            break;
+        dir = dir / "..";
+    }
+    auto prefix = (dir / "assets").string();
+    m_logger->info("Asset path is '{}'.", prefix);
+    return prefix;
 }
 
 void Application::setup_frame(Frame& frame) noexcept

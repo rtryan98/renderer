@@ -11,13 +11,13 @@ class Command_List;
 namespace ren
 {
 class Asset_Manager;
-class Shader_Library_Legacy;
 class Application;
+class Asset_Repository;
 
 class Ocean_Renderer
 {
 public:
-    Ocean_Renderer(Asset_Manager& asset_manager, Shader_Library_Legacy& shader_library);
+    Ocean_Renderer(Asset_Manager& asset_manager, Asset_Repository& asset_repository);
     ~Ocean_Renderer();
 
     [[nodiscard]] Ocean_Settings* get_settings() noexcept;
@@ -33,7 +33,7 @@ public:
 
 private:
     Asset_Manager& m_asset_manager;
-    Shader_Library_Legacy& m_shader_library;
+    Asset_Repository& m_asset_repository;
     Ocean_Resources m_resources;
     Ocean_Settings m_settings;
 };
