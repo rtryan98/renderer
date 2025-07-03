@@ -16,11 +16,13 @@ class Application;
 class Asset_Manager;
 class Input_State;
 struct Render_Attachment;
+class Render_Resource_Blackboard;
 
 class Renderer
 {
 public:
     Renderer(Application& app, Asset_Manager& asset_manager, rhi::Swapchain& swapchain,
+        Render_Resource_Blackboard& resource_blackboard,
         const Imgui_Renderer_Create_Info& imgui_renderer_create_info);
 
     std::vector<Settings_Base*> get_settings() noexcept;
@@ -29,6 +31,7 @@ public:
     void overlay_gui();
     void setup_frame();
     void render(rhi::Command_List* cmd, double t, double dt) noexcept;
+    void on_resize(uint32_t width, uint32_t height) noexcept;
 
 private:
     void render_gbuffer_pass(rhi::Command_List* cmd);
@@ -41,6 +44,7 @@ private:
     Application& m_app;
     Asset_Manager& m_asset_manager;
     rhi::Swapchain& m_swapchain;
+    Render_Resource_Blackboard& m_resource_blackboard;
 
     Fly_Camera m_fly_cam;
     rhi::Buffer* m_camera_buffer;

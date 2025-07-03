@@ -8,6 +8,7 @@
 #include "renderer/ocean/ocean_renderer.hpp"
 #include "renderer/renderer.hpp"
 #include "renderer/asset/asset_repository.hpp"
+#include "renderer/render_resource_blackboard.hpp"
 
 #include <rhi/graphics_device.hpp>
 #include <rhi/swapchain.hpp>
@@ -34,8 +35,8 @@ public:
     ~Application() noexcept;
 
     void run();
-    [[nodiscard]] Window& get_window() const { return *m_window; };
-    [[nodiscard]] Asset_Repository& get_asset_repository() const { return *m_asset_repository; };
+    [[nodiscard]] Window& get_window() const { return *m_window; }
+    [[nodiscard]] Asset_Repository& get_asset_repository() const { return *m_asset_repository; }
 
     void upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, uint64_t size, uint64_t offset) noexcept;
 
@@ -77,6 +78,7 @@ private:
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Input_State> m_input_state;
     std::unique_ptr<rhi::Graphics_Device> m_device;
+    std::unique_ptr<Render_Resource_Blackboard> m_resource_blackboard;
     std::unique_ptr<rhi::Swapchain> m_swapchain;
     std::unique_ptr<Asset_Repository> m_asset_repository;
     Asset_Manager m_asset_manager;

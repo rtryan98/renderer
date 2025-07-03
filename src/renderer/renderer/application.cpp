@@ -22,6 +22,7 @@ Application::Application() noexcept
         .enable_gpu_validation = false,
         .enable_locking = false
         }))
+    , m_resource_blackboard(std::make_unique<Render_Resource_Blackboard>(m_device.get()))
     , m_swapchain(m_device->create_swapchain({
         .hwnd = m_window->get_native_handle(),
         .preferred_format = rhi::Image_Format::R8G8B8A8_UNORM,
@@ -40,7 +41,7 @@ Application::Application() noexcept
             "../../thirdparty/rhi/src/shaders/"
         }}))
     , m_asset_manager(m_logger, m_device.get(), FRAME_IN_FLIGHT_COUNT, *m_window)
-    , m_renderer(*this, m_asset_manager, *m_swapchain, Imgui_Renderer_Create_Info{
+    , m_renderer(*this, m_asset_manager, *m_swapchain, *m_resource_blackboard, Imgui_Renderer_Create_Info{
         .device = m_device.get(),
         .frames_in_flight = FRAME_IN_FLIGHT_COUNT,
         .swapchain_image_format = m_swapchain->get_image_format()})
@@ -170,9 +171,11 @@ void Application::setup_frame(Frame& frame) noexcept
     frame.compute_command_pool->reset();
     frame.copy_command_pool->reset();
     m_asset_manager.flush_deletion_queue(m_frame_counter);
-    auto swapchain_resize = m_swapchain->query_resize();
-    if (swapchain_resize.is_size_changed)
+    m_resource_blackboard->garbage_collect(m_frame_counter);
+    auto [is_size_changed, width, height] = m_swapchain->query_resize();
+    if (is_size_changed)
     {
+        m_renderer.on_resize(width, height);
         m_asset_manager.recreate_size_dependent_render_attachment_images();
     }
     m_swapchain->acquire_next_image();

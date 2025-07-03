@@ -20,10 +20,12 @@ float calculate_aspect_ratio(const Window& window)
 }
 
 Renderer::Renderer(Application& app, Asset_Manager& asset_manager, rhi::Swapchain& swapchain,
+    Render_Resource_Blackboard& resource_blackboard,
     const Imgui_Renderer_Create_Info& imgui_renderer_create_info)
     : m_app(app)
     , m_asset_manager(asset_manager)
     , m_swapchain(swapchain)
+    , m_resource_blackboard(resource_blackboard)
     , m_fly_cam{
         .fov_y = 90.f,
         .aspect = calculate_aspect_ratio(app.get_window()),
@@ -213,6 +215,11 @@ void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
             .memory_barriers = {}
             });
     }
+}
+
+void Renderer::on_resize(uint32_t width, uint32_t height) noexcept
+{
+
 }
 
 void Renderer::render_gbuffer_pass(rhi::Command_List* cmd)

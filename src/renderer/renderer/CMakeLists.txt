@@ -18,6 +18,8 @@ target_sources(
     main.cpp
     renderer.cpp
     renderer.hpp
+    render_resource_blackboard.cpp
+    render_resource_blackboard.hpp
     window.cpp
     window.hpp
 )
