@@ -1,0 +1,17 @@
+{
+    "name": "ocean_debug_render_slope",
+    "vs": {
+        "name": "debug_render_ocean_slope.vs"
+    },
+    "ps": {
+        "name": "debug_render_ocean.ps"
+    },
+    "color_attachments": [
+        {
+            "format": "R8G8B8A8_UNORM"
+        }
+    ],
+    "depth_stencil": {
+    },
+    "primitive_topology": "Line"
+}

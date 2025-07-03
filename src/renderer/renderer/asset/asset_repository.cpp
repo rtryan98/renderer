@@ -45,6 +45,7 @@ Asset_Repository::Asset_Repository(
     }
 
     create_shader_and_compute_libraries();
+    create_graphics_pipeline_libraries();
 }
 
 Asset_Repository::~Asset_Repository()
@@ -692,35 +693,21 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
     uint32_t color_attachment_count = 0;
     rhi::Image_Format depth_stencil_format;
 
-    if (pipeline_json.contains("vs"))
-    {
-        if (pipeline_json["vs"].contains("name"))
-        {
-            if (pipeline_json["vs"].contains("variant"))
-            {
-                auto vs_name = pipeline_json["vs"]["name"].get<std::string>();
-                auto variant_name = pipeline_json["vs"]["variant"].get<std::string>();
-                vs = m_shader_library_ptrs[vs_name]->get_shader(variant_name);
-            }
-            else
-            {
-                auto vs_name = pipeline_json["vs"]["name"].get<std::string>();
-                vs = m_shader_library_ptrs[vs_name]->shaders[0].blob;
-            }
-        }
-    }
-
     auto set_shader = [&](auto& shader, const std::string_view type)
     {
         if (pipeline_json.contains(type))
         {
             if (pipeline_json[type].contains("name"))
             {
-                auto name = pipeline_json[type]["name"].get<std::string>();
+                const auto name = pipeline_json[type]["name"].get<std::string>();
                 auto variant_name = pipeline_json[type].contains("variant")
                     ? pipeline_json[type]["name"]["variant"].get<std::string>()
                     : "";
-                auto shader_lib = m_shader_library_ptrs[name];
+                if (!m_shader_library_ptrs.contains(name))
+                {
+                    m_logger->error("Shader library '{}' does not exist.", name);
+                }
+                const auto shader_lib = m_shader_library_ptrs[name];
                 if (!variant_name.empty())
                 {
                     shader = shader_lib->get_shader(variant_name);
@@ -733,6 +720,7 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
                 return std::make_pair(m_shader_library_ptrs[name], variant_name);
             }
         }
+        return std::make_pair(static_cast<Shader_Library*>(nullptr), std::string());
     };
 
     auto [ts_lib, ts_variant] = set_shader(ts, "ts");
@@ -885,6 +873,7 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
         {
             .ts = ts,
             .ms = ms,
+            .ps = ps,
             .blend_state_info = blend_state_info,
             .rasterizer_state_info = rasterizer_state_info,
             .depth_stencil_info = depth_stencil_info,
@@ -899,8 +888,8 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
     {
         rhi::Graphics_Pipeline_Create_Info create_info =
         {
-            .vs = ts,
-            .ps = ms,
+            .vs = vs,
+            .ps = ps,
             .blend_state_info = blend_state_info,
             .rasterizer_state_info = rasterizer_state_info,
             .depth_stencil_info = depth_stencil_info,
@@ -948,6 +937,8 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
     pipeline_library.color_attachments = color_attachments;
     pipeline_library.color_attachment_count = color_attachment_count;
     pipeline_library.depth_stencil_format = depth_stencil_format;
+
+    m_logger->info("Created graphics pipeline library '{}'", name);
 }
 
 void Asset_Repository::create_shader_and_compute_libraries()
@@ -988,18 +979,19 @@ void Asset_Repository::create_shader_and_compute_libraries()
 void Asset_Repository::create_graphics_pipeline_libraries()
 {
     ankerl::unordered_dense::set<std::string> graphics_pipeline_library_set;
-    for (const auto& graphics_pipeline_library_path : std::filesystem::recursive_directory_iterator(std::filesystem::path(m_paths.shaders)))
+    for (const auto& graphics_pipeline_library_path : std::filesystem::recursive_directory_iterator(std::filesystem::path(m_paths.pipelines)))
     {
         const auto& path = graphics_pipeline_library_path.path();
         auto extension = path.extension();
         if (extension == ".json")
         {
-            auto full_path = (path.parent_path() / path.stem()).string();
+            auto full_path = (path.parent_path() / path.filename()).string();
             graphics_pipeline_library_set.insert(full_path);
         }
     }
     for (const auto& graphics_pipeline_library : graphics_pipeline_library_set)
     {
+        m_logger->debug("Processing graphics pipeline library '{}'", graphics_pipeline_library);
         compile_graphics_pipeline_library(graphics_pipeline_library);
     }
 }

@@ -17,7 +17,6 @@ Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Asset_Repository& a
 {
     m_resources.create_buffers(m_asset_manager);
     m_resources.create_textures(m_asset_manager);
-    m_resources.create_graphics_pipelines(m_asset_manager, m_asset_repository);
     m_resources.create_samplers(m_asset_manager);
 
     float largest_lengthscale = 1024.f;
@@ -68,7 +67,6 @@ Ocean_Renderer::~Ocean_Renderer()
 {
     m_resources.destroy_buffers(m_asset_manager);
     m_resources.destroy_textures(m_asset_manager);
-    m_resources.destroy_graphics_pipelines(m_asset_manager);
     m_resources.destroy_samplers(m_asset_manager);
 }
 
@@ -280,7 +278,7 @@ void Ocean_Renderer::render(rhi::Command_List* cmd) noexcept
 void Ocean_Renderer::render_patch(rhi::Command_List* cmd, uint32_t camera_buffer_bindless_index) noexcept
 {
     cmd->add_debug_marker("Ocean Render - Single Patch", .2f, .2f, 1.f);
-    cmd->set_pipeline(m_resources.gpu_resources.render_patch_pipeline);
+    cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch"));
     constexpr auto SIZE = 2048;
     cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
         .length_scales = m_resources.data.initial_spectrum_data.length_scales,
@@ -296,7 +294,7 @@ void Ocean_Renderer::render_patch(rhi::Command_List* cmd, uint32_t camera_buffer
 
 void Ocean_Renderer::render_composite(rhi::Command_List* cmd, uint32_t color_image_bindless_index) noexcept
 {
-    cmd->set_pipeline(m_resources.gpu_resources.render_composite_pipeline);
+    cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_composite"));
     cmd->set_push_constants<Ocean_Render_Composition_Push_Constants>({
         .rt_color_tex = color_image_bindless_index,
         .tex_sampler = m_resources.gpu_resources.linear_sampler->bindless_index
@@ -309,7 +307,7 @@ void Ocean_Renderer::debug_render_slope(rhi::Command_List* cmd, uint32_t camera_
     if (!m_resources.data.debug_render_slope) return;
 
     cmd->add_debug_marker("Ocean Debug Render - Slopes", .2f, .2f, 1.f);
-    cmd->set_pipeline(m_resources.gpu_resources.debug_render_slopes_pipeline);
+    cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_debug_render_slope"));
     constexpr auto SIZE = 32;
     cmd->set_push_constants<Ocean_Render_Debug_Push_Constants>({
         .length_scales =       m_resources.data.initial_spectrum_data.length_scales,
@@ -329,7 +327,7 @@ void Ocean_Renderer::debug_render_normal(rhi::Command_List* cmd, uint32_t camera
     if (!m_resources.data.debug_render_normal) return;
 
     cmd->add_debug_marker("Ocean Debug Render - Normals", .2f, .2f, 1.f);
-    cmd->set_pipeline(m_resources.gpu_resources.debug_render_normals_pipeline);
+    cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_debug_render_normal"));
     constexpr auto SIZE = 32;
     cmd->set_push_constants<Ocean_Render_Debug_Push_Constants>({
         .length_scales = m_resources.data.initial_spectrum_data.length_scales,

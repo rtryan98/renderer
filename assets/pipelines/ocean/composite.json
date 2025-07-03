@@ -1,0 +1,16 @@
+{
+    "name": "ocean_render_composite",
+    "vs": {
+        "name": "fullscreen_triangle.vs"
+    },
+    "ps": {
+        "name": "compose_ocean.ps"
+    },
+    "color_attachments": [
+        {
+            "format": "R8G8B8A8_UNORM"
+        }
+    ],
+    "depth_stencil": {
+    }
+}

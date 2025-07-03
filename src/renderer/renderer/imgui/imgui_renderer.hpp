@@ -41,7 +41,6 @@ private:
     std::vector<rhi::Buffer*> m_vertex_buffers;
     std::vector<rhi::Buffer*> m_index_buffers;
     std::vector<rhi::Image*> m_images;
-    rhi::Pipeline* m_pipeline;
     rhi::Sampler* m_sampler;
     uint32_t m_frames_in_flight;
     uint32_t m_frame_index;

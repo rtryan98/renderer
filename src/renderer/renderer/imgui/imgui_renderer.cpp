@@ -24,7 +24,6 @@ Imgui_Renderer::Imgui_Renderer(const Imgui_Renderer_Create_Info& create_info, As
     , m_vertex_buffers()
     , m_index_buffers()
     , m_images()
-    , m_pipeline(nullptr)
     , m_sampler(nullptr)
     , m_frames_in_flight(create_info.frames_in_flight)
     , m_frame_index(0u)
@@ -37,51 +36,6 @@ Imgui_Renderer::Imgui_Renderer(const Imgui_Renderer_Create_Info& create_info, As
 
     m_vertex_buffers.resize(create_info.frames_in_flight);
     m_index_buffers.resize(create_info.frames_in_flight);
-
-    rhi::Graphics_Pipeline_Create_Info pipeline_create_info = {
-        .vs = m_asset_repository.get_shader_blob("imgui.vs"),
-        .hs = nullptr,
-        .ds = nullptr,
-        .gs = nullptr,
-        .ps = m_asset_repository.get_shader_blob("imgui.ps"),
-        .blend_state_info = {
-            .independent_blend_enable = false,
-            .color_attachments = {
-                {
-                    /* .blend_enable */ true,
-                    /* .logic_op_enable */ false,
-                    /* .color_src_blend */ rhi::Blend_Factor::Src_Alpha,
-                    /* .color_dst_blend */ rhi::Blend_Factor::One_Minus_Src_Alpha,
-                    /* .color_blend_op */ rhi::Blend_Op::Add,
-                    /* .alpha_src_blend */ rhi::Blend_Factor::One,
-                    /* .alpha_dst_blend */ rhi::Blend_Factor::One_Minus_Src_Alpha,
-                    /* .alpha_blend_op */ rhi::Blend_Op::Add,
-                    /* .logic_op */ rhi::Logic_Op::Noop,
-                    /* .color_write_mask */ rhi::Color_Component::Enable_All
-                }
-            }
-        },
-        .rasterizer_state_info = {
-            .fill_mode = rhi::Fill_Mode::Solid,
-            .cull_mode = rhi::Cull_Mode::None,
-            .winding_order = rhi::Winding_Order::Front_Face_CW,
-            .depth_bias = 0.0f,
-            .depth_bias_clamp = 0.0f,
-            .depth_bias_slope_scale = 0.0f,
-            .depth_clip_enable = false
-        },
-        .depth_stencil_info = {
-            .depth_enable = false,
-            .depth_write_enable = false,
-            .stencil_enable = false,
-            .depth_bounds_test_mode = rhi::Depth_Bounds_Test_Mode::Disabled
-        },
-        .primitive_topology = rhi::Primitive_Topology_Type::Triangle,
-        .color_attachment_count = 1,
-        .color_attachment_formats = create_info.swapchain_image_format,
-        .depth_stencil_format = rhi::Image_Format::Undefined
-    };
-    m_pipeline = m_device->create_pipeline(pipeline_create_info).value_or(nullptr);
 
     rhi::Sampler_Create_Info sampler_create_info = {
         .filter_min = rhi::Sampler_Filter::Linear,
@@ -118,7 +72,6 @@ Imgui_Renderer::~Imgui_Renderer() noexcept
         m_device->destroy_image(image);
     }
     m_device->destroy_sampler(m_sampler);
-    m_device->destroy_pipeline(m_pipeline);
     auto& io = ImGui::GetIO();
     io.BackendRendererUserData = nullptr;
 }
@@ -346,7 +299,7 @@ void Imgui_Renderer::setup_render_state(
     ImDrawData* draw_data) noexcept
 {
     cmd->set_viewport(0.0f, 0.0f, draw_data->DisplaySize.x, draw_data->DisplaySize.y, 0.0f, 1.0f);
-    cmd->set_pipeline(m_pipeline);
+    cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("imgui"));
     cmd->set_index_buffer(index_buffer, rhi::Index_Type::U16);
 }
 }
