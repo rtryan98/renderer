@@ -10,14 +10,14 @@ class Command_List;
 
 namespace ren
 {
-class Asset_Manager;
 class Application;
 class Asset_Repository;
+class Render_Resource_Blackboard;
 
 class Ocean_Renderer
 {
 public:
-    Ocean_Renderer(Asset_Manager& asset_manager, Asset_Repository& asset_repository);
+    Ocean_Renderer(Render_Resource_Blackboard& resource_blackboard, Asset_Repository& asset_repository);
     ~Ocean_Renderer();
 
     [[nodiscard]] Ocean_Settings* get_settings() noexcept;
@@ -32,7 +32,7 @@ public:
     void debug_render_normal(rhi::Command_List* cmd, uint32_t camera_buffer_bindless_index) noexcept;
 
 private:
-    Asset_Manager& m_asset_manager;
+    Render_Resource_Blackboard& m_resource_blackboard;
     Asset_Repository& m_asset_repository;
     Ocean_Resources m_resources;
     Ocean_Settings m_settings;

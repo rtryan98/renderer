@@ -3,6 +3,7 @@
 #include "renderer/imgui/imgui_renderer.hpp"
 #include "renderer/ocean/ocean_renderer.hpp"
 #include "renderer/scene/camera.hpp"
+#include "renderer/render_resource_blackboard.hpp"
 
 namespace rhi
 {
@@ -13,7 +14,6 @@ class Swapchain;
 namespace ren
 {
 class Application;
-class Asset_Manager;
 class Input_State;
 struct Render_Attachment;
 class Render_Resource_Blackboard;
@@ -21,7 +21,7 @@ class Render_Resource_Blackboard;
 class Renderer
 {
 public:
-    Renderer(Application& app, Asset_Manager& asset_manager, rhi::Swapchain& swapchain,
+    Renderer(Application& app, rhi::Swapchain& swapchain,
         Render_Resource_Blackboard& resource_blackboard,
         const Imgui_Renderer_Create_Info& imgui_renderer_create_info);
 
@@ -42,25 +42,24 @@ private:
 
 private:
     Application& m_app;
-    Asset_Manager& m_asset_manager;
     rhi::Swapchain& m_swapchain;
     Render_Resource_Blackboard& m_resource_blackboard;
 
     Fly_Camera m_fly_cam;
-    rhi::Buffer* m_camera_buffer;
+    Buffer m_camera_buffer;
     Imgui_Renderer m_imgui_renderer;
     Ocean_Renderer m_ocean_renderer;
 
     float m_render_scale = 1.f;
     struct
     {
-        Render_Attachment* target0;
-        Render_Attachment* depth_stencil;
+        Image target0;
+        Image depth_stencil;
     } m_g_buffer = {};
     struct
     {
-        Render_Attachment* color;
-        Render_Attachment* depth_stencil;
+        Image color;
+        Image depth_stencil;
     } m_ocean_rendertargets;
 
     bool m_should_display_overlay;

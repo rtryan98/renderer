@@ -22,8 +22,10 @@ public:
     rhi::Buffer_Create_Info get_create_info() const;
     void recreate(const rhi::Buffer_Create_Info& create_info);
 
-    uint32_t operator+() const;
-    rhi::Buffer* operator()() const;
+    operator uint32_t() const;
+    operator rhi::Buffer*() const;
+    operator void*() const;
+    operator const std::string&() const;
 
 private:
     Render_Resource_Blackboard* m_blackboard;
@@ -40,8 +42,10 @@ public:
     rhi::Image_Create_Info get_create_info() const;
     void recreate(const rhi::Image_Create_Info& create_info);
 
-    uint32_t operator+() const;
-    rhi::Image* operator()() const;
+    operator uint32_t() const;
+    operator rhi::Image*() const;
+    operator rhi::Image_View*() const;
+    operator const std::string&() const;
 
 private:
     Render_Resource_Blackboard* m_blackboard;
@@ -55,8 +59,8 @@ public:
     Sampler() = default;
     Sampler(rhi::Sampler* sampler);
 
-    uint32_t operator+() const;
-    rhi::Sampler* operator()() const;
+    operator uint32_t() const;
+    operator rhi::Sampler*() const;
 
 private:
     rhi::Sampler* m_sampler;

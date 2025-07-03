@@ -5,13 +5,13 @@
 namespace ren
 {
 struct Ocean_Resources;
-class Asset_Manager;
 class Asset_Repository;
+class Render_Resource_Blackboard;
 
 class Ocean_Settings : public Settings_Base
 {
 public:
-    Ocean_Settings(Ocean_Resources& resources, Asset_Manager& asset_manager, Asset_Repository& shader_library);
+    Ocean_Settings(Ocean_Resources& resources, Render_Resource_Blackboard& resource_blackboard, Asset_Repository& shader_library);
     virtual ~Ocean_Settings() noexcept = default;
 
     virtual void process_gui() override;
@@ -22,7 +22,7 @@ private:
 
 private:
     Ocean_Resources& m_resources;
-    Asset_Manager& m_asset_manager;
+    Render_Resource_Blackboard& m_resource_blackboard;
     Asset_Repository& m_asset_repository;
 };
 }

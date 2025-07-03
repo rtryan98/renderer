@@ -1,6 +1,7 @@
 #pragma once
 
 #include <rhi/resource.hpp>
+#include <renderer/render_resource_blackboard.hpp>
 
 #include <shared/ocean_shared_types.h>
 
@@ -33,23 +34,22 @@ struct Ocean_Resources
     } data;
     struct GPU_Resources
     {
-        rhi::Sampler* linear_sampler;
+        Sampler linear_sampler;
 
-        rhi::Image* initial_spectrum_texture;
-        rhi::Image* angular_frequency_texture;
-        rhi::Image* x_y_z_xdx_texture;
-        rhi::Image* ydx_zdx_ydy_zdy_texture;
+        Image initial_spectrum_texture;
+        Image angular_frequency_texture;
+        Image x_y_z_xdx_texture;
+        Image ydx_zdx_ydy_zdy_texture;
 
-        rhi::Buffer* initial_spectrum_data;
-        rhi::Buffer* vertex_buffer;
-        rhi::Buffer* index_buffer;
+        Buffer initial_spectrum_data;
+        Buffer vertex_buffer;
+        Buffer index_buffer;
     } gpu_resources;
 
-    void create_buffers(Asset_Manager& asset_manager);
-    void destroy_buffers(Asset_Manager& asset_manager);
-    void create_textures(Asset_Manager& asset_manager);
-    void destroy_textures(Asset_Manager& asset_manager);
-    void create_samplers(Asset_Manager& asset_manager);
-    void destroy_samplers(Asset_Manager& asset_manager);
+    void create_buffers(Render_Resource_Blackboard& resource_blackboard);
+    void destroy_buffers(Render_Resource_Blackboard& resource_blackboard);
+    void create_textures(Render_Resource_Blackboard& resource_blackboard);
+    void destroy_textures(Render_Resource_Blackboard& resource_blackboard);
+    void create_samplers(Render_Resource_Blackboard& resource_blackboard);
 };
 }

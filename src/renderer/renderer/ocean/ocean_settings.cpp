@@ -1,6 +1,5 @@
 #include "renderer/ocean/ocean_settings.hpp"
 #include "renderer/ocean/ocean_resources.hpp"
-#include "renderer/asset_manager.hpp"
 #include "renderer/imgui/imgui_util.hpp"
 
 #include <array>
@@ -57,11 +56,11 @@ constexpr const char* OCEAN_HELP_TEXT_LENGTHSCALE =
 
 Ocean_Settings::Ocean_Settings(
     Ocean_Resources& resources,
-    Asset_Manager& asset_manager,
+    Render_Resource_Blackboard& resource_blackboard,
     Asset_Repository& asset_repository)
     : Settings_Base("Ocean")
     , m_resources(resources)
-    , m_asset_manager(asset_manager)
+    , m_resource_blackboard(resource_blackboard)
     , m_asset_repository(asset_repository)
 {}
 
@@ -161,7 +160,7 @@ void Ocean_Settings::process_gui_options()
         options_before.cascade_count != options.cascade_count;
     if (recreate_textures)
     {
-        m_resources.create_textures(m_asset_manager);
+        m_resources.create_textures(m_resource_blackboard);
     }
 }
 

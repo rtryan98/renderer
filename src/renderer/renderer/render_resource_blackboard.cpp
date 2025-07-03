@@ -31,16 +31,27 @@ void Buffer::recreate(const rhi::Buffer_Create_Info& create_info)
     device->name_resource(*m_buffer, m_name.c_str());
 }
 
-uint32_t Buffer::operator+() const
+Buffer::operator unsigned int() const
 {
     if (!m_buffer) return 0u;
     return (*m_buffer)->buffer_view->bindless_index;
 }
 
-rhi::Buffer* Buffer::operator()() const
+Buffer::operator rhi::Buffer*() const
 {
     if (!m_buffer) return nullptr;
     return *m_buffer;
+}
+
+Buffer::operator void*() const
+{
+    if (!m_buffer) return nullptr;
+    return (*m_buffer)->data;
+}
+
+Buffer::operator const std::string&() const
+{
+    return m_name;
 }
 
 Image::Image(Render_Resource_Blackboard& blackboard, rhi::Image** image, const std::string& name)
@@ -75,29 +86,40 @@ void Image::recreate(const rhi::Image_Create_Info& create_info)
     device->name_resource(*m_image, m_name.c_str());
 }
 
-uint32_t Image::operator+() const
+Image::operator unsigned int() const
 {
     if (!m_image) return 0u;
     return (*m_image)->image_view->bindless_index;
 }
 
-rhi::Image* Image::operator()() const
+Image::operator rhi::Image*() const
 {
     if (!m_image) return nullptr;
     return *m_image;
+}
+
+Image::operator rhi::Image_View*() const
+{
+    if (!m_image) return nullptr;
+    return (*m_image)->image_view;
+}
+
+Image::operator const std::string&() const
+{
+    return m_name;
 }
 
 Sampler::Sampler(rhi::Sampler* sampler)
     : m_sampler(sampler)
 {}
 
-uint32_t Sampler::operator+() const
+Sampler::operator unsigned int() const
 {
     if (!m_sampler) return 0u;
     return m_sampler->bindless_index;
 }
 
-rhi::Sampler* Sampler::operator()() const
+Sampler::operator rhi::Sampler*() const
 {
     return m_sampler;
 }
@@ -110,6 +132,12 @@ Render_Resource_Blackboard::Render_Resource_Blackboard(rhi::Graphics_Device* dev
 
 Render_Resource_Blackboard::~Render_Resource_Blackboard()
 {
+    for (auto& buffer : m_buffers)
+        delete_resource(buffer.buffer);
+    for (auto& image : m_images)
+        delete_resource(image.image);
+    for (auto& sampler : m_samplers)
+        m_device->destroy_sampler(sampler.second);
     garbage_collect(~0ull);
 }
 

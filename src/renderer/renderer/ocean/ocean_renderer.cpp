@@ -1,7 +1,6 @@
 #include "renderer/ocean/ocean_renderer.hpp"
 
 #include "renderer/application.hpp"
-#include "renderer/asset_manager.hpp"
 
 #include <rhi/command_list.hpp>
 #include <shared/fft_shared_types.h>
@@ -9,15 +8,15 @@
 
 namespace ren
 {
-Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Asset_Repository& asset_repository)
-    : m_asset_manager(asset_manager)
+Ocean_Renderer::Ocean_Renderer(Render_Resource_Blackboard& resource_blackboard, Asset_Repository& asset_repository)
+    : m_resource_blackboard(resource_blackboard)
     , m_asset_repository(asset_repository)
     , m_resources()
-    , m_settings(m_resources, m_asset_manager, m_asset_repository)
+    , m_settings(m_resources, m_resource_blackboard, m_asset_repository)
 {
-    m_resources.create_buffers(m_asset_manager);
-    m_resources.create_textures(m_asset_manager);
-    m_resources.create_samplers(m_asset_manager);
+    m_resources.create_buffers(m_resource_blackboard);
+    m_resources.create_textures(m_resource_blackboard);
+    m_resources.create_samplers(m_resource_blackboard);
 
     float largest_lengthscale = 1024.f;
     auto calc_lengthscale = [](float lengthscale, uint32_t factor) {
@@ -65,9 +64,8 @@ Ocean_Renderer::Ocean_Renderer(Asset_Manager& asset_manager, Asset_Repository& a
 
 Ocean_Renderer::~Ocean_Renderer()
 {
-    m_resources.destroy_buffers(m_asset_manager);
-    m_resources.destroy_textures(m_asset_manager);
-    m_resources.destroy_samplers(m_asset_manager);
+    m_resources.destroy_buffers(m_resource_blackboard);
+    m_resources.destroy_textures(m_resource_blackboard);
 }
 
 Ocean_Settings* Ocean_Renderer::get_settings() noexcept
@@ -97,9 +95,9 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
         .image = m_resources.gpu_resources.initial_spectrum_texture,
         .subresource_range = {
             .first_mip_level = 0,
-            .mip_count = m_resources.gpu_resources.initial_spectrum_texture->mip_levels,
+            .mip_count = static_cast<rhi::Image*>(m_resources.gpu_resources.initial_spectrum_texture)->mip_levels,
             .first_array_index = 0,
-            .array_size = m_resources.gpu_resources.initial_spectrum_texture->array_size,
+            .array_size = static_cast<rhi::Image*>(m_resources.gpu_resources.initial_spectrum_texture)->array_size,
             .first_plane = 0,
             .plane_count = 1
         },
@@ -124,9 +122,9 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
         m_resources.options.size /
         initial_spectrum_pipeline->compute_shading_info.cs->groups_x;
     cmd->set_push_constants<Ocean_Initial_Spectrum_Push_Constants>({
-        m_resources.gpu_resources.initial_spectrum_data->buffer_view->bindless_index,
-        m_resources.gpu_resources.initial_spectrum_texture->image_view->bindless_index,
-        m_resources.gpu_resources.angular_frequency_texture->image_view->bindless_index },
+        m_resources.gpu_resources.initial_spectrum_data,
+        m_resources.gpu_resources.initial_spectrum_texture,
+        m_resources.gpu_resources.angular_frequency_texture },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(tex_dispatch_size_xy, tex_dispatch_size_xy, m_resources.options.cascade_count);
     cmd->end_debug_region();
@@ -173,10 +171,10 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
     cmd->begin_debug_region("Time Dependent Spectrum", 0.25f, 0.25f, 1.0f);
     cmd->set_pipeline(app.get_asset_repository().get_compute_pipeline("time_dependent_spectrum"));
     cmd->set_push_constants<Ocean_Time_Dependent_Spectrum_Push_Constants>({
-        m_resources.gpu_resources.initial_spectrum_texture->image_view->bindless_index,
-        m_resources.gpu_resources.angular_frequency_texture->image_view->bindless_index,
-        m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,
-        m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index,
+        m_resources.gpu_resources.initial_spectrum_texture,
+        m_resources.gpu_resources.angular_frequency_texture,
+        m_resources.gpu_resources.x_y_z_xdx_texture,
+        m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture,
         m_resources.options.size,
         m_resources.data.total_time },
         rhi::Pipeline_Bind_Point::Compute);
@@ -219,11 +217,11 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
     cmd->set_pipeline(app.get_asset_repository().get_compute_pipeline("fft").set_variant(select_fft()));
     cmd->add_debug_marker("IFFT-Vertical", 0.25f, 0.5f, 1.0f);
     cmd->set_push_constants<FFT_Push_Constants>(
-        { m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index, FFT_VERTICAL, true },
+        { m_resources.gpu_resources.x_y_z_xdx_texture, FFT_VERTICAL, true },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(1, m_resources.options.size, m_resources.options.cascade_count);
     cmd->set_push_constants<FFT_Push_Constants>(
-        { m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index, FFT_VERTICAL, true },
+        { m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture, FFT_VERTICAL, true },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(1, m_resources.options.size, m_resources.options.cascade_count);
 
@@ -238,11 +236,11 @@ void Ocean_Renderer::simulate(Application& app, rhi::Command_List* cmd, float dt
 
     cmd->add_debug_marker("IFFT-Horizontal", 0.25f, 0.5f, 1.0f);
     cmd->set_push_constants<FFT_Push_Constants>(
-        { m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index, FFT_HORIZONTAL, true },
+        { m_resources.gpu_resources.x_y_z_xdx_texture, FFT_HORIZONTAL, true },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(1, m_resources.options.size, m_resources.options.cascade_count);
     cmd->set_push_constants<FFT_Push_Constants>(
-        { m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index, FFT_HORIZONTAL, true },
+        { m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture, FFT_HORIZONTAL, true },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(1, m_resources.options.size, m_resources.options.cascade_count);
     cmd->end_debug_region();
@@ -282,10 +280,10 @@ void Ocean_Renderer::render_patch(rhi::Command_List* cmd, uint32_t camera_buffer
     constexpr auto SIZE = 2048;
     cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
         .length_scales = m_resources.data.initial_spectrum_data.length_scales,
-        .tex_sampler = m_resources.gpu_resources.linear_sampler->bindless_index,
+        .tex_sampler = m_resources.gpu_resources.linear_sampler,
         .camera = camera_buffer_bindless_index,
-        .x_y_z_xdx_tex = m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,
-        .ydx_zdx_ydy_zdy_tex = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index,
+        .x_y_z_xdx_tex = m_resources.gpu_resources.x_y_z_xdx_texture,
+        .ydx_zdx_ydy_zdy_tex = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture,
         .vertex_position_dist = .25f,
         .field_size = SIZE
         }, rhi::Pipeline_Bind_Point::Graphics);
@@ -297,7 +295,7 @@ void Ocean_Renderer::render_composite(rhi::Command_List* cmd, uint32_t color_ima
     cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_composite"));
     cmd->set_push_constants<Ocean_Render_Composition_Push_Constants>({
         .rt_color_tex = color_image_bindless_index,
-        .tex_sampler = m_resources.gpu_resources.linear_sampler->bindless_index
+        .tex_sampler = m_resources.gpu_resources.linear_sampler
         }, rhi::Pipeline_Bind_Point::Graphics);
     cmd->draw(3,1,0,0);
 }
@@ -311,10 +309,10 @@ void Ocean_Renderer::debug_render_slope(rhi::Command_List* cmd, uint32_t camera_
     constexpr auto SIZE = 32;
     cmd->set_push_constants<Ocean_Render_Debug_Push_Constants>({
         .length_scales =       m_resources.data.initial_spectrum_data.length_scales,
-        .tex_sampler =         m_resources.gpu_resources.linear_sampler->bindless_index,
+        .tex_sampler =         m_resources.gpu_resources.linear_sampler,
         .camera =              camera_buffer_bindless_index,
-        .x_y_z_xdx_tex =       m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,
-        .ydx_zdx_ydy_zdy_tex = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index,
+        .x_y_z_xdx_tex =       m_resources.gpu_resources.x_y_z_xdx_texture,
+        .ydx_zdx_ydy_zdy_tex = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture,
         .line_scale =          .5f,
         .point_dist =          1.f,
         .point_field_size =    SIZE
@@ -331,10 +329,10 @@ void Ocean_Renderer::debug_render_normal(rhi::Command_List* cmd, uint32_t camera
     constexpr auto SIZE = 32;
     cmd->set_push_constants<Ocean_Render_Debug_Push_Constants>({
         .length_scales = m_resources.data.initial_spectrum_data.length_scales,
-        .tex_sampler = m_resources.gpu_resources.linear_sampler->bindless_index,
+        .tex_sampler = m_resources.gpu_resources.linear_sampler,
         .camera = camera_buffer_bindless_index,
-        .x_y_z_xdx_tex = m_resources.gpu_resources.x_y_z_xdx_texture->image_view->bindless_index,
-        .ydx_zdx_ydy_zdy_tex = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture->image_view->bindless_index,
+        .x_y_z_xdx_tex = m_resources.gpu_resources.x_y_z_xdx_texture,
+        .ydx_zdx_ydy_zdy_tex = m_resources.gpu_resources.ydx_zdx_ydy_zdy_texture,
         .line_scale = 1.f,
         .point_dist = 1.f,
         .point_field_size = SIZE

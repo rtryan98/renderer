@@ -40,8 +40,7 @@ Application::Application() noexcept
             "../../src/shared/",
             "../../thirdparty/rhi/src/shaders/"
         }}))
-    , m_asset_manager(m_logger, m_device.get(), FRAME_IN_FLIGHT_COUNT, *m_window)
-    , m_renderer(*this, m_asset_manager, *m_swapchain, *m_resource_blackboard, Imgui_Renderer_Create_Info{
+    , m_renderer(*this, *m_swapchain, *m_resource_blackboard, Imgui_Renderer_Create_Info{
         .device = m_device.get(),
         .frames_in_flight = FRAME_IN_FLIGHT_COUNT,
         .swapchain_image_format = m_swapchain->get_image_format()})
@@ -81,7 +80,6 @@ Application::~Application() noexcept
 {
     m_logger->info("Shutting down.");
     m_device->wait_idle();
-    m_asset_manager.flush_deletion_queue(~0ull);
     for (auto& frame : m_frames)
     {
         m_device->destroy_fence(frame.frame_fence);
@@ -127,7 +125,6 @@ void Application::run()
         last_time = current_time;
         current_time = std::chrono::steady_clock::now();
 
-        m_asset_manager.next_frame();
         m_frame_counter += 1;
     }
 }
@@ -170,13 +167,11 @@ void Application::setup_frame(Frame& frame) noexcept
     frame.graphics_command_pool->reset();
     frame.compute_command_pool->reset();
     frame.copy_command_pool->reset();
-    m_asset_manager.flush_deletion_queue(m_frame_counter);
     m_resource_blackboard->garbage_collect(m_frame_counter);
     auto [is_size_changed, width, height] = m_swapchain->query_resize();
     if (is_size_changed)
     {
         m_renderer.on_resize(width, height);
-        m_asset_manager.recreate_size_dependent_render_attachment_images();
     }
     m_swapchain->acquire_next_image();
 

@@ -2,7 +2,6 @@
 
 #include "renderer/logger.hpp"
 #include "renderer/window.hpp"
-#include "renderer/asset_manager.hpp"
 #include "renderer/cbt/cbt_cpu.hpp"
 #include "renderer/imgui/renderer_settings.hpp"
 #include "renderer/ocean/ocean_renderer.hpp"
@@ -81,7 +80,6 @@ private:
     std::unique_ptr<Render_Resource_Blackboard> m_resource_blackboard;
     std::unique_ptr<rhi::Swapchain> m_swapchain;
     std::unique_ptr<Asset_Repository> m_asset_repository;
-    Asset_Manager m_asset_manager;
     Renderer m_renderer;
     std::array<Frame, FRAME_IN_FLIGHT_COUNT> m_frames;
     std::array<std::vector<rhi::Buffer*>, FRAME_IN_FLIGHT_COUNT> m_staging_buffers;

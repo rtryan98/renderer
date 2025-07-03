@@ -1,8 +1,6 @@
 #include "renderer/renderer.hpp"
 
 #include "renderer/application.hpp"
-#include "renderer/asset_manager.hpp"
-
 #include "renderer/window.hpp"
 #include "renderer/input_codes.hpp"
 
@@ -19,11 +17,10 @@ float calculate_aspect_ratio(const Window& window)
     return float(window_data.width) / float(window_data.height);
 }
 
-Renderer::Renderer(Application& app, Asset_Manager& asset_manager, rhi::Swapchain& swapchain,
+Renderer::Renderer(Application& app, rhi::Swapchain& swapchain,
     Render_Resource_Blackboard& resource_blackboard,
     const Imgui_Renderer_Create_Info& imgui_renderer_create_info)
     : m_app(app)
-    , m_asset_manager(asset_manager)
     , m_swapchain(swapchain)
     , m_resource_blackboard(resource_blackboard)
     , m_fly_cam{
@@ -37,12 +34,12 @@ Renderer::Renderer(Application& app, Asset_Manager& asset_manager, rhi::Swapchai
         .yaw = 0.f,
         .position = { .0f, .0f, .5f }
     }
-    , m_camera_buffer(m_asset_manager.create_buffer({
+    , m_camera_buffer(m_resource_blackboard.create_buffer("Camera Buffer", {
         .size = sizeof(GPU_Camera_Data),
         .heap = rhi::Memory_Heap_Type::GPU
-        }, "Camera Buffer"))
+        }))
     , m_imgui_renderer(imgui_renderer_create_info, m_app.get_asset_repository())
-    , m_ocean_renderer(m_asset_manager, m_app.get_asset_repository())
+    , m_ocean_renderer(m_resource_blackboard, m_app.get_asset_repository())
     , m_should_display_overlay(false)
 {
     init_rendertargets();
@@ -133,7 +130,7 @@ void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
             .layout_after = rhi::Barrier_Image_Layout::Color_Attachment,
             .queue_type_ownership_transfer_target_queue = rhi::Queue_Type::Graphics,
             .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
-            .image = m_ocean_rendertargets.color->image,
+            .image = m_ocean_rendertargets.color,
             .subresource_range = RT_DEFAULT_SUBRESOURCE_RANGE,
             .discard = true
         };
@@ -146,7 +143,7 @@ void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
             .layout_after = rhi::Barrier_Image_Layout::Depth_Stencil_Write,
             .queue_type_ownership_transfer_target_queue = rhi::Queue_Type::Graphics,
             .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
-            .image = m_ocean_rendertargets.depth_stencil->image,
+            .image = m_ocean_rendertargets.depth_stencil,
             .subresource_range = RT_DEFAULT_SUBRESOURCE_RANGE,
             .discard = true
         };
@@ -183,7 +180,7 @@ void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
             .layout_after = rhi::Barrier_Image_Layout::Shader_Read_Only,
             .queue_type_ownership_transfer_target_queue = rhi::Queue_Type::Graphics,
             .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
-            .image = m_ocean_rendertargets.color->image,
+            .image = m_ocean_rendertargets.color,
             .subresource_range = RT_DEFAULT_SUBRESOURCE_RANGE,
             .discard = false
         };
@@ -219,7 +216,17 @@ void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
 
 void Renderer::on_resize(uint32_t width, uint32_t height) noexcept
 {
-
+    auto resize_target = [width, height, this](Image& image)
+    {
+        auto create_info = image.get_create_info();
+        create_info.width = width;
+        create_info.height = height;
+        image.recreate(create_info);
+    };
+    resize_target(m_ocean_rendertargets.color);
+    resize_target(m_ocean_rendertargets.depth_stencil);
+    resize_target(m_g_buffer.target0);
+    resize_target(m_g_buffer.depth_stencil);
 }
 
 void Renderer::render_gbuffer_pass(rhi::Command_List* cmd)
@@ -234,7 +241,7 @@ void Renderer::render_ocean_pass(rhi::Command_List* cmd)
     cmd->begin_debug_region("Ocean Pass", .2f, .2f, 1.f);
 
     rhi::Render_Pass_Color_Attachment_Info ocean_color_attachment_info = {
-        .attachment = m_ocean_rendertargets.color->image->image_view,
+        .attachment = m_ocean_rendertargets.color,
         .load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
         .store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
         .clear_value = {
@@ -244,7 +251,7 @@ void Renderer::render_ocean_pass(rhi::Command_List* cmd)
     rhi::Render_Pass_Begin_Info render_pass_info = {
         .color_attachments = { &ocean_color_attachment_info, 1 },
         .depth_stencil_attachment = {
-            .attachment = m_ocean_rendertargets.depth_stencil->image->image_view,
+            .attachment = m_ocean_rendertargets.depth_stencil,
             .depth_load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
             .depth_store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
             .stencil_load_op = rhi::Render_Pass_Attachment_Load_Op::No_Access,
@@ -260,7 +267,7 @@ void Renderer::render_ocean_pass(rhi::Command_List* cmd)
     auto scale = 1.f; // m_app.get_window().get_dpi_scale();
     cmd->set_viewport(0.f, 0.f, float(window_data.width) * scale, float(window_data.height) * scale, 0.f, 1.f);
     cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);
-    m_ocean_renderer.render_patch(cmd, m_camera_buffer->buffer_view->bindless_index);
+    m_ocean_renderer.render_patch(cmd, m_camera_buffer);
     cmd->end_render_pass();
 
     cmd->end_debug_region();
@@ -292,11 +299,11 @@ void Renderer::render_swapchain_pass(rhi::Command_List* cmd)
     cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);
 
     cmd->add_debug_marker("Ocean Composite", .5f, .5f, 1.f);
-    m_ocean_renderer.render_composite(cmd, m_ocean_rendertargets.color->image->image_view->bindless_index);
+    m_ocean_renderer.render_composite(cmd, m_ocean_rendertargets.color);
 
     cmd->begin_debug_region("Debug Renderer", 1.f, .75f, .75f);
-    m_ocean_renderer.debug_render_slope(cmd, m_camera_buffer->buffer_view->bindless_index);
-    m_ocean_renderer.debug_render_normal(cmd, m_camera_buffer->buffer_view->bindless_index);
+    m_ocean_renderer.debug_render_slope(cmd, m_camera_buffer);
+    m_ocean_renderer.debug_render_normal(cmd, m_camera_buffer);
     cmd->end_debug_region();
 
     cmd->add_debug_marker("Dear ImGui", .5f, 1.f, .0f);
@@ -308,38 +315,40 @@ void Renderer::render_swapchain_pass(rhi::Command_List* cmd)
 
 void Renderer::init_rendertargets()
 {
-    Render_Attachment_Create_Info default_info = {
+    rhi::Image_Create_Info default_image_create_info = {
         .format = rhi::Image_Format::Undefined,
-        .scaling_mode = Render_Attachment_Scaling_Mode::Ratio,
-        .scaling_factor = m_render_scale,
-        .layers = 1,
-        .create_srv = false
+        .width = m_app.get_window().get_window_data().width,
+        .height = m_app.get_window().get_window_data().height,
+        .depth = 1,
+        .array_size = 1,
+        .mip_levels = 1,
+        .primary_view_type = rhi::Image_View_Type::Texture_2D
     };
 
-    auto target0_info = default_info;
-    target0_info.name = "gbuffer0";
-    target0_info.format = rhi::Image_Format::R16G16B16A16_SFLOAT;
-    target0_info.create_srv = true;
-    auto ds_info = default_info;
-    ds_info.name = "gbuffer_ds";
-    ds_info.format = rhi::Image_Format::D32_SFLOAT;
+    rhi::Image_Create_Info gbuffer_target0_create_info = default_image_create_info;
+    gbuffer_target0_create_info.format = rhi::Image_Format::R16G16B16A16_SFLOAT;
+    gbuffer_target0_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
+
+    rhi::Image_Create_Info gbuffer_ds_create_info = default_image_create_info;
+    gbuffer_ds_create_info.format = rhi::Image_Format::D32_SFLOAT;
+    gbuffer_ds_create_info.usage = rhi::Image_Usage::Depth_Stencil_Attachment;
 
     m_g_buffer = {
-        .target0 = m_asset_manager.create_render_attachment(target0_info),
-        .depth_stencil = m_asset_manager.create_render_attachment(ds_info)
+        .target0 = m_resource_blackboard.create_image("gbuffer0", gbuffer_target0_create_info),
+        .depth_stencil = m_resource_blackboard.create_image("gbuffer_ds", gbuffer_ds_create_info)
     };
 
-    auto ocean_color_info = default_info;
-    ocean_color_info.name = "ocean_color";
-    ocean_color_info.format = rhi::Image_Format::R8G8B8A8_UNORM;
-    ocean_color_info.create_srv = true;
-    auto ocean_ds_info = default_info;
-    ocean_ds_info.name = "ocean_ds";
-    ocean_ds_info.format = rhi::Image_Format::D32_SFLOAT;
+    rhi::Image_Create_Info ocean_color_create_info = default_image_create_info;
+    ocean_color_create_info.format = rhi::Image_Format::R8G8B8A8_UNORM;
+    ocean_color_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
+
+    rhi::Image_Create_Info ocean_ds_create_info = default_image_create_info;
+    ocean_ds_create_info.format = rhi::Image_Format::D32_SFLOAT;
+    ocean_ds_create_info.usage = rhi::Image_Usage::Depth_Stencil_Attachment;
 
     m_ocean_rendertargets = {
-        .color = m_asset_manager.create_render_attachment(ocean_color_info),
-        .depth_stencil = m_asset_manager.create_render_attachment(ocean_ds_info)
+        .color = m_resource_blackboard.create_image("ocean_color", ocean_color_create_info),
+        .depth_stencil = m_resource_blackboard.create_image("ocean_ds", ocean_ds_create_info)
     };
 }
 }
