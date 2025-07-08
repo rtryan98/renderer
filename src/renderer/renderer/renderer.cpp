@@ -326,7 +326,7 @@ void Renderer::init_rendertargets()
     };
 
     rhi::Image_Create_Info gbuffer_target0_create_info = default_image_create_info;
-    gbuffer_target0_create_info.format = rhi::Image_Format::R16G16B16A16_SFLOAT;
+    gbuffer_target0_create_info.format = rhi::Image_Format::B10G11R11_UFLOAT_PACK32;
     gbuffer_target0_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
 
     rhi::Image_Create_Info gbuffer_ds_create_info = default_image_create_info;
@@ -334,12 +334,12 @@ void Renderer::init_rendertargets()
     gbuffer_ds_create_info.usage = rhi::Image_Usage::Depth_Stencil_Attachment;
 
     m_g_buffer = {
-        .target0 = m_resource_blackboard.create_image("gbuffer0", gbuffer_target0_create_info),
+        .target0 = m_resource_blackboard.create_image("gbuffer_color", gbuffer_target0_create_info),
         .depth_stencil = m_resource_blackboard.create_image("gbuffer_ds", gbuffer_ds_create_info)
     };
 
     rhi::Image_Create_Info ocean_color_create_info = default_image_create_info;
-    ocean_color_create_info.format = rhi::Image_Format::R8G8B8A8_UNORM;
+    ocean_color_create_info.format = rhi::Image_Format::B10G11R11_UFLOAT_PACK32;
     ocean_color_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
 
     rhi::Image_Create_Info ocean_ds_create_info = default_image_create_info;

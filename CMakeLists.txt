@@ -8,6 +8,25 @@ project(
 
 add_subdirectory(thirdparty)
 
+add_executable(asset_baker)
+target_link_libraries(
+    asset_baker PUBLIC
+    rhi
+    unordered_dense
+    fastgltf
+    nlohmann_json
+)
+target_include_directories(
+    asset_baker PUBLIC
+    src/asset_baker
+    src/shared
+    thirdparty/spdlog/include
+)
+set_target_properties(
+    asset_baker PROPERTIES
+    CXX_STANDARD 23
+)
+
 add_executable(renderer)
 target_link_libraries(
     renderer PUBLIC
@@ -15,7 +34,6 @@ target_link_libraries(
     rhi_dxc_lib
     imgui
     Shcore.lib
-    fastgltf
     unordered_dense
     nlohmann_json
 )

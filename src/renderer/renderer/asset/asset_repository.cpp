@@ -389,6 +389,8 @@ void Asset_Repository::compile_shader_library(
     }
     auto* shader_library = m_shader_library_ptrs[shader_library_lookup_name];
     shader_library->shaders = std::move(named_shaders);
+    shader_library->hlsl_path = hlsl_path;
+    shader_library->json_path = json_path;
     m_logger->info("Successfully created shader library '{}'", shader_library_lookup_name);
 
     if (shader_type == Shader_Type::Compute)

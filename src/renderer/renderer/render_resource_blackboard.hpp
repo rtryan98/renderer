@@ -22,6 +22,8 @@ public:
     rhi::Buffer_Create_Info get_create_info() const;
     void recreate(const rhi::Buffer_Create_Info& create_info);
 
+    uint64_t size() const noexcept;
+
     operator uint32_t() const;
     operator rhi::Buffer*() const;
     operator void*() const;

@@ -31,6 +31,12 @@ void Buffer::recreate(const rhi::Buffer_Create_Info& create_info)
     device->name_resource(*m_buffer, m_name.c_str());
 }
 
+uint64_t Buffer::size() const noexcept
+{
+    if (!m_buffer) return 0ull;
+    return (*m_buffer)->size;
+}
+
 Buffer::operator unsigned int() const
 {
     if (!m_buffer) return 0u;
