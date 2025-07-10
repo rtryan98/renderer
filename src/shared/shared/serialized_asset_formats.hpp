@@ -1,0 +1,193 @@
+#ifndef SERIALIZED_ASSET_FORMATS_HPP
+#define SERIALIZED_ASSET_FORMATS_HPP
+#ifdef __cplusplus
+
+#include <cstdint>
+#include "rhi/resource.hpp"
+
+namespace serialization
+{
+constexpr static auto NAME_MAX_SIZE = 159ull;
+constexpr static auto NAME_FIELD_SIZE = NAME_MAX_SIZE + 1ull;
+
+constexpr static auto MODEL_FILE_EXTENSION = ".renmdl"; // renderer model container
+constexpr static auto TEXTURE_FILE_EXTENSION = ".rentex"; // renderer texture container
+
+struct URI_Reference_00
+{
+    char value[NAME_FIELD_SIZE];
+};
+
+struct Mesh_Material_00
+{
+    constexpr static auto URI_NO_REFERENCE = ~0u;
+
+    float base_color_factor[4];
+    float pbr_roughness;
+    float pbr_metallic;
+    float emissive_color[3];
+    float emissive_strength;
+    uint32_t albedo_uri_index;
+    uint32_t normal_uri_index;
+    uint32_t metallic_roughness_uri_index;
+    uint32_t emissive_uri_index;
+};
+
+struct Submesh_Data_Ranges_00
+{
+    uint32_t material_index;
+    uint32_t vertex_position_range_start;
+    uint32_t vertex_position_range_end;
+    uint32_t vertex_attribute_range_start;
+    uint32_t vertex_attribute_range_end;
+    uint32_t index_range_start;
+    uint32_t index_range_end;
+};
+
+struct Mesh_Instance_00
+{
+    uint32_t submeshes_range_start;
+    uint32_t submeshes_range_end;
+    uint32_t mesh_index;
+    uint32_t parent_index;
+    float translation[3];
+    float rotation[4];
+    float scale[3];
+};
+
+struct Model_Header
+{
+    constexpr static uint32_t MAGIC = 0x4C444D52u; // RMDL
+
+    // can't directly set value, otherwise no longer trivial type
+    uint32_t magic;
+    uint32_t version;
+
+    bool validate()
+    {
+        return magic == MAGIC && version == 1;
+    }
+};
+
+struct Model_Header_00
+{
+    Model_Header header;
+    char name[NAME_FIELD_SIZE];
+    uint32_t referenced_uri_count;      // URI_Reference_00
+    uint32_t material_count;            // Mesh_Material_00
+    uint32_t submesh_count;             // Submesh_Data_Ranges_00
+    uint32_t instance_count;            // Mesh_Instance_00
+    uint32_t vertex_position_count;     // float[3]
+    uint32_t vertex_attribute_count;    // float[8]
+    uint32_t index_count;               // uint32_t
+
+    // Data is ordered in the way it was declared.
+    // That means first all referenced URIs are listed, then all materials, and so on.
+
+    static std::size_t get_referenced_uris_offset()
+    {
+        return sizeof(Model_Header_00);
+    }
+
+    URI_Reference_00* get_referenced_uris()
+    {
+        auto ptr = reinterpret_cast<char*>(this);
+        ptr += get_referenced_uris_offset();
+        return reinterpret_cast<URI_Reference_00*>(ptr);
+    }
+
+    std::size_t get_materials_offset() const
+    {
+        return get_referenced_uris_offset()
+            + referenced_uri_count * sizeof(URI_Reference_00);
+    }
+
+    Mesh_Material_00* get_materials()
+    {
+        auto ptr = reinterpret_cast<char*>(this);
+        ptr += get_materials_offset();
+        return reinterpret_cast<Mesh_Material_00*>(ptr);
+    }
+
+    std::size_t get_submeshes_offset() const
+    {
+        return get_materials_offset()
+            + material_count * sizeof(Mesh_Material_00);
+    }
+
+    Submesh_Data_Ranges_00* get_submeshes()
+    {
+        auto ptr = reinterpret_cast<char*>(this);
+        ptr += get_submeshes_offset();
+        return reinterpret_cast<Submesh_Data_Ranges_00*>(ptr);
+    }
+
+    std::size_t get_instances_offset() const
+    {
+        return get_submeshes_offset()
+            + submesh_count * sizeof(Submesh_Data_Ranges_00);
+    }
+
+    Mesh_Instance_00* get_instances()
+    {
+        auto ptr = reinterpret_cast<char*>(this);
+        ptr += get_instances_offset();
+        return reinterpret_cast<Mesh_Instance_00*>(ptr);
+    }
+
+    std::size_t get_vertex_positions_offset() const
+    {
+        return get_instances_offset()
+            + instance_count * sizeof(Mesh_Instance_00);
+    }
+
+    float* get_vertex_positions()
+    {
+        auto ptr = reinterpret_cast<char*>(this);
+        ptr += get_vertex_positions_offset();
+        return reinterpret_cast<float*>(ptr);
+    }
+
+    std::size_t get_vertex_attributes_offset() const
+    {
+        return get_vertex_positions_offset()
+            + vertex_position_count * 12; // sizeof(float[3]);
+    }
+
+    float* get_vertex_attributes()
+    {
+        auto ptr = reinterpret_cast<char*>(this);
+        ptr += get_vertex_attributes_offset();
+        return reinterpret_cast<float*>(ptr);
+    }
+
+    std::size_t get_indices_offset() const
+    {
+        return get_vertex_attributes_offset()
+            + vertex_attribute_count * 32; // sizeof(float[8]);
+    }
+
+    uint32_t* get_indices()
+    {
+        auto ptr = reinterpret_cast<char*>(this);
+        ptr += get_indices_offset();
+        return reinterpret_cast<uint32_t*>(ptr);
+    }
+
+    std::size_t get_size() const
+    {
+        auto size = sizeof(Model_Header_00);
+        size += (referenced_uri_count * sizeof(URI_Reference_00));
+        size += (material_count * sizeof(Mesh_Material_00));
+        size += (submesh_count * sizeof(Submesh_Data_Ranges_00));
+        size += (instance_count * sizeof(Mesh_Instance_00));
+        size += (vertex_position_count * 12); //sizeof(float[3]));
+        size += (vertex_attribute_count * 32); // sizeof(float[8]));
+        size += (index_count * sizeof(uint32_t));
+        return size;
+    }
+};
+}
+
+#endif
+#endif

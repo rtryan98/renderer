@@ -24,3 +24,22 @@ target_include_directories(
 
 add_subdirectory(fastgltf)
 add_subdirectory(unordered_dense)
+
+set(XXHASH_BUILD_XXHSUM OFF)
+option(BUILD_SHARED_LIBS OFF)
+add_subdirectory(xxHash/build/cmake xxhash_build EXCLUDE_FROM_ALL)
+
+add_library(mikktspace)
+target_sources(
+    mikktspace PRIVATE
+    MikkTSpace/mikktspace.c
+    MikkTSpace/mikktspace.h
+)
+target_include_directories(
+    mikktspace PUBLIC
+    MikkTSpace
+)
+set_target_properties(
+    mikktspace PROPERTIES
+    CXX_STANDARD 23
+)

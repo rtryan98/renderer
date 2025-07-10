@@ -15,12 +15,15 @@ target_link_libraries(
     unordered_dense
     fastgltf
     nlohmann_json
+    xxHash::xxhash
+    mikktspace
 )
 target_include_directories(
     asset_baker PUBLIC
     src/asset_baker
     src/shared
     thirdparty/spdlog/include
+    thirdparty/tclap/include
 )
 set_target_properties(
     asset_baker PROPERTIES

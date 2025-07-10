@@ -13,3 +13,12 @@
 [submodule "thirdparty/unordered_dense"]
 	path = thirdparty/unordered_dense
 	url = https://github.com/martinus/unordered_dense
+[submodule "thirdparty/tclap"]
+	path = thirdparty/tclap
+	url = https://github.com/mirror/tclap
+[submodule "thirdparty/xxHash"]
+	path = thirdparty/xxHash
+	url = https://github.com/Cyan4973/xxHash
+[submodule "thirdparty/MikkTSpace"]
+	path = thirdparty/MikkTSpace
+	url = https://github.com/mmikk/MikkTSpace/
