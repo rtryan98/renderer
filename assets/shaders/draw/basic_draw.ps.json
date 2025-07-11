@@ -1,0 +1,5 @@
+{
+    "name": "basic_draw",
+    "shader_type": "ps",
+    "entry_point": "main"
+}

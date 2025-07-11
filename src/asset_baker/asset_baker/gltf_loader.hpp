@@ -25,7 +25,7 @@ struct GLTF_Submesh
 {
     std::size_t material_index;
     std::vector<std::array<float, 3>> positions;
-    std::vector<std::array<uint32_t, 1>> colors;
+    std::vector<std::array<float, 4>> colors;
     std::vector<std::array<float, 3>> normals;
     std::vector<std::array<float, 3>> tangents;
     std::vector<std::array<float, 2>> tex_coords;

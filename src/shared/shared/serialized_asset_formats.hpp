@@ -30,6 +30,19 @@ constexpr static auto NAME_FIELD_SIZE = NAME_MAX_SIZE + 1ull;
 constexpr static auto MODEL_FILE_EXTENSION = ".renmdl"; // renderer model container
 constexpr static auto TEXTURE_FILE_EXTENSION = ".rentex"; // renderer texture container
 
+struct Vertex_Attributes
+{
+    std::array<float, 3> normal;
+    std::array<float, 3> tangent;
+    std::array<float, 2> tex_coords;
+    std::array<uint8_t, 4> color;
+};
+
+struct Vertex_Skin_Attributes
+{
+    std::array<uint32_t, 4> joints;
+    std::array<float, 4> weights;
+};
 
 static std::size_t calculate_total_attribute_size(Attribute_Flags flags)
 {
@@ -76,6 +89,8 @@ struct Submesh_Data_Ranges_00
     uint32_t vertex_position_range_end;
     uint32_t vertex_attribute_range_start;
     uint32_t vertex_attribute_range_end;
+    uint32_t vertex_skin_attribute_range_start;
+    uint32_t vertex_skin_attribute_range_end;
     uint32_t index_range_start;
     uint32_t index_range_end;
 };
@@ -108,13 +123,14 @@ struct Model_Header_00
 {
     Model_Header header;
     char name[NAME_FIELD_SIZE];
-    uint32_t referenced_uri_count;      // URI_Reference_00
-    uint32_t material_count;            // Mesh_Material_00
-    uint32_t submesh_count;             // Submesh_Data_Ranges_00
-    uint32_t instance_count;            // Mesh_Instance_00
-    uint32_t vertex_position_count;     // std::array<float, 3>
-    uint32_t vertex_attribute_count;    // dependent on submesh attribute flags
-    uint32_t index_count;               // uint32_t
+    uint32_t referenced_uri_count;          // URI_Reference_00
+    uint32_t material_count;                // Mesh_Material_00
+    uint32_t submesh_count;                 // Submesh_Data_Ranges_00
+    uint32_t instance_count;                // Mesh_Instance_00
+    uint32_t vertex_position_count;         // std::array<float, 3>
+    uint32_t vertex_attribute_count;        // Vertex_Attributes
+    uint32_t vertex_skin_attribute_count;   // Vertex_Skin_Attributes
+    uint32_t index_count;                   // uint32_t
 
     // Data is ordered in the way it was declared.
     // That means first all referenced URIs are listed, then all materials, and so on.
@@ -196,10 +212,23 @@ struct Model_Header_00
         return reinterpret_cast<float*>(ptr);
     }
 
-    std::size_t get_indices_offset() const
+    std::size_t get_vertex_skin_attributes_offset() const
     {
         return get_vertex_attributes_offset()
-            + vertex_attribute_count * sizeof(uint32_t);
+            + vertex_attribute_count * sizeof(Vertex_Attributes);
+    }
+
+    Vertex_Skin_Attributes* get_vertex_skin_attributes()
+    {
+        auto ptr = reinterpret_cast<char*>(this);
+        ptr += get_vertex_skin_attributes_offset();
+        return reinterpret_cast<Vertex_Skin_Attributes*>(ptr);
+    }
+
+    std::size_t get_indices_offset() const
+    {
+        return get_vertex_skin_attributes_offset()
+            + vertex_skin_attribute_count * sizeof(Vertex_Skin_Attributes);
     }
 
     uint32_t* get_indices()
@@ -217,7 +246,8 @@ struct Model_Header_00
         size += (submesh_count * sizeof(Submesh_Data_Ranges_00));
         size += (instance_count * sizeof(Mesh_Instance_00));
         size += (vertex_position_count * 12); //sizeof(float[3]));
-        size += (vertex_attribute_count * sizeof(uint32_t));
+        size += (vertex_attribute_count * sizeof(Vertex_Attributes));
+        size += (vertex_skin_attribute_count * sizeof(Vertex_Skin_Attributes));
         size += (index_count * sizeof(uint32_t));
         return size;
     }

@@ -17,6 +17,7 @@ struct Submesh
 {
     std::array<uint32_t, 2> vertex_position_range;
     std::array<uint32_t, 2> vertex_attribute_range;
+    std::array<uint32_t, 2> vertex_skin_attribute_range;
     std::array<uint32_t, 2> index_range;
     uint32_t material_index;
 };

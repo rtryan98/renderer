@@ -1,0 +1,20 @@
+{
+    "name": "basic_draw",
+    "vs": {
+        "name": "basic_draw.vs"
+    },
+    "ps": {
+        "name": "basic_draw.ps"
+    },
+    "color_attachments": [
+        {
+            "format": "B10G11R11_UFLOAT_PACK32"
+        }
+    ],
+    "depth_stencil": {
+        "format": "D32_SFLOAT",
+        "depth_enable": true,
+        "depth_write_enable": true,
+        "comparison_func": "Less"
+    }
+}

@@ -129,442 +129,127 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
             }
 
             mesh.material_index = primitive.materialIndex.value_or(NO_INDEX);
-            auto position_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_POSITION);
-            auto color_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_COLOR_0);
-            auto normal_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_NORMAL);
-            auto tangent_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_TANGENT);
-            auto tex_coord_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_TEXCOORD_0);
-            auto joint_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_JOINTS_0);
-            auto weights_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_WEIGHTS_0);
 
-            auto load_accessor = [&]<typename T>(const fastgltf::Accessor& accessor, std::vector<T>& target, const std::string& semantic)
+            if (auto position_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_POSITION))
             {
-                if (!accessor.bufferViewIndex.has_value())
-                {
-                    spdlog::error("GLTF file '{}' has unsupported accessor (no buffer view) '{}'. Semantic: '{}'",
-                        path.string(), accessor.name, semantic);
-                    return GLTF_Error::No_Buffer_View;
-                }
-                const auto& view = asset->bufferViews.at(accessor.bufferViewIndex.value());
-                const auto& buffer = asset->buffers.at(view.bufferIndex);
-                const auto* array = std::get_if<fastgltf::sources::Array>(&buffer.data);
-
-                if (!array)
-                {
-                    spdlog::error("GLTF file '{}' has unsupported accessor (array) '{}'. Semantic: '{}'",
-                        path.string(), accessor.name, semantic);
-                    return GLTF_Error::Non_Supported_Accessor;
-                }
-                if (accessor.sparse.has_value())
-                {
-                    spdlog::error("GLTF file '{}' has unsupported sparse accessor '{}'. Semantic: '{}'",
-                        path.string(), accessor.name, semantic);
-                    return GLTF_Error::Non_Supported_Accessor;
-                }
-                const auto offset = view.byteOffset + accessor.byteOffset;
-                const auto values = array->bytes.data() + offset;
-
-                const auto count = accessor.count;
-                const auto stride = view.byteStride.value_or(0);
-
-                const auto element_count = [](const fastgltf::AccessorType type)
-                {
-                    switch (type)
-                    {
-                    case fastgltf::AccessorType::Invalid:
-                        return 0;
-                    case fastgltf::AccessorType::Scalar:
-                        return 1;
-                    case fastgltf::AccessorType::Vec2:
-                        return 2;
-                    case fastgltf::AccessorType::Vec3:
-                        return 3;
-                    case fastgltf::AccessorType::Vec4:
-                        return 4;
-                    case fastgltf::AccessorType::Mat2:
-                        return 4;
-                    case fastgltf::AccessorType::Mat3:
-                        return 9;
-                    case fastgltf::AccessorType::Mat4:
-                        return 16;
-                    }
-                    return 0;
-                }(accessor.type);
-                const auto component_type_size = [](const fastgltf::ComponentType type)
-                {
-                    switch (type)
-                    {
-                    case fastgltf::ComponentType::Invalid:
-                        return 0ull;
-                    case fastgltf::ComponentType::Byte:
-                        return sizeof(int8_t);
-                    case fastgltf::ComponentType::UnsignedByte:
-                        return sizeof(uint8_t);
-                    case fastgltf::ComponentType::Short:
-                        return sizeof(int16_t);
-                    case fastgltf::ComponentType::UnsignedShort:
-                        return sizeof(uint16_t);
-                    case fastgltf::ComponentType::Int:
-                        return sizeof(int32_t);
-                    case fastgltf::ComponentType::UnsignedInt:
-                        return sizeof(uint32_t);
-                    case fastgltf::ComponentType::Float:
-                        return sizeof(float);
-                    case fastgltf::ComponentType::Double:
-                        return sizeof(double);
-                    }
-                    return 0ull;
-                }(accessor.componentType);
-
-                if (element_count == 0)
-                {
-                    spdlog::error("GLTF file '{}' has unsupported accessor (element count) '{}'. Semantic: '{}'",
-                        path.string(), accessor.name, semantic);
-                    return GLTF_Error::Non_Supported_Accessor;
-                }
-
-                if (component_type_size == 0)
-                {
-                    spdlog::error("GLTF file '{}' has unsupported accessor (element type size) '{}'. Semantic: '{}'",
-                        path.string(), accessor.name,semantic);
-                    return GLTF_Error::Non_Supported_Accessor;
-                }
-
-                const auto element_size = element_count * component_type_size;
-
-                if (element_size != sizeof(T))
-                // if (component_type_size != sizeof(T))
-                {
-                    spdlog::error("GLTF file '{}' has unsupported accessor (element size) '{}'. Semantic: '{}'",
-                        path.string(), accessor.name,semantic);
-                    return GLTF_Error::Non_Supported_Accessor;
-                }
-
-                target.reserve(element_size * count);
-                for (auto i = 0; i < count; ++i)
-                {
-                    auto& value = target.emplace_back();
-                    if (stride)
-                    {
-                        memcpy(&value, &values[i * stride], element_size);
-                    }
-                    else
-                    {
-                        memcpy(&value, &values[i * element_size], element_size);
-                    }
-                }
-
-                return GLTF_Error::No_Error;
-            };
-
-            if (position_attribute)
-            {
-                spdlog::trace("Gathering positions.");
                 auto& positions = asset->accessors.at(position_attribute->accessorIndex);
-                auto error = load_accessor(positions, mesh.positions, GLTF_ATTRIBUTE_POSITION);
-                if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                mesh.positions.resize(positions.count);
+                fastgltf::copyFromAccessor<fastgltf::math::fvec3>(
+                    asset.get(),
+                    positions,
+                    mesh.positions.data());
             }
 
             if (primitive.indicesAccessor.has_value())
             {
-                spdlog::trace("Gathering indices.");
                 auto& indices = asset->accessors.at(primitive.indicesAccessor.value());
-                switch (indices.componentType)
-                {
-                case fastgltf::ComponentType::UnsignedByte:
-                    {
-                        std::vector<uint8_t> indices8{};
-                        load_accessor(indices, indices8, "INDICES");
-                        mesh.indices.assign(indices8.begin(), indices8.end());
-                        break;
-                    }
-                case fastgltf::ComponentType::UnsignedShort:
-                    {
-                        std::vector<uint16_t> indices16{};
-                        load_accessor(indices, indices16, "INDICES");
-                        mesh.indices.assign(indices16.begin(), indices16.end());
-                        break;
-                    }
-                case fastgltf::ComponentType::UnsignedInt:
-                    {
-                        load_accessor(indices, mesh.indices, "INDICES");
-                        break;
-                    }
-                default:
-                    break;
-                }
+                mesh.indices.resize(indices.count);
+                fastgltf::copyFromAccessor<uint32_t>(
+                    asset.get(),
+                    indices,
+                    mesh.indices.data());
             }
 
             { // Attributes
-                spdlog::trace("Processing attributes.");
-
-                if (color_attribute && color_attribute != primitive.attributes.end())
+                if (auto color_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_COLOR_0))
                 {
-                    spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED COLORS.");
-                    return std::unexpected(GLTF_Error::Non_Supported_Accessor);
-
-                    spdlog::trace("Gathering colors.");
-                    auto& colors = asset->accessors.at(color_attribute->accessorIndex);
-                    switch (colors.componentType)
+                    if (color_attribute != primitive.attributes.end())
                     {
-                    case fastgltf::ComponentType::UnsignedByte:
-                        {
-                            if (colors.type == fastgltf::AccessorType::Vec3)
-                            {
-                                std::vector<std::array<uint8_t, 3>> colors8{};
-                                auto error = load_accessor(colors, colors8, GLTF_ATTRIBUTE_COLOR_0);
-                                if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                                mesh.colors.reserve(colors8.size());
-                                for (auto i = 0; i < colors8.size(); ++i)
-                                {
-                                    auto& mesh_colors = mesh.colors.emplace_back();
-                                    mesh_colors[0] |= colors8[i][0] << 24;
-                                    mesh_colors[0] |= colors8[i][1] << 16;
-                                    mesh_colors[0] |= colors8[i][2] <<  8;
-                                }
-                            }
-                            else
-                            {
-                                std::vector<std::array<uint8_t, 4>> colors8{};
-                                auto error = load_accessor(colors, colors8, GLTF_ATTRIBUTE_COLOR_0);
-                                if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                                mesh.colors.reserve(colors8.size());
-                                for (auto i = 0; i < colors8.size(); ++i)
-                                {
-                                    auto& mesh_colors = mesh.colors.emplace_back();
-                                    mesh_colors[0] |= colors8[i][0] << 24;
-                                    mesh_colors[0] |= colors8[i][1] << 16;
-                                    mesh_colors[0] |= colors8[i][2] <<  8;
-                                    mesh_colors[0] |= colors8[i][3] <<  0;
-                                }
-                            }
-                            break;
-                        }
-                    case fastgltf::ComponentType::Float:
-                        {
-                            if (colors.type == fastgltf::AccessorType::Vec3)
-                            {
-                                std::vector<std::array<float, 3>> colors_f32{};
-                                auto error = load_accessor(colors, colors_f32, GLTF_ATTRIBUTE_COLOR_0);
-                                if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                                mesh.colors.reserve(colors_f32.size());
-                                for (auto i = 0; i < colors_f32.size(); ++i)
-                                {
-                                    auto& mesh_colors = mesh.colors.emplace_back();
-                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][0] * 255.f) << 24;
-                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][1] * 255.f) << 16;
-                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][2] * 255.f) <<  8;
-                                }
-                            }
-                            else
-                            {
-                                std::vector<std::array<float, 4>> colors_f32{};
-                                auto error = load_accessor(colors, colors_f32, GLTF_ATTRIBUTE_COLOR_0);
-                                if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                                mesh.colors.reserve(colors_f32.size());
-                                for (auto i = 0; i < colors_f32.size(); ++i)
-                                {
-                                    auto& mesh_colors = mesh.colors.emplace_back();
-                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][0] * 255.f) << 24;
-                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][1] * 255.f) << 16;
-                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][2] * 255.f) <<  8;
-                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][3] * 255.f) <<  0;
-                                }
-                            }
-                            break;
-                        }
-                    default:
-                        break;
+                        spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED COLORS.");
+                        return std::unexpected(GLTF_Error::Non_Supported_Accessor);
+
+                        auto& colors = asset->accessors.at(color_attribute->accessorIndex);
+                        mesh.colors.resize(colors.count);
+                        fastgltf::copyFromAccessor<fastgltf::math::fvec4>(
+                            asset.get(),
+                            colors,
+                            mesh.indices.data());
                     }
                 }
 
-                if (normal_attribute && normal_attribute != primitive.attributes.end())
+                if (auto normal_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_NORMAL))
                 {
-                    spdlog::trace("Gathering normals.");
-                    auto& normals = asset->accessors.at(normal_attribute->accessorIndex);
-                    auto error = load_accessor(normals, mesh.normals, GLTF_ATTRIBUTE_NORMAL);
-                    if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                }
-
-                if (tangent_attribute && tangent_attribute != primitive.attributes.end())
-                {
-                    spdlog::trace("Gathering tangents.");
-                    auto& tangents = asset->accessors.at(tangent_attribute->accessorIndex);
-                    std::vector<std::array<float, 4>> tangents_f32{};
-                    auto error = load_accessor(tangents, tangents_f32, GLTF_ATTRIBUTE_TANGENT);
-                    mesh.tangents.reserve(tangents_f32.size());
-                    for (auto i = 0; i < tangents_f32.size(); ++i)
+                    if (normal_attribute != primitive.attributes.end())
                     {
-                        auto& mesh_tangent = mesh.tangents.emplace_back();
-                        mesh_tangent = {
-                            tangents_f32[i][0] * tangents_f32[i][3],
-                            tangents_f32[i][1] * tangents_f32[i][3],
-                            tangents_f32[i][2] * tangents_f32[i][3],
-                        };
-                    }
-                    if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                }
-
-                if (tex_coord_attribute && tex_coord_attribute != primitive.attributes.end())
-                {
-                    spdlog::trace("Gathering uvs.");
-                    auto& tex_coords = asset->accessors.at(tex_coord_attribute->accessorIndex);
-                    switch (tex_coords.componentType)
-                    {
-                    case fastgltf::ComponentType::UnsignedByte:
-                        {
-                            std::vector<std::array<uint8_t, 2>> tex_coords_u8{};
-                            auto error = load_accessor(tex_coords, tex_coords_u8, GLTF_ATTRIBUTE_TEXCOORD_0);
-                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                            mesh.tex_coords.reserve(tex_coords_u8.size() * tex_coords.count);
-                            for (uint32_t i = 0; i < tex_coords_u8.size(); ++i)
-                            {
-                                auto& tex_coords_val = mesh.tex_coords.emplace_back();
-                                tex_coords_val = {
-                                    static_cast<float>(tex_coords_u8[i][0]) / 255.0f,
-                                    static_cast<float>(tex_coords_u8[i][1]) / 255.0f
-                                };
-                            }
-                            break;
-                        }
-                    case fastgltf::ComponentType::UnsignedShort:
-                        {
-                            std::vector<std::array<uint16_t, 2>> tex_coords_u16{};
-                            auto error = load_accessor(tex_coords, tex_coords_u16, GLTF_ATTRIBUTE_TEXCOORD_0);
-                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                            mesh.tex_coords.reserve(tex_coords_u16.size() * tex_coords.count);
-                            for (uint32_t i = 0; i < tex_coords_u16.size(); ++i)
-                            {
-                                auto& tex_coords_val = mesh.tex_coords.emplace_back();
-                                tex_coords_val = {
-                                    static_cast<float>(tex_coords_u16[i][0]) / 65535.0f,
-                                    static_cast<float>(tex_coords_u16[i][1]) / 65535.0f
-                                };
-                            }
-                            break;
-                        }
-                    case fastgltf::ComponentType::Float:
-                        {
-                            auto error = load_accessor(tex_coords, mesh.tex_coords, GLTF_ATTRIBUTE_TEXCOORD_0);
-                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                            break;
-                        }
-                    default:
-                        break;
+                        auto& normals = asset->accessors.at(normal_attribute->accessorIndex);
+                        mesh.normals.resize(normals.count);
+                        fastgltf::copyFromAccessor<fastgltf::math::fvec3>(
+                            asset.get(),
+                            normals,
+                            mesh.normals.data());
                     }
                 }
 
-                if (joint_attribute && joint_attribute != primitive.attributes.end())
+                if (auto tangent_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_TANGENT))
                 {
-                    spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED JOINTS.");
-                    return std::unexpected(GLTF_Error::Non_Supported_Accessor);
-
-                    spdlog::trace("Gathering joints.");
-                    auto& joints = asset->accessors.at(joint_attribute->accessorIndex);
-                    switch (joints.componentType)
+                    if (tangent_attribute != primitive.attributes.end())
                     {
-                    case fastgltf::ComponentType::UnsignedByte:
+                        auto& tangents = asset->accessors.at(tangent_attribute->accessorIndex);
+                        std::vector<std::array<float, 4>> tangents_vec4{};
+                        tangents_vec4.resize(tangents.count);
+                        fastgltf::copyFromAccessor<fastgltf::math::fvec4>(
+                            asset.get(),
+                            tangents,
+                            tangents_vec4.data());
+                        mesh.tangents.reserve(tangents_vec4.size());
+                        for (auto i = 0; i < tangents_vec4.size(); ++i)
                         {
-                            std::vector<std::array<uint8_t, 4>> joints8{};
-                            auto error = load_accessor(joints, joints8, GLTF_ATTRIBUTE_JOINTS_0);
-                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                            mesh.joints.reserve(joints8.size());
-                            for (auto i = 0; i < joints8.size(); ++i)
-                            {
-                                auto& joint = mesh.joints.emplace_back();
-                                joint = {
-                                    static_cast<uint32_t>(joints8[i][0]),
-                                    static_cast<uint32_t>(joints8[i][1]),
-                                    static_cast<uint32_t>(joints8[i][2]),
-                                    static_cast<uint32_t>(joints8[i][3])
-                                };
-                            }
-                            break;
+                            auto& mesh_tangent = mesh.tangents.emplace_back();
+                            mesh_tangent = {
+                                tangents_vec4[i][0] * tangents_vec4[i][3],
+                                tangents_vec4[i][1] * tangents_vec4[i][3],
+                                tangents_vec4[i][2] * tangents_vec4[i][3],
+                            };
                         }
-                    case fastgltf::ComponentType::UnsignedShort:
-                        {
-                            std::vector<std::array<uint16_t, 4>> joints16{};
-                            auto error = load_accessor(joints, joints16, GLTF_ATTRIBUTE_JOINTS_0);
-                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                            mesh.joints.reserve(joints16.size());
-                            for (auto i = 0; i < joints16.size(); i += 4)
-                            {
-                                auto& joint = mesh.joints.emplace_back();
-                                joint = {
-                                    static_cast<uint32_t>(joints16[i][0]),
-                                    static_cast<uint32_t>(joints16[i][1]),
-                                    static_cast<uint32_t>(joints16[i][2]),
-                                    static_cast<uint32_t>(joints16[i][3])
-                                };
-                            }
-                            break;
-                        }
-                    default:
-                        break;
                     }
                 }
 
-                if (weights_attribute && weights_attribute != primitive.attributes.end())
+                if (auto tex_coord_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_TEXCOORD_0))
                 {
-                    spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED WEIGHTS.");
-                    return std::unexpected(GLTF_Error::Non_Supported_Accessor);
-
-                    spdlog::trace("Gathering weights.");
-                    auto& weights = asset->accessors.at(weights_attribute->accessorIndex);
-                    switch (weights.componentType)
+                    if (tex_coord_attribute != primitive.attributes.end())
                     {
-                    case fastgltf::ComponentType::UnsignedByte:
-                        {
-                            std::vector<uint8_t> weights8{};
-                            auto error = load_accessor(weights, weights8, GLTF_ATTRIBUTE_WEIGHTS_0);
-                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                            mesh.weights.reserve(weights8.size() / 4);
-                            for (auto i = 0; i < weights8.size(); i += 4)
-                            {
-                                auto& weight = mesh.weights.emplace_back();
-                                weight = {
-                                    static_cast<float>(weights8[i + 0]) / 255.f,
-                                    static_cast<float>(weights8[i + 1]) / 255.f,
-                                    static_cast<float>(weights8[i + 2]) / 255.f,
-                                    static_cast<float>(weights8[i + 3]) / 255.f
-                                };
-                            }
-                            break;
-                        }
-                    case fastgltf::ComponentType::UnsignedShort:
-                        {
-                            std::vector<uint16_t> weights16{};
-                            auto error = load_accessor(weights, weights16, GLTF_ATTRIBUTE_WEIGHTS_0);
-                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                            mesh.weights.reserve(weights16.size() / 4);
-                            for (auto i = 0; i < weights16.size(); i += 4)
-                            {
-                                auto& weight = mesh.weights.emplace_back();
-                                weight = {
-                                    static_cast<float>(weights16[i + 0]) / 65535.f,
-                                    static_cast<float>(weights16[i + 1]) / 65535.f,
-                                    static_cast<float>(weights16[i + 2]) / 65535.f,
-                                    static_cast<float>(weights16[i + 3]) / 65535.f
-                                };
-                            }
-                            break;
-                        }
-                    case fastgltf::ComponentType::Float:
-                        {
-                            auto error = load_accessor(weights, mesh.weights, GLTF_ATTRIBUTE_WEIGHTS_0);
-                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                            break;
-                        }
-                    default:
-                        break;
+                        auto& tex_coords = asset->accessors.at(tex_coord_attribute->accessorIndex);
+                        mesh.tex_coords.resize(tex_coords.count);
+                        fastgltf::copyFromAccessor<fastgltf::math::fvec2>(
+                            asset.get(),
+                            tex_coords,
+                            mesh.tex_coords.data());
                     }
                 }
 
-                auto has_tangents = mesh.tangents.size() > 0;
-                auto has_material = mesh.material_index != NO_INDEX;
-                auto requires_tangents = has_material && !result.materials[mesh.material_index].normal_uri.empty();
+                if (auto joint_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_JOINTS_0))
+                {
+                    if (joint_attribute != primitive.attributes.end())
+                    {
+                        spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED JOINTS.");
+                        return std::unexpected(GLTF_Error::Non_Supported_Accessor);
 
-                if (!has_tangents && requires_tangents)
+                        auto& joints = asset->accessors.at(joint_attribute->accessorIndex);
+                        mesh.joints.resize(joints.count);
+                        fastgltf::copyFromAccessor<fastgltf::math::uvec4>(
+                            asset.get(),
+                            joints,
+                            mesh.joints.data());
+                    }
+                }
+
+                if (auto weights_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_WEIGHTS_0))
+                {
+                    if (weights_attribute != primitive.attributes.end())
+                    {
+                        spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED WEIGHTS.");
+                        return std::unexpected(GLTF_Error::Non_Supported_Accessor);
+
+                        auto& weights = asset->accessors.at(weights_attribute->accessorIndex);
+                        mesh.weights.resize(weights.count);
+                        fastgltf::copyFromAccessor<fastgltf::math::fvec4>(
+                            asset.get(),
+                            weights,
+                            mesh.weights.data());
+                    }
+                }
+
+                if (mesh.tangents.size() == 0 && mesh.normals.size() > 0 && mesh.tex_coords.size() > 0)
                 {
                     spdlog::debug("GLTF file '{}' has no tangents and they need to be generated.", path.string());
 
@@ -661,7 +346,7 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                         .m_pInterface = &mikktspace_interface,
                         .m_pUserData = &user_data
                     };
-                    has_tangents = genTangSpaceDefault(&mikktspace_context);
+                    auto has_tangents = genTangSpaceDefault(&mikktspace_context);
 
                     if (!has_tangents)
                     {
@@ -672,12 +357,7 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                         spdlog::debug("Generated mikktspace tangents.");
                     }
                 }
-                else if (!has_tangents && !requires_tangents)
-                {
-                    spdlog::trace("Mesh has no normal map and requires no tangents.");
-                }
-                spdlog::trace("Attributes processed");
-                spdlog::trace("Swizzling axes");
+
                 for (auto& position : mesh.positions)
                 {
                     position = { position[0], position[2], position[1] };
@@ -693,9 +373,7 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
             }
         }
 
-
         range.second = result.submeshes.size();
-        spdlog::trace("Submesh range for mesh '{}': {} - {}", static_cast<void*>(&gltf_mesh), range.first, range.second);
         submesh_ranges[&gltf_mesh] = range;
     }
 
@@ -861,7 +539,9 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
     std::vector<serialization::Submesh_Data_Ranges_00> mesh_data_ranges;
     std::vector<std::array<float, 3>> mesh_positions;
     std::vector<uint32_t> mesh_indices;
-    std::vector<uint32_t> mesh_attribute_data;
+    std::vector<serialization::Vertex_Attributes> mesh_attributes;
+    std::vector<serialization::Vertex_Skin_Attributes> mesh_skin_attributes;
+    // std::vector<uint32_t> mesh_attribute_data;
 
     for (const auto& submesh : gltf_model.submeshes)
     {
@@ -869,10 +549,106 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
         auto new_mesh_position_count = submesh.positions.size() + current_mesh_position_count;
         auto current_mesh_indices_count = mesh_indices.size();
         auto new_mesh_indices_count = submesh.indices.size() + current_mesh_indices_count;
+        auto current_mesh_attributes_count = mesh_attributes.size();
+        auto new_mesh_attributes_count = submesh.normals.size() + current_mesh_attributes_count;
+        auto current_mesh_skin_attributes_count = mesh_skin_attributes.size();
+        auto new_mesh_skin_attributes_count = submesh.weights.size() + current_mesh_skin_attributes_count;
 
-        mesh_positions.resize(new_mesh_position_count, {});
-        mesh_indices.resize(new_mesh_indices_count, {});
+        mesh_positions.reserve(new_mesh_position_count);
+        for (auto& position : submesh.positions)
+        {
+            mesh_positions.emplace_back(position);
+        }
 
+        mesh_indices.reserve(new_mesh_indices_count);
+        for (auto& indices : submesh.indices)
+        {
+            mesh_indices.emplace_back(indices);
+        }
+
+        mesh_attributes.reserve(new_mesh_attributes_count);
+        for (auto i = 0; i < submesh.positions.size(); ++i)
+        {
+            auto& attributes = mesh_attributes.emplace_back();
+            if (submesh.normals.size() > i)
+            {
+                attributes.normal = submesh.normals[i];
+            }
+            else
+            {
+                attributes.normal = {};
+            }
+            if (submesh.tangents.size() > i)
+            {
+                attributes.tangent = submesh.tangents[i];
+            }
+            else
+            {
+                attributes.tangent = {};
+            }
+            if (submesh.tex_coords.size() > i)
+            {
+                attributes.tex_coords = submesh.tex_coords[i];
+            }
+            else
+            {
+                attributes.tex_coords = {};
+            }
+            if (submesh.colors.size() > i)
+            {
+                attributes.color = {
+                    static_cast<uint8_t>(submesh.colors[i][0] * 255.f),
+                    static_cast<uint8_t>(submesh.colors[i][1] * 255.f),
+                    static_cast<uint8_t>(submesh.colors[i][2] * 255.f),
+                    static_cast<uint8_t>(submesh.colors[i][3] * 255.f)
+                };
+            }
+            else
+            {
+                attributes.color = { 255, 255, 255, 255 };
+            }
+        }
+
+        if (submesh.weights.size() > 0 && submesh.joints.size() > 0)
+        {
+            mesh_skin_attributes.reserve(new_mesh_skin_attributes_count);
+            for (auto i = 0; i < submesh.positions.size(); ++i)
+            {
+                auto& attributes = mesh_skin_attributes.emplace_back();
+
+                if (submesh.joints.size() > i)
+                {
+                    attributes.joints = submesh.joints[i];
+                }
+                else
+                {
+                    attributes.joints = {};
+                }
+
+                if (submesh.weights.size() > i)
+                {
+                    attributes.weights = submesh.weights[i];
+                }
+                else
+                {
+                    attributes.weights = {};
+                }
+            }
+        }
+
+        mesh_data_ranges.emplace_back( serialization::Submesh_Data_Ranges_00 {
+            .material_index = static_cast<uint32_t>(submesh.material_index),
+            .vertex_position_range_start = static_cast<uint32_t>(current_mesh_position_count),
+            .vertex_position_range_end = static_cast<uint32_t>(new_mesh_position_count),
+            .vertex_attribute_range_start = static_cast<uint32_t>(current_mesh_attributes_count),
+            .vertex_attribute_range_end = static_cast<uint32_t>(new_mesh_attributes_count),
+            .vertex_skin_attribute_range_start = static_cast<uint32_t>(current_mesh_skin_attributes_count),
+            .vertex_skin_attribute_range_end = static_cast<uint32_t>(new_mesh_skin_attributes_count),
+            .index_range_start = static_cast<uint32_t>(current_mesh_indices_count),
+            .index_range_end = static_cast<uint32_t>(new_mesh_indices_count),
+        });
+
+        /*
 
         spdlog::trace("copying positions");
         auto mesh_position_data = reinterpret_cast<char*>(&mesh_positions.data()[current_mesh_position_count]);
@@ -943,10 +719,12 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
             .index_range_start = static_cast<uint32_t>(current_mesh_indices_count),
             .index_range_end = static_cast<uint32_t>(new_mesh_indices_count),
         });
+        */
     }
     serialized_model.submesh_count = static_cast<uint32_t>(mesh_data_ranges.size());
     serialized_model.vertex_position_count = static_cast<uint32_t>(mesh_positions.size());
-    serialized_model.vertex_attribute_count = static_cast<uint32_t>(mesh_attribute_data.size());
+    serialized_model.vertex_attribute_count = static_cast<uint32_t>(mesh_attributes.size());
+    serialized_model.vertex_skin_attribute_count = static_cast<uint32_t>(mesh_skin_attributes.size());
     serialized_model.index_count = static_cast<uint32_t>(mesh_indices.size());
 
     std::vector<char> result;
@@ -985,8 +763,13 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
 
     data = &(result.data()[serialized_model.get_vertex_attributes_offset()]);
     spdlog::trace("Copying attributes. Offset: {}, Size: {}",
-        serialized_model.get_vertex_attributes_offset(), mesh_attribute_data.size() * sizeof(uint32_t));
-    memcpy(data, mesh_attribute_data.data(), mesh_attribute_data.size() * sizeof(uint32_t));
+        serialized_model.get_vertex_attributes_offset(), mesh_attributes.size() * sizeof(serialization::Vertex_Attributes));
+    memcpy(data, mesh_attributes.data(), mesh_attributes.size() * sizeof(serialization::Vertex_Attributes));
+
+    data = &(result.data()[serialized_model.get_vertex_skin_attributes_offset()]);
+    spdlog::trace("Copying skin attributes. Offset: {}, Size: {}",
+        serialized_model.get_vertex_skin_attributes_offset(), mesh_skin_attributes.size() * sizeof(serialization::Vertex_Skin_Attributes));
+    memcpy(data, mesh_skin_attributes.data(), mesh_skin_attributes.size() * sizeof(serialization::Vertex_Skin_Attributes));
 
     data = &(result.data()[serialized_model.get_indices_offset()]);
     spdlog::trace("Copying indices. Offset: {}, Size: {}",

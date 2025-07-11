@@ -1097,7 +1097,7 @@ void Asset_Repository::load_model(const std::filesystem::path& path)
             model.vertex_positions = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
             m_graphics_device->name_resource(model.vertex_positions, (model_identifier + ":position").c_str());
 
-            buffer_create_info.size = header->vertex_attribute_count * sizeof(float);
+            buffer_create_info.size = header->vertex_attribute_count * sizeof(serialization::Vertex_Attributes);
             model.vertex_attributes = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
             m_graphics_device->name_resource(model.vertex_attributes, (model_identifier + ":attributes").c_str());
 
@@ -1170,7 +1170,7 @@ void Asset_Repository::load_model(const std::filesystem::path& path)
         m_app.upload_buffer_data_immediate(
             model.vertex_attributes,
             attributes,
-            header->vertex_attribute_count * sizeof(float),
+            header->vertex_attribute_count * sizeof(serialization::Vertex_Attributes),
             0);
 
         auto* indices = header->get_indices();
