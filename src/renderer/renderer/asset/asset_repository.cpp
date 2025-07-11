@@ -2,6 +2,8 @@
 #include <rhi_dxc_lib/shader_compiler.hpp>
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <shared/serialized_asset_formats.hpp>
+#include "renderer/application.hpp"
 
 #include "rhi/graphics_device.hpp"
 
@@ -29,10 +31,11 @@ private:
 
 Asset_Repository::Asset_Repository(
     std::shared_ptr<Logger> logger, rhi::Graphics_Device* graphics_device,
-    Asset_Repository_Paths&& paths)
+    Asset_Repository_Paths&& paths, Application& app)
     : m_logger(std::move(logger))
     , m_graphics_device(graphics_device)
     , m_paths(std::move(paths))
+    , m_app(app)
     , m_shader_compiler(std::make_unique<Shader_Compiler>())
 {
     m_logger->info("Asset repository created with the following asset paths:");
@@ -46,6 +49,7 @@ Asset_Repository::Asset_Repository(
 
     create_shader_and_compute_libraries();
     create_graphics_pipeline_libraries();
+    load_models();
 }
 
 Asset_Repository::~Asset_Repository()
@@ -79,6 +83,11 @@ Compute_Pipeline Asset_Repository::get_compute_pipeline(const std::string_view& 
 Graphics_Pipeline Asset_Repository::get_graphics_pipeline(const std::string_view& name) const
 {
     return Graphics_Pipeline(m_pipeline_library_ptrs.at(std::string(name)));
+}
+
+Model* Asset_Repository::get_model(const std::string_view& name) const
+{
+    return m_model_ptrs.at(std::string(name));
 }
 
 enum class Shader_Type
@@ -884,7 +893,26 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
             .color_attachment_formats = color_attachments,
             .depth_stencil_format = depth_stencil_format
         };
-        pipeline = m_graphics_device->create_pipeline(create_info).value_or(nullptr);
+        auto pipeline_result = m_graphics_device->create_pipeline(create_info);
+        pipeline = pipeline_result.value_or(nullptr);
+        if (!pipeline_result.has_value())
+        {
+            m_logger->error("Failed to create graphics pipeline '{}'.", std::string(json_path));
+            switch (pipeline_result.error())
+            {
+            case rhi::Result::Error_Out_Of_Memory:
+                m_logger->error("Out of memory.");
+                break;
+            case rhi::Result::Error_Invalid_Parameters:
+                m_logger->error("Invalid parameters.");
+                break;
+            case rhi::Result::Error_No_Resource:
+                m_logger->error("No resource.");
+                break;
+            default:
+                break;
+            }
+        }
     }
     else
     {
@@ -900,7 +928,26 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
             .color_attachment_formats = color_attachments,
             .depth_stencil_format = depth_stencil_format
         };
-        pipeline = m_graphics_device->create_pipeline(create_info).value_or(nullptr);
+        auto pipeline_result = m_graphics_device->create_pipeline(create_info);
+        pipeline = pipeline_result.value_or(nullptr);
+        if (!pipeline_result.has_value())
+        {
+            m_logger->error("Failed to create graphics pipeline '{}'.", std::string(json_path));
+            switch (pipeline_result.error())
+            {
+            case rhi::Result::Error_Out_Of_Memory:
+                m_logger->error("Out of memory.");
+                break;
+            case rhi::Result::Error_Invalid_Parameters:
+                m_logger->error("Invalid parameters.");
+                break;
+            case rhi::Result::Error_No_Resource:
+                m_logger->error("No resource.");
+                break;
+            default:
+                break;
+            }
+        }
     }
 
     auto name = pipeline_json["name"].get<std::string>();
@@ -996,5 +1043,144 @@ void Asset_Repository::create_graphics_pipeline_libraries()
         m_logger->debug("Processing graphics pipeline library '{}'", graphics_pipeline_library);
         compile_graphics_pipeline_library(graphics_pipeline_library);
     }
+}
+
+void Asset_Repository::load_models()
+{
+    auto directory = std::filesystem::path(m_paths.models);
+    for (auto& directory_entry : std::filesystem::recursive_directory_iterator(directory))
+    {
+        if (directory_entry.path().extension() == ".renmdl")
+        {
+            m_logger->debug("Loading model '{}'", directory_entry.path().string());
+            load_model(directory_entry.path());
+        }
+    }
+}
+
+void Asset_Repository::load_model(const std::filesystem::path& path)
+{
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file.is_open())
+    {
+        m_logger->error("Failed to open file '{}'", path.string());
+        return;
+    }
+    const std::streamsize stream_size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    std::vector<char> buffer(stream_size);
+    if (file.read(buffer.data(), stream_size))
+    {
+        auto model_identifier = path.filename().string();
+        if (!m_model_ptrs.contains(model_identifier))
+        {
+            m_model_ptrs[model_identifier] = m_models.acquire();
+        }
+        auto& model = *m_model_ptrs.at(model_identifier);
+
+        serialization::Model_Header* file_header = reinterpret_cast<serialization::Model_Header*>(buffer.data());
+        if (!file_header->validate())
+        {
+            m_logger->error("Failed to validate file '{}'", path.string());
+            file.close();
+            return;
+        }
+        serialization::Model_Header_00* header = reinterpret_cast<serialization::Model_Header_00*>(buffer.data());
+        m_logger->info("Loading model '{}'", header->name);
+
+        // create buffers
+        {
+            rhi::Buffer_Create_Info buffer_create_info = {
+                .size = header->vertex_position_count * sizeof(std::array<float, 3>),
+                .heap = rhi::Memory_Heap_Type::GPU
+            };
+            model.vertex_positions = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+            m_graphics_device->name_resource(model.vertex_positions, (model_identifier + ":position").c_str());
+
+            buffer_create_info.size = header->vertex_attribute_count * sizeof(float);
+            model.vertex_attributes = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+            m_graphics_device->name_resource(model.vertex_attributes, (model_identifier + ":attributes").c_str());
+
+            buffer_create_info.size = header->index_count * sizeof(uint32_t);
+            model.indices = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+            m_graphics_device->name_resource(model.indices, (model_identifier + ":indices").c_str());
+        }
+
+        auto* referenced_uris = header->get_referenced_uris();
+        auto* materials = header->get_materials();
+
+        model.submeshes.reserve(header->submesh_count);
+        auto* submeshes = header->get_submeshes();
+        for (auto i = 0; i < header->submesh_count; ++i)
+        {
+            const auto& submesh_data = submeshes[i];
+            model.submeshes.emplace_back( Submesh{
+                .vertex_position_range = {
+                    submesh_data.vertex_position_range_start,
+                    submesh_data.vertex_position_range_end
+                },
+                .vertex_attribute_range = {
+                    submesh_data.vertex_attribute_range_start,
+                    submesh_data.vertex_attribute_range_end
+                },
+                .index_range = {
+                    submesh_data.index_range_start,
+                    submesh_data.index_range_end
+                },
+                .material_index = submesh_data.material_index
+            } );
+        }
+
+        model.instances.reserve(header->instance_count);
+        auto* instances = header->get_instances();
+        for (auto i = 0; i < header->instance_count; ++i)
+        {
+            const auto& instance_data = instances[i];
+            model.instances.emplace_back( Instance{
+                .submeshes_range_start = instance_data.submeshes_range_start,
+                .submeshes_range_end  = instance_data.submeshes_range_end,
+                .parent_index = instance_data.parent_index,
+                .translation = {
+                    instance_data.translation[0],
+                    instance_data.translation[1],
+                    instance_data.translation[2]
+                },
+                .rotation = {
+                    instance_data.rotation[0],
+                    instance_data.rotation[1],
+                    instance_data.rotation[2],
+                    instance_data.rotation[3]
+                },
+                .scale = {
+                    instance_data.scale[0],
+                    instance_data.scale[1],
+                    instance_data.scale[2]
+                }
+            } );
+        }
+
+        auto* positions = header->get_vertex_positions();
+        m_app.upload_buffer_data_immediate(
+            model.vertex_positions,
+            positions,
+            header->vertex_position_count * sizeof(std::array<float, 3>),
+            0);
+
+        auto* attributes = header->get_vertex_attributes();
+        m_app.upload_buffer_data_immediate(
+            model.vertex_attributes,
+            attributes,
+            header->vertex_attribute_count * sizeof(float),
+            0);
+
+        auto* indices = header->get_indices();
+        m_app.upload_buffer_data_immediate(
+            model.indices,
+            indices,
+            header->index_count * sizeof(uint32_t),
+            0);
+
+    }
+    file.close();
 }
 }

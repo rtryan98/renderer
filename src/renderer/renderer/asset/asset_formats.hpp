@@ -1,38 +1,44 @@
 #pragma once
 
-#include <DirectXMath.h>
-#include <string>
 #include <vector>
+#include <rhi/resource.hpp>
+#include <DirectXMath.h>
 
 namespace ren
 {
-using namespace DirectX;
-
 constexpr static uint32_t MESH_PARENT_INDEX_NO_PARENT = ~0u;
 
-struct Vertex_Data
+struct Material
 {
-    XMFLOAT4 normal;
-    XMFLOAT4 tangent;
-    XMFLOAT2 uv;
+    uint32_t unused;
 };
 
-struct Mesh_Data
+struct Submesh
 {
-    std::vector<XMFLOAT4> vertex_positions;
-    std::vector<Vertex_Data> vertices;
-    std::vector<uint32_t> indices;
-    uint32_t albedo_uri_index;
-    uint32_t normal_uri_index;
-    uint32_t metal_roughness_uri_index;
-    uint32_t ao_uri_index;
+    std::array<uint32_t, 2> vertex_position_range;
+    std::array<uint32_t, 2> vertex_attribute_range;
+    std::array<uint32_t, 2> index_range;
+    uint32_t material_index;
 };
 
-struct Model_Data
+struct Instance
 {
-    std::vector<Mesh_Data> meshes;
-    std::vector<uint32_t> parent_indices;
-    std::vector<XMFLOAT4X4> transforms;
-    std::vector<std::string> texture_uris;
+    uint32_t submeshes_range_start;
+    uint32_t submeshes_range_end;
+    uint32_t parent_index;
+    DirectX::XMFLOAT3 translation;
+    DirectX::XMFLOAT4 rotation;
+    DirectX::XMFLOAT3 scale;
 };
+
+struct Model
+{
+    std::vector<Material> materials;
+    std::vector<Submesh> submeshes;
+    std::vector<Instance> instances;
+    rhi::Buffer* vertex_positions;
+    rhi::Buffer* vertex_attributes;
+    rhi::Buffer* indices;
+};
+
 }

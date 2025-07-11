@@ -22,13 +22,16 @@ Application::Application() noexcept
         .enable_gpu_validation = false,
         .enable_locking = false
         }))
-    , m_resource_blackboard(std::make_unique<Render_Resource_Blackboard>(m_device.get()))
     , m_swapchain(m_device->create_swapchain({
         .hwnd = m_window->get_native_handle(),
         .preferred_format = rhi::Image_Format::R8G8B8A8_UNORM,
         .image_count = FRAME_IN_FLIGHT_COUNT + 1,
         .present_mode = rhi::Present_Mode::Immediate
         }))
+    , m_frames()
+    , m_staging_buffers()
+    , m_buffer_staging_infos()
+    , m_frame_counter(0)
     , m_asset_repository(std::make_unique<Asset_Repository>(
         m_logger,
         m_device.get(),
@@ -39,14 +42,14 @@ Application::Application() noexcept
             "../",
             "../../src/shared/",
             "../../thirdparty/rhi/src/shaders/"
-        }}))
+        },
+        .models = m_asset_path + "/cache/"},
+        *this))
+    , m_resource_blackboard(std::make_unique<Render_Resource_Blackboard>(m_device.get()))
     , m_renderer(*this, *m_swapchain, *m_resource_blackboard, Imgui_Renderer_Create_Info{
         .device = m_device.get(),
         .frames_in_flight = FRAME_IN_FLIGHT_COUNT,
         .swapchain_image_format = m_swapchain->get_image_format()})
-    , m_frames()
-    , m_staging_buffers()
-    , m_frame_counter(0)
     , m_is_running(true)
     , m_cbt_cpu_vis(nullptr)
     , m_renderer_settings()

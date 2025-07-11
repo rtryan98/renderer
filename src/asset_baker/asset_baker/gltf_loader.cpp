@@ -12,12 +12,12 @@
 namespace asset_baker
 {
 constexpr static auto GLTF_ATTRIBUTE_POSITION = "POSITION";
-constexpr static auto GLTF_ATTRIBUTE_COLOR = "COLOR_0";
+constexpr static auto GLTF_ATTRIBUTE_COLOR_0 = "COLOR_0";
 constexpr static auto GLTF_ATTRIBUTE_NORMAL = "NORMAL";
 constexpr static auto GLTF_ATTRIBUTE_TANGENT = "TANGENT";
 constexpr static auto GLTF_ATTRIBUTE_TEXCOORD_0 = "TEXCOORD_0";
-constexpr static auto GLTF_ATTRIBUTE_JOINTS = "JOINTS";
-constexpr static auto GLTF_ATTRIBUTE_WEIGHTS = "WEIGHTS";
+constexpr static auto GLTF_ATTRIBUTE_JOINTS_0 = "JOINTS_0";
+constexpr static auto GLTF_ATTRIBUTE_WEIGHTS_0 = "WEIGHTS_0";
 
 constexpr static auto NO_INDEX = ~0ull;
 
@@ -72,17 +72,17 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 },
                 [&](const fastgltf::sources::Array& vector)
                 {
-                    spdlog::warn("GLTF file '{}' uses unsupported embedded image data (Array).", path.string());
+                    spdlog::debug("GLTF file '{}' uses unsupported embedded image data (Array).", path.string());
                     return std::string("");
                 },
                 [&](const fastgltf::sources::BufferView& buffer_view)
                 {
-                    spdlog::warn("GLTF file '{}' uses unsupported embedded image data (BufferView).", path.string());
+                    spdlog::debug("GLTF file '{}' uses unsupported embedded image data (BufferView).", path.string());
                     return std::string("");
                 },
                 [&](const auto&)
                 {
-                    spdlog::warn("GLTF file '{}' uses unknown unsupported embedded image data (BufferView).", path.string());
+                    spdlog::debug("GLTF file '{}' uses unknown unsupported embedded image data (BufferView).", path.string());
                     return std::string("");
                 } // no data
             }, image.data);
@@ -130,15 +130,19 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
 
             mesh.material_index = primitive.materialIndex.value_or(NO_INDEX);
             auto position_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_POSITION);
+            auto color_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_COLOR_0);
             auto normal_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_NORMAL);
             auto tangent_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_TANGENT);
             auto tex_coord_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_TEXCOORD_0);
+            auto joint_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_JOINTS_0);
+            auto weights_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_WEIGHTS_0);
 
-            auto load_accessor = [&]<typename T>(const fastgltf::Accessor& accessor, std::vector<T>& target)
+            auto load_accessor = [&]<typename T>(const fastgltf::Accessor& accessor, std::vector<T>& target, const std::string& semantic)
             {
                 if (!accessor.bufferViewIndex.has_value())
                 {
-                    spdlog::error("GLTF file '{}' has unsupported accessor (no buffer view).", path.string());
+                    spdlog::error("GLTF file '{}' has unsupported accessor (no buffer view) '{}'. Semantic: '{}'",
+                        path.string(), accessor.name, semantic);
                     return GLTF_Error::No_Buffer_View;
                 }
                 const auto& view = asset->bufferViews.at(accessor.bufferViewIndex.value());
@@ -147,12 +151,14 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
 
                 if (!array)
                 {
-                    spdlog::error("GLTF file '{}' has unsupported accessor (array).", path.string());
+                    spdlog::error("GLTF file '{}' has unsupported accessor (array) '{}'. Semantic: '{}'",
+                        path.string(), accessor.name, semantic);
                     return GLTF_Error::Non_Supported_Accessor;
                 }
                 if (accessor.sparse.has_value())
                 {
-                    spdlog::error("GLTF file '{}' has unsupported sparse accessor.", path.string());
+                    spdlog::error("GLTF file '{}' has unsupported sparse accessor '{}'. Semantic: '{}'",
+                        path.string(), accessor.name, semantic);
                     return GLTF_Error::Non_Supported_Accessor;
                 }
                 const auto offset = view.byteOffset + accessor.byteOffset;
@@ -212,21 +218,25 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
 
                 if (element_count == 0)
                 {
-                    spdlog::error("GLTF file '{}' has unsupported sparse accessor (element count).", path.string());
+                    spdlog::error("GLTF file '{}' has unsupported accessor (element count) '{}'. Semantic: '{}'",
+                        path.string(), accessor.name, semantic);
                     return GLTF_Error::Non_Supported_Accessor;
                 }
 
                 if (component_type_size == 0)
                 {
-                    spdlog::error("GLTF file '{}' has unsupported sparse accessor (element type size).", path.string());
+                    spdlog::error("GLTF file '{}' has unsupported accessor (element type size) '{}'. Semantic: '{}'",
+                        path.string(), accessor.name,semantic);
                     return GLTF_Error::Non_Supported_Accessor;
                 }
 
                 const auto element_size = element_count * component_type_size;
 
                 if (element_size != sizeof(T))
+                // if (component_type_size != sizeof(T))
                 {
-                    spdlog::error("GLTF file '{}' has unsupported sparse accessor (element size).", path.string());
+                    spdlog::error("GLTF file '{}' has unsupported accessor (element size) '{}'. Semantic: '{}'",
+                        path.string(), accessor.name,semantic);
                     return GLTF_Error::Non_Supported_Accessor;
                 }
 
@@ -251,7 +261,7 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
             {
                 spdlog::trace("Gathering positions.");
                 auto& positions = asset->accessors.at(position_attribute->accessorIndex);
-                auto error = load_accessor(positions, mesh.positions);
+                auto error = load_accessor(positions, mesh.positions, GLTF_ATTRIBUTE_POSITION);
                 if (error != GLTF_Error::No_Error) return std::unexpected(error);
             }
 
@@ -261,62 +271,137 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 auto& indices = asset->accessors.at(primitive.indicesAccessor.value());
                 switch (indices.componentType)
                 {
-                case fastgltf::ComponentType::Byte:
-                    [[fallthrough]];
                 case fastgltf::ComponentType::UnsignedByte:
                     {
                         std::vector<uint8_t> indices8{};
-                        load_accessor(indices, indices8);
+                        load_accessor(indices, indices8, "INDICES");
                         mesh.indices.assign(indices8.begin(), indices8.end());
                         break;
                     }
-                case fastgltf::ComponentType::Short:
-                    [[fallthrough]];
                 case fastgltf::ComponentType::UnsignedShort:
                     {
                         std::vector<uint16_t> indices16{};
-                        load_accessor(indices, indices16);
+                        load_accessor(indices, indices16, "INDICES");
                         mesh.indices.assign(indices16.begin(), indices16.end());
                         break;
                     }
-                case fastgltf::ComponentType::Int:
-                    [[fallthrough]];
                 case fastgltf::ComponentType::UnsignedInt:
                     {
-                        load_accessor(indices, mesh.indices);
+                        load_accessor(indices, mesh.indices, "INDICES");
                         break;
                     }
                 default:
-                    spdlog::error("GLTF file '{}' has unsupported indices type.", path.string());
-                    return std::unexpected(GLTF_Error::Non_Supported_Indices);
+                    break;
                 }
             }
 
             { // Attributes
-                spdlog::debug("Processing attributes.");
+                spdlog::trace("Processing attributes.");
 
-                std::vector<std::array<float, 3>> normals_deinterleaved;
-                std::vector<std::array<float, 4>> tangents_deinterleaved;
-                std::vector<std::array<float, 2>> tex_coords_deinterleaved;
+                if (color_attribute && color_attribute != primitive.attributes.end())
+                {
+                    spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED COLORS.");
+                    return std::unexpected(GLTF_Error::Non_Supported_Accessor);
+
+                    spdlog::trace("Gathering colors.");
+                    auto& colors = asset->accessors.at(color_attribute->accessorIndex);
+                    switch (colors.componentType)
+                    {
+                    case fastgltf::ComponentType::UnsignedByte:
+                        {
+                            if (colors.type == fastgltf::AccessorType::Vec3)
+                            {
+                                std::vector<std::array<uint8_t, 3>> colors8{};
+                                auto error = load_accessor(colors, colors8, GLTF_ATTRIBUTE_COLOR_0);
+                                if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                                mesh.colors.reserve(colors8.size());
+                                for (auto i = 0; i < colors8.size(); ++i)
+                                {
+                                    auto& mesh_colors = mesh.colors.emplace_back();
+                                    mesh_colors[0] |= colors8[i][0] << 24;
+                                    mesh_colors[0] |= colors8[i][1] << 16;
+                                    mesh_colors[0] |= colors8[i][2] <<  8;
+                                }
+                            }
+                            else
+                            {
+                                std::vector<std::array<uint8_t, 4>> colors8{};
+                                auto error = load_accessor(colors, colors8, GLTF_ATTRIBUTE_COLOR_0);
+                                if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                                mesh.colors.reserve(colors8.size());
+                                for (auto i = 0; i < colors8.size(); ++i)
+                                {
+                                    auto& mesh_colors = mesh.colors.emplace_back();
+                                    mesh_colors[0] |= colors8[i][0] << 24;
+                                    mesh_colors[0] |= colors8[i][1] << 16;
+                                    mesh_colors[0] |= colors8[i][2] <<  8;
+                                    mesh_colors[0] |= colors8[i][3] <<  0;
+                                }
+                            }
+                            break;
+                        }
+                    case fastgltf::ComponentType::Float:
+                        {
+                            if (colors.type == fastgltf::AccessorType::Vec3)
+                            {
+                                std::vector<std::array<float, 3>> colors_f32{};
+                                auto error = load_accessor(colors, colors_f32, GLTF_ATTRIBUTE_COLOR_0);
+                                if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                                mesh.colors.reserve(colors_f32.size());
+                                for (auto i = 0; i < colors_f32.size(); ++i)
+                                {
+                                    auto& mesh_colors = mesh.colors.emplace_back();
+                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][0] * 255.f) << 24;
+                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][1] * 255.f) << 16;
+                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][2] * 255.f) <<  8;
+                                }
+                            }
+                            else
+                            {
+                                std::vector<std::array<float, 4>> colors_f32{};
+                                auto error = load_accessor(colors, colors_f32, GLTF_ATTRIBUTE_COLOR_0);
+                                if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                                mesh.colors.reserve(colors_f32.size());
+                                for (auto i = 0; i < colors_f32.size(); ++i)
+                                {
+                                    auto& mesh_colors = mesh.colors.emplace_back();
+                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][0] * 255.f) << 24;
+                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][1] * 255.f) << 16;
+                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][2] * 255.f) <<  8;
+                                    mesh_colors[0] |= static_cast<uint8_t>(colors_f32[i][3] * 255.f) <<  0;
+                                }
+                            }
+                            break;
+                        }
+                    default:
+                        break;
+                    }
+                }
 
                 if (normal_attribute && normal_attribute != primitive.attributes.end())
                 {
                     spdlog::trace("Gathering normals.");
                     auto& normals = asset->accessors.at(normal_attribute->accessorIndex);
-                    auto error = load_accessor(normals, normals_deinterleaved);
+                    auto error = load_accessor(normals, mesh.normals, GLTF_ATTRIBUTE_NORMAL);
                     if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                }
-                if (normals_deinterleaved.size() == 0)
-                {
-                    spdlog::error("GLTF file '{}' has no normals.", path.string());
-                    return std::unexpected(GLTF_Error::Missing_Normals);
                 }
 
                 if (tangent_attribute && tangent_attribute != primitive.attributes.end())
                 {
                     spdlog::trace("Gathering tangents.");
                     auto& tangents = asset->accessors.at(tangent_attribute->accessorIndex);
-                    auto error = load_accessor(tangents, tangents_deinterleaved);
+                    std::vector<std::array<float, 4>> tangents_f32{};
+                    auto error = load_accessor(tangents, tangents_f32, GLTF_ATTRIBUTE_TANGENT);
+                    mesh.tangents.reserve(tangents_f32.size());
+                    for (auto i = 0; i < tangents_f32.size(); ++i)
+                    {
+                        auto& mesh_tangent = mesh.tangents.emplace_back();
+                        mesh_tangent = {
+                            tangents_f32[i][0] * tangents_f32[i][3],
+                            tangents_f32[i][1] * tangents_f32[i][3],
+                            tangents_f32[i][2] * tangents_f32[i][3],
+                        };
+                    }
                     if (error != GLTF_Error::No_Error) return std::unexpected(error);
                 }
 
@@ -324,26 +409,169 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 {
                     spdlog::trace("Gathering uvs.");
                     auto& tex_coords = asset->accessors.at(tex_coord_attribute->accessorIndex);
-                    auto error = load_accessor(tex_coords, tex_coords_deinterleaved);
-                    if (error != GLTF_Error::No_Error) return std::unexpected(error);
-                }
-                if (tex_coords_deinterleaved.size() == 0)
-                {
-                    spdlog::error("GLTF file '{}' has no texture coordinates.", path.string());
-                    return std::unexpected(GLTF_Error::Missing_Texcoords);
+                    switch (tex_coords.componentType)
+                    {
+                    case fastgltf::ComponentType::UnsignedByte:
+                        {
+                            std::vector<std::array<uint8_t, 2>> tex_coords_u8{};
+                            auto error = load_accessor(tex_coords, tex_coords_u8, GLTF_ATTRIBUTE_TEXCOORD_0);
+                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                            mesh.tex_coords.reserve(tex_coords_u8.size() * tex_coords.count);
+                            for (uint32_t i = 0; i < tex_coords_u8.size(); ++i)
+                            {
+                                auto& tex_coords_val = mesh.tex_coords.emplace_back();
+                                tex_coords_val = {
+                                    static_cast<float>(tex_coords_u8[i][0]) / 255.0f,
+                                    static_cast<float>(tex_coords_u8[i][1]) / 255.0f
+                                };
+                            }
+                            break;
+                        }
+                    case fastgltf::ComponentType::UnsignedShort:
+                        {
+                            std::vector<std::array<uint16_t, 2>> tex_coords_u16{};
+                            auto error = load_accessor(tex_coords, tex_coords_u16, GLTF_ATTRIBUTE_TEXCOORD_0);
+                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                            mesh.tex_coords.reserve(tex_coords_u16.size() * tex_coords.count);
+                            for (uint32_t i = 0; i < tex_coords_u16.size(); ++i)
+                            {
+                                auto& tex_coords_val = mesh.tex_coords.emplace_back();
+                                tex_coords_val = {
+                                    static_cast<float>(tex_coords_u16[i][0]) / 65535.0f,
+                                    static_cast<float>(tex_coords_u16[i][1]) / 65535.0f
+                                };
+                            }
+                            break;
+                        }
+                    case fastgltf::ComponentType::Float:
+                        {
+                            auto error = load_accessor(tex_coords, mesh.tex_coords, GLTF_ATTRIBUTE_TEXCOORD_0);
+                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                            break;
+                        }
+                    default:
+                        break;
+                    }
                 }
 
-                auto has_tangents = tangents_deinterleaved.size() > 0;
-                auto requires_tangents = !result.materials[mesh.material_index].normal_uri.empty();
+                if (joint_attribute && joint_attribute != primitive.attributes.end())
+                {
+                    spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED JOINTS.");
+                    return std::unexpected(GLTF_Error::Non_Supported_Accessor);
+
+                    spdlog::trace("Gathering joints.");
+                    auto& joints = asset->accessors.at(joint_attribute->accessorIndex);
+                    switch (joints.componentType)
+                    {
+                    case fastgltf::ComponentType::UnsignedByte:
+                        {
+                            std::vector<std::array<uint8_t, 4>> joints8{};
+                            auto error = load_accessor(joints, joints8, GLTF_ATTRIBUTE_JOINTS_0);
+                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                            mesh.joints.reserve(joints8.size());
+                            for (auto i = 0; i < joints8.size(); ++i)
+                            {
+                                auto& joint = mesh.joints.emplace_back();
+                                joint = {
+                                    static_cast<uint32_t>(joints8[i][0]),
+                                    static_cast<uint32_t>(joints8[i][1]),
+                                    static_cast<uint32_t>(joints8[i][2]),
+                                    static_cast<uint32_t>(joints8[i][3])
+                                };
+                            }
+                            break;
+                        }
+                    case fastgltf::ComponentType::UnsignedShort:
+                        {
+                            std::vector<std::array<uint16_t, 4>> joints16{};
+                            auto error = load_accessor(joints, joints16, GLTF_ATTRIBUTE_JOINTS_0);
+                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                            mesh.joints.reserve(joints16.size());
+                            for (auto i = 0; i < joints16.size(); i += 4)
+                            {
+                                auto& joint = mesh.joints.emplace_back();
+                                joint = {
+                                    static_cast<uint32_t>(joints16[i][0]),
+                                    static_cast<uint32_t>(joints16[i][1]),
+                                    static_cast<uint32_t>(joints16[i][2]),
+                                    static_cast<uint32_t>(joints16[i][3])
+                                };
+                            }
+                            break;
+                        }
+                    default:
+                        break;
+                    }
+                }
+
+                if (weights_attribute && weights_attribute != primitive.attributes.end())
+                {
+                    spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED WEIGHTS.");
+                    return std::unexpected(GLTF_Error::Non_Supported_Accessor);
+
+                    spdlog::trace("Gathering weights.");
+                    auto& weights = asset->accessors.at(weights_attribute->accessorIndex);
+                    switch (weights.componentType)
+                    {
+                    case fastgltf::ComponentType::UnsignedByte:
+                        {
+                            std::vector<uint8_t> weights8{};
+                            auto error = load_accessor(weights, weights8, GLTF_ATTRIBUTE_WEIGHTS_0);
+                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                            mesh.weights.reserve(weights8.size() / 4);
+                            for (auto i = 0; i < weights8.size(); i += 4)
+                            {
+                                auto& weight = mesh.weights.emplace_back();
+                                weight = {
+                                    static_cast<float>(weights8[i + 0]) / 255.f,
+                                    static_cast<float>(weights8[i + 1]) / 255.f,
+                                    static_cast<float>(weights8[i + 2]) / 255.f,
+                                    static_cast<float>(weights8[i + 3]) / 255.f
+                                };
+                            }
+                            break;
+                        }
+                    case fastgltf::ComponentType::UnsignedShort:
+                        {
+                            std::vector<uint16_t> weights16{};
+                            auto error = load_accessor(weights, weights16, GLTF_ATTRIBUTE_WEIGHTS_0);
+                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                            mesh.weights.reserve(weights16.size() / 4);
+                            for (auto i = 0; i < weights16.size(); i += 4)
+                            {
+                                auto& weight = mesh.weights.emplace_back();
+                                weight = {
+                                    static_cast<float>(weights16[i + 0]) / 65535.f,
+                                    static_cast<float>(weights16[i + 1]) / 65535.f,
+                                    static_cast<float>(weights16[i + 2]) / 65535.f,
+                                    static_cast<float>(weights16[i + 3]) / 65535.f
+                                };
+                            }
+                            break;
+                        }
+                    case fastgltf::ComponentType::Float:
+                        {
+                            auto error = load_accessor(weights, mesh.weights, GLTF_ATTRIBUTE_WEIGHTS_0);
+                            if (error != GLTF_Error::No_Error) return std::unexpected(error);
+                            break;
+                        }
+                    default:
+                        break;
+                    }
+                }
+
+                auto has_tangents = mesh.tangents.size() > 0;
+                auto has_material = mesh.material_index != NO_INDEX;
+                auto requires_tangents = has_material && !result.materials[mesh.material_index].normal_uri.empty();
 
                 if (!has_tangents && requires_tangents)
                 {
                     spdlog::debug("GLTF file '{}' has no tangents and they need to be generated.", path.string());
 
-                    tangents_deinterleaved.resize(normals_deinterleaved.size());
+                    mesh.tangents.resize(mesh.normals.size());
 
-                    if (!(normals_deinterleaved.size() == tangents_deinterleaved.size() &&
-                        tangents_deinterleaved.size() == tex_coords_deinterleaved.size()))
+                    if (!(mesh.normals.size() == mesh.tangents.size() &&
+                        mesh.tangents.size() == mesh.tex_coords.size()))
                     {
                         spdlog::error("GLTF file '{}' has no tangents and they failed to generate.", path.string());
                         return std::unexpected(GLTF_Error::Tangent_Generation_Failed);
@@ -354,13 +582,13 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                         std::vector<std::array<float, 3>>& positions;
                         std::vector<std::array<float, 3>>& normals;
                         std::vector<std::array<float, 2>>& tex_coords;
-                        std::vector<std::array<float, 4>>& tangents;
+                        std::vector<std::array<float, 3>>& tangents;
                         std::vector<uint32_t>& indices;
                     } user_data = {
                         .positions = mesh.positions,
-                        .normals = normals_deinterleaved,
-                        .tex_coords = tex_coords_deinterleaved,
-                        .tangents = tangents_deinterleaved,
+                        .normals = mesh.normals,
+                        .tex_coords = mesh.tex_coords,
+                        .tangents = mesh.tangents,
                         .indices = mesh.indices,
                     };
 
@@ -423,10 +651,9 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                         {
                             const auto& data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
                             auto& tangent = data.tangents[data.indices[face_idx * 3 + vert_idx]];
-                            tangent[0] = fv_tangent[0];
-                            tangent[1] = fv_tangent[1];
-                            tangent[2] = fv_tangent[2];
-                            tangent[3] = sign; // TODO: handedness?
+                            tangent[0] = sign * fv_tangent[0]; // TODO: handedness?
+                            tangent[1] = sign * fv_tangent[1];
+                            tangent[2] = sign * fv_tangent[2];
                         },
                         .m_setTSpace = nullptr,
                     };
@@ -447,52 +674,28 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 }
                 else if (!has_tangents && !requires_tangents)
                 {
-                    spdlog::debug("Mesh has no normal map and requires no tangents.");
-                    tangents_deinterleaved.resize(normals_deinterleaved.size());
-                    return std::unexpected(GLTF_Error::Missing_Normals);
+                    spdlog::trace("Mesh has no normal map and requires no tangents.");
                 }
-
-                auto equal_attribute_count = normals_deinterleaved.size() == tangents_deinterleaved.size()
-                                          && tangents_deinterleaved.size() == tex_coords_deinterleaved.size()
-                                          && tex_coords_deinterleaved.size() == mesh.positions.size();
-
-                if (has_tangents && equal_attribute_count)
+                spdlog::trace("Attributes processed");
+                spdlog::trace("Swizzling axes");
+                for (auto& position : mesh.positions)
                 {
-                    mesh.vertex_attributes.reserve(normals_deinterleaved.size());
-                    for (auto i = 0; i < normals_deinterleaved.size(); ++i)
-                    {
-                        auto tangent_w = tangents_deinterleaved[i][3];
-                        mesh.vertex_attributes.emplace_back( GLTF_Default_Vertex_Attributes {
-                            .normal = {
-                                normals_deinterleaved[i][0],
-                                normals_deinterleaved[i][1],
-                                normals_deinterleaved[i][2]
-                            },
-                            .tangent = {
-                                tangent_w * tangents_deinterleaved[i][0],
-                                tangent_w * tangents_deinterleaved[i][1],
-                                tangent_w * tangents_deinterleaved[i][2]
-                            },
-                            .uv = {
-                                tex_coords_deinterleaved[i][0],
-                                tex_coords_deinterleaved[i][1]
-                            }
-                        });
-                    }
+                    position = { position[0], position[2], position[1] };
                 }
-                else if (!equal_attribute_count)
+                for (auto& normal : mesh.normals)
                 {
-                    spdlog::error("GLTF file '{}' has varying attribute sizes.", path.string());
-                    spdlog::debug("Position count: {}", mesh.positions.size());
-                    spdlog::debug("Normal count: {}", normals_deinterleaved.size());
-                    spdlog::debug("Tangent count: {}", tangents_deinterleaved.size());
-                    spdlog::debug("UVs count: {}", tex_coords_deinterleaved.size());
-                    return std::unexpected(GLTF_Error::Varying_Attribute_Size);
+                    normal = { normal[0], normal[2], normal[1] };
+                }
+                for (auto& tangent : mesh.tangents)
+                {
+                    tangent = { tangent[0], tangent[2], tangent[1] };
                 }
             }
         }
 
+
         range.second = result.submeshes.size();
+        spdlog::trace("Submesh range for mesh '{}': {} - {}", static_cast<void*>(&gltf_mesh), range.first, range.second);
         submesh_ranges[&gltf_mesh] = range;
     }
 
@@ -519,6 +722,7 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
             if (mesh_idx != NO_INDEX)
             {
                 auto& range = submesh_ranges[&asset->meshes[mesh_idx]];
+                spdlog::trace("Submesh range for mesh index '{}': {} - {}", mesh_idx, range.first, range.second);
                 submesh_range_start = range.first;
                 submesh_range_end = range.second;
             }
@@ -526,7 +730,6 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
             result.instances.emplace_back( GLTF_Mesh_Instance {
                 .submesh_range_start = submesh_range_start,
                 .submesh_range_end = submesh_range_end,
-                .mesh_index = mesh_idx,
                 .parent_index = parent_index,
                 .translation = { trs.translation[0], trs.translation[1], trs.translation[2] },
                 .rotation = { trs.rotation[0], trs.rotation[1], trs.rotation[2], trs.rotation[3] },
@@ -634,7 +837,8 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
     for (const auto& instance : gltf_model.instances)
     {
         instances.emplace_back( serialization::Mesh_Instance_00 {
-            .mesh_index = static_cast<uint32_t>(instance.mesh_index),
+            .submeshes_range_start = static_cast<uint32_t>(instance.submesh_range_start),
+            .submeshes_range_end = static_cast<uint32_t>(instance.submesh_range_end),
             .parent_index = static_cast<uint32_t>(instance.parent_index),
             .translation = {
                 instance.translation[0], instance.translation[1],
@@ -656,49 +860,93 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
     spdlog::trace("Serializing submeshes and ranges.");
     std::vector<serialization::Submesh_Data_Ranges_00> mesh_data_ranges;
     std::vector<std::array<float, 3>> mesh_positions;
-    std::vector<std::array<float, 8>> mesh_attributes;
     std::vector<uint32_t> mesh_indices;
-    mesh_data_ranges.reserve(gltf_model.submeshes.size());
-    for (const auto& mesh : gltf_model.submeshes)
+    std::vector<uint32_t> mesh_attribute_data;
+
+    for (const auto& submesh : gltf_model.submeshes)
     {
         auto current_mesh_position_count = mesh_positions.size();
-        auto current_mesh_attribute_count = mesh_attributes.size();
+        auto new_mesh_position_count = submesh.positions.size() + current_mesh_position_count;
         auto current_mesh_indices_count = mesh_indices.size();
-
-        auto new_mesh_position_count = mesh.positions.size() + current_mesh_attribute_count;
-        auto new_mesh_attribute_count = mesh.vertex_attributes.size() + current_mesh_attribute_count;
-        auto new_mesh_indices_count = mesh.indices.size() + current_mesh_indices_count;
+        auto new_mesh_indices_count = submesh.indices.size() + current_mesh_indices_count;
 
         mesh_positions.resize(new_mesh_position_count, {});
-        mesh_attributes.resize(new_mesh_attribute_count, {});
         mesh_indices.resize(new_mesh_indices_count, {});
 
+
+        spdlog::trace("copying positions");
         auto mesh_position_data = reinterpret_cast<char*>(&mesh_positions.data()[current_mesh_position_count]);
         memcpy(mesh_position_data,
-            mesh.positions.data(),
-            mesh.positions.size() * sizeof(float[3]));
-        auto mesh_attribute_data = reinterpret_cast<char*>(&mesh_attributes.data()[current_mesh_attribute_count]);
-        memcpy(mesh_attribute_data,
-            mesh.vertex_attributes.data(),
-            mesh.vertex_attributes.size() * sizeof(float[8]));
+            submesh.positions.data(),
+            submesh.positions.size() * sizeof(float) * 3);
+
+        spdlog::trace("copying indices");
         auto mesh_indices_data = reinterpret_cast<char*>(&mesh_indices.data()[current_mesh_indices_count]);
         memcpy(mesh_indices_data,
-            mesh.indices.data(),
-            mesh.indices.size() * sizeof(uint32_t));
+            submesh.indices.data(),
+            submesh.indices.size() * sizeof(uint32_t));
+
+        serialization::Attribute_Flags attribute_flags = {};
+        auto add_flag = [&](const auto& data, auto flag)
+        {
+            attribute_flags = attribute_flags | (data.size() > 0 ? flag : serialization::Attribute_Flags::None);
+        };
+        add_flag(submesh.colors, serialization::Attribute_Flags::Color);
+        add_flag(submesh.normals, serialization::Attribute_Flags::Normal);
+        add_flag(submesh.tangents, serialization::Attribute_Flags::Tangent);
+        add_flag(submesh.tex_coords, serialization::Attribute_Flags::Tex_Coords);
+        add_flag(submesh.joints, serialization::Attribute_Flags::Joints);
+        add_flag(submesh.weights, serialization::Attribute_Flags::Weights);
+
+        auto current_mesh_attribute_start = mesh_attribute_data.size();
+        std::size_t current_mesh_attribute_count = serialization::calculate_total_attribute_size(attribute_flags);
+        auto current_mesh_attribute_end = current_mesh_attribute_start + current_mesh_attribute_count * submesh.positions.size();
+        mesh_attribute_data.resize(current_mesh_attribute_end);
+
+        spdlog::trace("copying attributes");
+        if (current_mesh_attribute_count > 0)
+        {
+            spdlog::trace("pos: {}", submesh.positions.size());
+            spdlog::trace("col: {}", submesh.colors.size());
+            spdlog::trace("nrm: {}", submesh.normals.size());
+            spdlog::trace("tan: {}", submesh.tangents.size());
+            spdlog::trace("uvs: {}", submesh.tex_coords.size());
+            spdlog::trace("jnt: {}", submesh.joints.size());
+            spdlog::trace("wgt: {}", submesh.weights.size());
+
+            auto* ptr = &mesh_attribute_data[current_mesh_attribute_start];
+            for (auto i = 0; i < submesh.positions.size(); ++i)
+            {
+                auto add_element = [&]<typename T, std::size_t N>(const std::vector<std::array<T, N>>& data)
+                {
+                    if (data.size() > 0)
+                    {
+                        memcpy(ptr, &data[i], N * sizeof(uint32_t));
+                        ptr += N;
+                    }
+                };
+                add_element(submesh.colors);
+                add_element(submesh.normals);
+                add_element(submesh.tangents);
+                add_element(submesh.tex_coords);
+                add_element(submesh.joints);
+                add_element(submesh.weights);
+            }
+        }
 
         mesh_data_ranges.emplace_back( serialization::Submesh_Data_Ranges_00 {
-            .material_index = static_cast<uint32_t>(mesh.material_index),
+            .material_index = static_cast<uint32_t>(submesh.material_index),
             .vertex_position_range_start = static_cast<uint32_t>(current_mesh_position_count),
             .vertex_position_range_end = static_cast<uint32_t>(new_mesh_position_count),
-            .vertex_attribute_range_start = static_cast<uint32_t>(current_mesh_attribute_count),
-            .vertex_attribute_range_end = static_cast<uint32_t>(current_mesh_attribute_count),
+            .vertex_attribute_range_start = static_cast<uint32_t>(current_mesh_attribute_start),
+            .vertex_attribute_range_end = static_cast<uint32_t>(current_mesh_attribute_end),
             .index_range_start = static_cast<uint32_t>(current_mesh_indices_count),
-            .index_range_end = static_cast<uint32_t>(current_mesh_indices_count),
+            .index_range_end = static_cast<uint32_t>(new_mesh_indices_count),
         });
     }
     serialized_model.submesh_count = static_cast<uint32_t>(mesh_data_ranges.size());
     serialized_model.vertex_position_count = static_cast<uint32_t>(mesh_positions.size());
-    serialized_model.vertex_attribute_count = static_cast<uint32_t>(mesh_attributes.size());
+    serialized_model.vertex_attribute_count = static_cast<uint32_t>(mesh_attribute_data.size());
     serialized_model.index_count = static_cast<uint32_t>(mesh_indices.size());
 
     std::vector<char> result;
@@ -737,8 +985,8 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
 
     data = &(result.data()[serialized_model.get_vertex_attributes_offset()]);
     spdlog::trace("Copying attributes. Offset: {}, Size: {}",
-        serialized_model.get_vertex_attributes_offset(), mesh_attributes.size() * 32);
-    memcpy(data, mesh_attributes.data(), mesh_attributes.size() * 32);
+        serialized_model.get_vertex_attributes_offset(), mesh_attribute_data.size() * sizeof(uint32_t));
+    memcpy(data, mesh_attribute_data.data(), mesh_attribute_data.size() * sizeof(uint32_t));
 
     data = &(result.data()[serialized_model.get_indices_offset()]);
     spdlog::trace("Copying indices. Offset: {}, Size: {}",

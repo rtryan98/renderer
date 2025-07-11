@@ -104,7 +104,7 @@ int32_t main(const int32_t argc, char** argv) try
         "l",
         "log-level",
         "Set log level. 0 is trace, 1 is debug, 2 is info, 3 is warn, 4 is error, 5 is critical.",
-        true,
+        false,
         2,
         "int");
     cmd.add(log_level_arg);

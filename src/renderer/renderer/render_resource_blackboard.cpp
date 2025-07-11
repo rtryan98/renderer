@@ -138,6 +138,9 @@ Render_Resource_Blackboard::Render_Resource_Blackboard(rhi::Graphics_Device* dev
 
 Render_Resource_Blackboard::~Render_Resource_Blackboard()
 {
+    m_device->wait_idle();
+    garbage_collect(~0ull);
+    // remove remaining resources
     for (auto& buffer : m_buffers)
         delete_resource(buffer.buffer);
     for (auto& image : m_images)
@@ -183,6 +186,7 @@ void Render_Resource_Blackboard::destroy_buffer(const std::string& name)
 {
     if (!has_buffer(name))
         return;
+    m_buffers.release(m_buffer_wrapper_ptrs[name]);
     delete_resource(m_buffer_wrapper_ptrs[name]->buffer);
     m_buffer_wrapper_ptrs.erase(name);
 }
@@ -212,6 +216,7 @@ void Render_Resource_Blackboard::destroy_image(const std::string& name)
 {
     if (!has_image(name))
         return;
+    m_images.release(m_image_wrapper_ptrs[name]);
     delete_resource(m_image_wrapper_ptrs[name]->image);
     m_image_wrapper_ptrs.erase(name);
 }

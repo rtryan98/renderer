@@ -7,11 +7,46 @@
 
 namespace serialization
 {
+enum class Attribute_Flags : uint32_t
+{
+    None = 0x0,
+    Color = 0x1,
+    Normal = 0x2,
+    Tangent = 0x4,
+    Tex_Coords = 0x8,
+    Joints = 0x10,
+    Weights = 0x20,
+};
+}
+
+template<>
+constexpr static bool RHI_ENABLE_BIT_OPERATORS<serialization::Attribute_Flags> = true;
+
+namespace serialization
+{
 constexpr static auto NAME_MAX_SIZE = 159ull;
 constexpr static auto NAME_FIELD_SIZE = NAME_MAX_SIZE + 1ull;
 
 constexpr static auto MODEL_FILE_EXTENSION = ".renmdl"; // renderer model container
 constexpr static auto TEXTURE_FILE_EXTENSION = ".rentex"; // renderer texture container
+
+
+static std::size_t calculate_total_attribute_size(Attribute_Flags flags)
+{
+    const auto is_same = [&](const Attribute_Flags rhs)
+    {
+        return (flags & rhs) == rhs;
+    };
+
+    std::size_t result = 0;
+    result += is_same(Attribute_Flags::Color) * sizeof(uint32_t);
+    result += is_same(Attribute_Flags::Normal) * sizeof(float) * 3;
+    result += is_same(Attribute_Flags::Tangent) * sizeof(float) * 3;
+    result += is_same(Attribute_Flags::Tex_Coords) * sizeof(float) * 2;
+    result += is_same(Attribute_Flags::Joints) * sizeof(uint32_t) * 4;
+    result += is_same(Attribute_Flags::Weights) * sizeof(float) * 4;
+    return result;
+};
 
 struct URI_Reference_00
 {
@@ -35,6 +70,7 @@ struct Mesh_Material_00
 
 struct Submesh_Data_Ranges_00
 {
+    uint32_t attribute_flags;
     uint32_t material_index;
     uint32_t vertex_position_range_start;
     uint32_t vertex_position_range_end;
@@ -48,7 +84,6 @@ struct Mesh_Instance_00
 {
     uint32_t submeshes_range_start;
     uint32_t submeshes_range_end;
-    uint32_t mesh_index;
     uint32_t parent_index;
     float translation[3];
     float rotation[4];
@@ -77,8 +112,8 @@ struct Model_Header_00
     uint32_t material_count;            // Mesh_Material_00
     uint32_t submesh_count;             // Submesh_Data_Ranges_00
     uint32_t instance_count;            // Mesh_Instance_00
-    uint32_t vertex_position_count;     // float[3]
-    uint32_t vertex_attribute_count;    // float[8]
+    uint32_t vertex_position_count;     // std::array<float, 3>
+    uint32_t vertex_attribute_count;    // dependent on submesh attribute flags
     uint32_t index_count;               // uint32_t
 
     // Data is ordered in the way it was declared.
@@ -164,7 +199,7 @@ struct Model_Header_00
     std::size_t get_indices_offset() const
     {
         return get_vertex_attributes_offset()
-            + vertex_attribute_count * 32; // sizeof(float[8]);
+            + vertex_attribute_count * sizeof(uint32_t);
     }
 
     uint32_t* get_indices()
@@ -182,7 +217,7 @@ struct Model_Header_00
         size += (submesh_count * sizeof(Submesh_Data_Ranges_00));
         size += (instance_count * sizeof(Mesh_Instance_00));
         size += (vertex_position_count * 12); //sizeof(float[3]));
-        size += (vertex_attribute_count * 32); // sizeof(float[8]));
+        size += (vertex_attribute_count * sizeof(uint32_t));
         size += (index_count * sizeof(uint32_t));
         return size;
     }

@@ -13,7 +13,6 @@ enum class GLTF_Error
     File_Load_Failed,
     Parse_Failed,
     Non_Supported_Primitive,
-    Non_Supported_Indices,
     Non_Supported_Accessor,
     No_Buffer_View,
     Varying_Attribute_Size,
@@ -22,18 +21,16 @@ enum class GLTF_Error
     Tangent_Generation_Failed
 };
 
-struct GLTF_Default_Vertex_Attributes
-{
-    std::array<float, 3> normal;
-    std::array<float, 3> tangent;
-    std::array<float, 2> uv;
-};
-
 struct GLTF_Submesh
 {
     std::size_t material_index;
     std::vector<std::array<float, 3>> positions;
-    std::vector<GLTF_Default_Vertex_Attributes> vertex_attributes;
+    std::vector<std::array<uint32_t, 1>> colors;
+    std::vector<std::array<float, 3>> normals;
+    std::vector<std::array<float, 3>> tangents;
+    std::vector<std::array<float, 2>> tex_coords;
+    std::vector<std::array<uint32_t, 4>> joints;
+    std::vector<std::array<float, 4>> weights;
     std::vector<uint32_t> indices;
 };
 
@@ -41,7 +38,6 @@ struct GLTF_Mesh_Instance
 {
     std::size_t submesh_range_start;
     std::size_t submesh_range_end;
-    std::size_t mesh_index;
     std::size_t parent_index;
     std::array<float, 3> translation;
     std::array<float, 4> rotation;

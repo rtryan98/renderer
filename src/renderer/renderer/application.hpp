@@ -77,14 +77,14 @@ private:
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Input_State> m_input_state;
     std::unique_ptr<rhi::Graphics_Device> m_device;
-    std::unique_ptr<Render_Resource_Blackboard> m_resource_blackboard;
     std::unique_ptr<rhi::Swapchain> m_swapchain;
-    std::unique_ptr<Asset_Repository> m_asset_repository;
-    Renderer m_renderer;
     std::array<Frame, FRAME_IN_FLIGHT_COUNT> m_frames;
     std::array<std::vector<rhi::Buffer*>, FRAME_IN_FLIGHT_COUNT> m_staging_buffers;
     std::array<std::vector<Buffer_Staging_Info>, FRAME_IN_FLIGHT_COUNT> m_buffer_staging_infos;
     uint64_t m_frame_counter;
+    std::unique_ptr<Asset_Repository> m_asset_repository;
+    std::unique_ptr<Render_Resource_Blackboard> m_resource_blackboard;
+    Renderer m_renderer;
     bool m_is_running;
     ImGui_Data m_imgui_data = {};
     std::unique_ptr<CBT_CPU_Vis> m_cbt_cpu_vis;

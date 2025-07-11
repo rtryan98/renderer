@@ -290,11 +290,18 @@ void Ocean_Renderer::render_patch(rhi::Command_List* cmd, uint32_t camera_buffer
     cmd->draw(6 * SIZE * SIZE, 1, 0, 0);
 }
 
-void Ocean_Renderer::render_composite(rhi::Command_List* cmd, uint32_t color_image_bindless_index) noexcept
+void Ocean_Renderer::render_composite(rhi::Command_List* cmd,
+    uint32_t ocean_color_idx,
+    uint32_t ocean_depth_idx,
+    uint32_t geom_color_idx,
+    uint32_t geom_depth_idx) noexcept
 {
     cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_composite"));
     cmd->set_push_constants<Ocean_Render_Composition_Push_Constants>({
-        .rt_color_tex = color_image_bindless_index,
+        .ocean_color_tex = ocean_color_idx,
+        .ocean_depth_tex = ocean_depth_idx,
+        .geom_color_tex = geom_color_idx,
+        .geom_depth_tex = geom_depth_idx,
         .tex_sampler = m_resources.gpu_resources.linear_sampler
         }, rhi::Pipeline_Bind_Point::Graphics);
     cmd->draw(3,1,0,0);

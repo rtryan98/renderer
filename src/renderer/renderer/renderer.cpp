@@ -4,6 +4,7 @@
 #include "renderer/window.hpp"
 #include "renderer/input_codes.hpp"
 
+#include "shared/draw_shared_types.h"
 #include "shared/camera_shared_types.h"
 
 #undef near
@@ -117,7 +118,38 @@ void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
     m_ocean_renderer.simulate(m_app, cmd, dt);
 
     /* Transition gbuffer attachments for rendering */ {
-
+        rhi::Image_Barrier_Info gbuffer_color_barrier = {
+            .stage_before = rhi::Barrier_Pipeline_Stage::None,
+            .stage_after = rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
+            .access_before = rhi::Barrier_Access::None,
+            .access_after = rhi::Barrier_Access::Color_Attachment_Write,
+            .layout_before = rhi::Barrier_Image_Layout::Undefined,
+            .layout_after = rhi::Barrier_Image_Layout::Color_Attachment,
+            .queue_type_ownership_transfer_target_queue = rhi::Queue_Type::Graphics,
+            .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
+            .image = m_g_buffer.target0,
+            .subresource_range = RT_DEFAULT_SUBRESOURCE_RANGE,
+            .discard = true
+        };
+        rhi::Image_Barrier_Info gbuffer_ds_barrier = {
+            .stage_before = rhi::Barrier_Pipeline_Stage::None,
+            .stage_after = rhi::Barrier_Pipeline_Stage::Early_Fragment_Tests,
+            .access_before = rhi::Barrier_Access::None,
+            .access_after = rhi::Barrier_Access::Depth_Stencil_Attachment_Write,
+            .layout_before = rhi::Barrier_Image_Layout::Undefined,
+            .layout_after = rhi::Barrier_Image_Layout::Depth_Stencil_Write,
+            .queue_type_ownership_transfer_target_queue = rhi::Queue_Type::Graphics,
+            .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
+            .image = m_g_buffer.depth_stencil,
+            .subresource_range = RT_DEFAULT_SUBRESOURCE_RANGE,
+            .discard = true
+        };
+        auto ocean_targets = std::to_array({ gbuffer_color_barrier, gbuffer_ds_barrier });
+        cmd->barrier({
+            .buffer_barriers = {},
+            .image_barriers = { ocean_targets },
+            .memory_barriers = {}
+            });
     }
     render_gbuffer_pass(cmd);
     /* Transition ocean pass attachments for rendering */ {
@@ -184,7 +216,49 @@ void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
             .subresource_range = RT_DEFAULT_SUBRESOURCE_RANGE,
             .discard = false
         };
-        auto barriers = std::to_array({ swapchain_layout_barrier, ocean_color_barrier });
+        rhi::Image_Barrier_Info ocean_depth_barrier = {
+            .stage_before = rhi::Barrier_Pipeline_Stage::Late_Fragment_Tests,
+            .stage_after = rhi::Barrier_Pipeline_Stage::Early_Fragment_Tests,
+            .access_before = rhi::Barrier_Access::Depth_Stencil_Attachment_Write,
+            .access_after = rhi::Barrier_Access::Depth_Stencil_Attachment_Read,
+            .layout_before = rhi::Barrier_Image_Layout::Depth_Stencil_Write,
+            .layout_after = rhi::Barrier_Image_Layout::Depth_Stencil_Read_Only,
+            .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
+            .image = m_ocean_rendertargets.depth_stencil,
+            .subresource_range = RT_DEFAULT_SUBRESOURCE_RANGE,
+            .discard = false
+        };
+        rhi::Image_Barrier_Info gbuffer_color_barrier = {
+            .stage_before = rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
+            .stage_after = rhi::Barrier_Pipeline_Stage::Pixel_Shader,
+            .access_before = rhi::Barrier_Access::Color_Attachment_Write,
+            .access_after = rhi::Barrier_Access::Shader_Sampled_Read,
+            .layout_before = rhi::Barrier_Image_Layout::Color_Attachment,
+            .layout_after = rhi::Barrier_Image_Layout::Shader_Read_Only,
+            .queue_type_ownership_transfer_target_queue = rhi::Queue_Type::Graphics,
+            .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
+            .image = m_g_buffer.target0,
+            .subresource_range = RT_DEFAULT_SUBRESOURCE_RANGE,
+            .discard = false
+        };
+        rhi::Image_Barrier_Info gbuffer_depth_barrier = {
+            .stage_before = rhi::Barrier_Pipeline_Stage::Late_Fragment_Tests,
+            .stage_after = rhi::Barrier_Pipeline_Stage::Early_Fragment_Tests,
+            .access_before = rhi::Barrier_Access::Depth_Stencil_Attachment_Write,
+            .access_after = rhi::Barrier_Access::Depth_Stencil_Attachment_Read,
+            .layout_before = rhi::Barrier_Image_Layout::Depth_Stencil_Write,
+            .layout_after = rhi::Barrier_Image_Layout::Depth_Stencil_Read_Only,
+            .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
+            .image = m_g_buffer.depth_stencil,
+            .subresource_range = RT_DEFAULT_SUBRESOURCE_RANGE,
+            .discard = false
+        };
+        auto barriers = std::to_array({
+            swapchain_layout_barrier,
+            ocean_color_barrier,
+            ocean_depth_barrier,
+            gbuffer_color_barrier,
+            gbuffer_depth_barrier });
         cmd->barrier({
             .buffer_barriers = {},
             .image_barriers = barriers,
@@ -232,6 +306,62 @@ void Renderer::on_resize(uint32_t width, uint32_t height) noexcept
 void Renderer::render_gbuffer_pass(rhi::Command_List* cmd)
 {
     cmd->begin_debug_region("GBuffer Pass", 1.f, .5f, 1.f);
+
+    rhi::Render_Pass_Color_Attachment_Info ocean_color_attachment_info = {
+        .attachment = m_g_buffer.target0,
+        .load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
+        .store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
+        .clear_value = {
+            .color = { 0.0f, 0.0f, 0.0f, 0.0f }
+        }
+    };
+    rhi::Render_Pass_Begin_Info render_pass_info = {
+        .color_attachments = { &ocean_color_attachment_info, 1 },
+        .depth_stencil_attachment = {
+            .attachment = m_g_buffer.depth_stencil,
+            .depth_load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
+            .depth_store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
+            .stencil_load_op = rhi::Render_Pass_Attachment_Load_Op::No_Access,
+            .stencil_store_op = rhi::Render_Pass_Attachment_Store_Op::No_Access,
+            .clear_value = {
+                .depth_stencil = { 1.0f, 0 }
+            }
+        }
+    };
+
+    cmd->begin_render_pass(render_pass_info);
+
+    auto& window_data = m_app.get_window().get_window_data();
+    auto scale = 1.f; // m_app.get_window().get_dpi_scale();
+    cmd->set_viewport(0.f, 0.f, float(window_data.width) * scale, float(window_data.height) * scale, 0.f, 1.f);
+    cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);
+
+    // TODO: TESTING
+    auto draw_pipeline = m_app.get_asset_repository().get_graphics_pipeline("basic_draw");
+    cmd->set_pipeline(draw_pipeline);
+    auto* model = m_app.get_asset_repository().get_model("Sponza.renmdl");
+    for (auto& instance : model->instances)
+    {
+        cmd->set_index_buffer(model->indices, rhi::Index_Type::U32);
+        for (auto i = instance.submeshes_range_start; i < instance.submeshes_range_end; ++i)
+        {
+            auto& submesh = model->submeshes[i];
+            auto index_count = submesh.index_range[1] - submesh.index_range[0];
+            cmd->set_push_constants<Immediate_Draw_Push_Constants>({
+                .position_buffer = model->vertex_positions->buffer_view->bindless_index,
+                .attribute_buffer = model->vertex_attributes->buffer_view->bindless_index,
+                .camera_buffer = m_camera_buffer,
+                .vertex_offset = submesh.vertex_position_range[0]
+            }, rhi::Pipeline_Bind_Point::Graphics);
+            cmd->draw_indexed(
+                index_count,
+                1,
+                submesh.index_range[0],
+                0,
+                0);
+        }
+    }
+    cmd->end_render_pass();
 
     cmd->end_debug_region();
 }
@@ -299,7 +429,11 @@ void Renderer::render_swapchain_pass(rhi::Command_List* cmd)
     cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);
 
     cmd->add_debug_marker("Ocean Composite", .5f, .5f, 1.f);
-    m_ocean_renderer.render_composite(cmd, m_ocean_rendertargets.color);
+    m_ocean_renderer.render_composite(cmd,
+        m_ocean_rendertargets.color,
+        m_ocean_rendertargets.depth_stencil,
+        m_g_buffer.target0,
+        m_g_buffer.depth_stencil);
 
     cmd->begin_debug_region("Debug Renderer", 1.f, .75f, .75f);
     m_ocean_renderer.debug_render_slope(cmd, m_camera_buffer);
@@ -331,7 +465,7 @@ void Renderer::init_rendertargets()
 
     rhi::Image_Create_Info gbuffer_ds_create_info = default_image_create_info;
     gbuffer_ds_create_info.format = rhi::Image_Format::D32_SFLOAT;
-    gbuffer_ds_create_info.usage = rhi::Image_Usage::Depth_Stencil_Attachment;
+    gbuffer_ds_create_info.usage = rhi::Image_Usage::Depth_Stencil_Attachment | rhi::Image_Usage::Sampled;
 
     m_g_buffer = {
         .target0 = m_resource_blackboard.create_image("gbuffer_color", gbuffer_target0_create_info),
@@ -344,7 +478,7 @@ void Renderer::init_rendertargets()
 
     rhi::Image_Create_Info ocean_ds_create_info = default_image_create_info;
     ocean_ds_create_info.format = rhi::Image_Format::D32_SFLOAT;
-    ocean_ds_create_info.usage = rhi::Image_Usage::Depth_Stencil_Attachment;
+    ocean_ds_create_info.usage = rhi::Image_Usage::Depth_Stencil_Attachment | rhi::Image_Usage::Sampled;
 
     m_ocean_rendertargets = {
         .color = m_resource_blackboard.create_image("ocean_color", ocean_color_create_info),

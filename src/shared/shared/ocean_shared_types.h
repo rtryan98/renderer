@@ -85,7 +85,10 @@ struct SHADER_STRUCT_ALIGN Ocean_Render_Patch_Push_Constants
 
 struct SHADER_STRUCT_ALIGN Ocean_Render_Composition_Push_Constants
 {
-    SHADER_HANDLE_TYPE rt_color_tex;
+    SHADER_HANDLE_TYPE ocean_color_tex;
+    SHADER_HANDLE_TYPE ocean_depth_tex;
+    SHADER_HANDLE_TYPE geom_color_tex;
+    SHADER_HANDLE_TYPE geom_depth_tex;
     SHADER_HANDLE_TYPE tex_sampler;
 };
 
