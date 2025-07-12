@@ -8,6 +8,10 @@
 #include <ankerl/unordered_dense.h>
 #include <mikktspace.h>
 #include <ranges>
+#include <stb_image.h>
+#include <stb_image_resize2.h>
+#include <vector>
+#include <xxhash.h>
 
 namespace asset_baker
 {
@@ -20,6 +24,26 @@ constexpr static auto GLTF_ATTRIBUTE_JOINTS_0 = "JOINTS_0";
 constexpr static auto GLTF_ATTRIBUTE_WEIGHTS_0 = "WEIGHTS_0";
 
 constexpr static auto NO_INDEX = ~0ull;
+
+template <typename T>
+std::string base_16_string(const T& input)
+{
+    constexpr static char TABLE[] = {
+        '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'A', 'B', 'C', 'D', 'E', 'F',
+    };
+    std::string result;
+    result.reserve(sizeof(T) * 2);
+    for (auto i = 0; i < sizeof(T); ++i)
+    {
+        const char data = reinterpret_cast<const char*>(&input)[i];
+        const char lower = (data & 0x0F) >> 0;
+        const char upper = (data & 0xF0) >> 4;
+        result.append(&TABLE[upper]);
+        result.append(&TABLE[lower]);
+    }
+    return result;
+};
 
 std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesystem::path& path)
 {
@@ -34,6 +58,7 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
     }
 
     constexpr auto options = fastgltf::Options::LoadExternalBuffers
+                           | fastgltf::Options::LoadExternalImages
                            | fastgltf::Options::GenerateMeshIndices
                            | fastgltf::Options::DecomposeNodeMatrices
                            | fastgltf::Options::DontRequireValidAssetMember;
@@ -48,13 +73,9 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
     result.materials.reserve(asset->materials.size());
     for (const auto& material : asset->materials)
     {
-        const auto mangle_uri = [&](const std::string& uri) -> std::string
-        {
-            if (uri.empty()) return "";
-            std::filesystem::path uri_path(uri);
-            return uri_path.stem().string() + serialization::TEXTURE_FILE_EXTENSION;
-        };
-        const auto get_uri = [&]<typename T>(const fastgltf::Optional<T>& texture_info_opt) -> std::string
+        const auto get_uri = [&]<typename T>(const fastgltf::Optional<T>& texture_info_opt,
+            bool squash,
+            rhi::Image_Format target_format) -> std::string
         {
             if (!texture_info_opt.has_value()) return "";
             const auto& texture_info = texture_info_opt.value();
@@ -63,29 +84,70 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
             const auto image_index = texture.imageIndex.value_or(NO_INDEX);
             if (image_index == NO_INDEX) return "";
             const auto& image = asset->images.at(image_index);
-            return std::visit(fastgltf::visitor{
-                [&](const fastgltf::sources::URI& file_path)
+
+            auto texture_name = path.stem().string() + ":" + std::string(image.name);
+
+            auto request = GLTF_Texture_Load_Request {
+                .squash_gb_to_rg = squash,
+                .name = texture_name,
+                .target_format = target_format,
+            };
+            request.data = std::visit(fastgltf::visitor{
+                [&](auto&)
                 {
-                    auto mangled_uri = mangle_uri(std::string(file_path.uri.string()));
-                    spdlog::trace("URI '{}' mangled to '{}'", file_path.uri.string(), mangled_uri);
-                    return mangled_uri;
+                    spdlog::warn("GLTF file '{}' has unsupported embedded image (.:unknown).", path.string());
+                    return std::vector<char>{};
+                },
+                [&](const fastgltf::sources::BufferView& buffer_view_ref)
+                {
+                    const auto& buffer_view = asset->bufferViews.at(buffer_view_ref.bufferViewIndex);
+                    const auto& buffer = asset->buffers.at(buffer_view.bufferIndex);
+                    return std::visit(fastgltf::visitor{
+                        [&](auto&)
+                        {
+                            spdlog::warn("GLTF file '{}' has unsupported embedded image (BufferView:unknown).", path.string());
+                            return std::vector<char>{};
+                        },
+                        [&](const fastgltf::sources::Array& vector)
+                        {
+                            std::vector<char> request_image_data;
+                            request_image_data.resize(vector.bytes.size());
+                            memcpy(request_image_data.data(), vector.bytes.data(), vector.bytes.size());
+                            return request_image_data;
+                        }
+                    }, buffer.data);
+                },
+                [&](const fastgltf::sources::URI&)
+                {
+                    spdlog::warn("GLTF file '{}' has unsupported embedded image (.:URI).", path.string());
+                    return std::vector<char>{};
                 },
                 [&](const fastgltf::sources::Array& vector)
                 {
-                    spdlog::debug("GLTF file '{}' uses unsupported embedded image data (Array).", path.string());
-                    return std::string("");
-                },
-                [&](const fastgltf::sources::BufferView& buffer_view)
-                {
-                    spdlog::debug("GLTF file '{}' uses unsupported embedded image data (BufferView).", path.string());
-                    return std::string("");
-                },
-                [&](const auto&)
-                {
-                    spdlog::debug("GLTF file '{}' uses unknown unsupported embedded image data (BufferView).", path.string());
-                    return std::string("");
-                } // no data
+                    std::vector<char> request_image_data;
+                    request_image_data.resize(vector.bytes.size());
+                    memcpy(request_image_data.data(), vector.bytes.data(), vector.bytes.size());
+                    return request_image_data;
+                }
             }, image.data);
+
+            if (request.data.empty())
+            {
+                spdlog::debug("GLTF file '{}' - texture '{}' has no data.", path.string(), texture_name);
+                return "";
+            }
+
+            const auto hash_base16 = base_16_string(XXH3_128bits(request.data.data(), request.data.size()));
+            hash_base16.copy(
+                request.hash_identifier,
+                std::min(serialization::HASH_IDENTIFIER_FIELD_SIZE, hash_base16.size()));
+
+            spdlog::trace("Mangled name of texture '{}' to '{}'",
+                texture_name,
+                std::string(request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE));
+
+            result.texture_load_requests.emplace_back(std::move(request));
+            return hash_base16 + serialization::TEXTURE_FILE_EXTENSION;
         };
 
         result.materials.emplace_back( GLTF_Material {
@@ -100,10 +162,22 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 material.emissiveFactor[2]
             }},
             .emissive_strength = material.emissiveStrength,
-            .albedo_uri = get_uri.template operator()<fastgltf::TextureInfo>(material.pbrData.baseColorTexture),
-            .normal_uri = get_uri.template operator()<fastgltf::NormalTextureInfo>(material.normalTexture),
-            .metallic_roughness_uri = get_uri.template operator()<fastgltf::TextureInfo>(material.pbrData.metallicRoughnessTexture),
-            .emissive_uri = get_uri.template operator()<fastgltf::TextureInfo>(material.emissiveTexture),
+            .albedo_uri = get_uri.template operator()<fastgltf::TextureInfo>(
+                material.pbrData.baseColorTexture,
+                false,
+                rhi::Image_Format::R8G8B8A8_SRGB),
+            .normal_uri = get_uri.template operator()<fastgltf::NormalTextureInfo>(
+                material.normalTexture,
+                false,
+                rhi::Image_Format::R8G8B8A8_UNORM),
+            .metallic_roughness_uri = get_uri.template operator()<fastgltf::TextureInfo>(
+                material.pbrData.metallicRoughnessTexture,
+                true,
+                rhi::Image_Format::R8G8_UNORM),
+            .emissive_uri = get_uri.template operator()<fastgltf::TextureInfo>(
+                material.emissiveTexture,
+                false,
+                rhi::Image_Format::R8G8B8A8_SRGB),
         });
     }
 
@@ -148,6 +222,15 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                     asset.get(),
                     indices,
                     mesh.indices.data());
+                for (auto i = 0; i < indices.count; i += 3)
+                {
+                    auto a = mesh.indices[i + 0];
+                    auto b = mesh.indices[i + 1];
+                    auto c = mesh.indices[i + 2];
+                    mesh.indices[i + 0] = c;
+                    mesh.indices[i + 1] = b;
+                    mesh.indices[i + 2] = a;
+                }
             }
 
             { // Attributes
@@ -155,15 +238,12 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 {
                     if (color_attribute != primitive.attributes.end())
                     {
-                        spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED COLORS.");
-                        return std::unexpected(GLTF_Error::Non_Supported_Accessor);
-
                         auto& colors = asset->accessors.at(color_attribute->accessorIndex);
                         mesh.colors.resize(colors.count);
                         fastgltf::copyFromAccessor<fastgltf::math::fvec4>(
                             asset.get(),
                             colors,
-                            mesh.indices.data());
+                            mesh.colors.data());
                     }
                 }
 
@@ -221,9 +301,6 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 {
                     if (joint_attribute != primitive.attributes.end())
                     {
-                        spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED JOINTS.");
-                        return std::unexpected(GLTF_Error::Non_Supported_Accessor);
-
                         auto& joints = asset->accessors.at(joint_attribute->accessorIndex);
                         mesh.joints.resize(joints.count);
                         fastgltf::copyFromAccessor<fastgltf::math::uvec4>(
@@ -237,9 +314,6 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 {
                     if (weights_attribute != primitive.attributes.end())
                     {
-                        spdlog::error("SKIPPING PROCESSING - NOT YET SUPPORTED WEIGHTS.");
-                        return std::unexpected(GLTF_Error::Non_Supported_Accessor);
-
                         auto& weights = asset->accessors.at(weights_attribute->accessorIndex);
                         mesh.weights.resize(weights.count);
                         fastgltf::copyFromAccessor<fastgltf::math::fvec4>(
@@ -249,7 +323,11 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                     }
                 }
 
-                if (mesh.tangents.size() == 0 && mesh.normals.size() > 0 && mesh.tex_coords.size() > 0)
+                if (mesh.tangents.size() == 0 &&                                // Mesh has no tangents
+                    mesh.normals.size() > 0 &&                                  // and it has normals
+                    mesh.tex_coords.size() > 0 &&                               // and texture coordinates
+                    mesh.material_index != NO_INDEX &&                          // and a material
+                    !result.materials[mesh.material_index].normal_uri.empty())  // that contains a normal map
                 {
                     spdlog::debug("GLTF file '{}' has no tangents and they need to be generated.", path.string());
 
@@ -357,6 +435,10 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                         spdlog::debug("Generated mikktspace tangents.");
                     }
                 }
+                else
+                {
+                    spdlog::debug("Mesh requires no tangents or cannot generate them.");
+                }
 
                 for (auto& position : mesh.positions)
                 {
@@ -429,6 +511,118 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
     return result;
 }
 
+std::vector<char> process_and_serialize_gltf_texture(const GLTF_Texture_Load_Request& request)
+{
+    int32_t x = 0, y = 0, comp = 0;
+    stbi_set_flip_vertically_on_load(true);
+    auto original_data = stbi_load_from_memory(
+        reinterpret_cast<const uint8_t*>(request.data.data()),
+        static_cast<int>(request.data.size()),
+        &x, &y, &comp,
+        4);
+    if (!original_data)
+    {
+        spdlog::error("Failed to load texture.");
+        return {};
+    }
+
+    const auto max_mips_x = std::countr_zero(static_cast<uint32_t>(x));
+    const auto max_mips_y = std::countr_zero(static_cast<uint32_t>(y));
+    const auto mip_level_count = std::max(std::min(max_mips_x, max_mips_y) + 1 - 2, 1);
+
+    serialization::Image_Data_00 image_data = {
+        .header = {
+            .magic = serialization::Image_Header::MAGIC,
+            .version = 1,
+        },
+        .mip_count = static_cast<uint32_t>(mip_level_count),
+        .format = request.target_format,
+    };
+    request.name.copy(image_data.name, std::min(request.name.size(), serialization::NAME_MAX_SIZE));
+    memcpy(image_data.hash_identifier, request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE);
+
+    std::vector<uint8_t> squashed_data;
+    if (request.squash_gb_to_rg)
+    {
+        squashed_data.resize(rhi::get_image_format_info(image_data.format).bytes * x * y);
+        spdlog::trace("squashing texture");
+        for (auto i = 0; i < x * y; i += 4)
+        {
+            squashed_data[i + 0] = original_data[i + 1];
+            squashed_data[i + 1] = original_data[i + 2];
+        }
+    }
+
+    std::vector<std::vector<uint8_t>> mip_image_data;
+    uint32_t image_data_size = 0;
+    for (auto i = 0; i < mip_level_count; ++i)
+    {
+        const uint32_t size_x = x >> i;
+        const uint32_t size_y = y >> i;
+
+        image_data.mips[i] = {
+            .width = size_x,
+            .height = size_y,
+        };
+
+        spdlog::trace("Generating mip {} with size w:{}, h:{}", i, size_x, size_y);
+
+        auto& mip_data = mip_image_data.emplace_back();
+
+        const auto data_size = size_x * size_y * rhi::get_image_format_info(image_data.format).bytes;
+        mip_data.resize(data_size);
+
+        if (i > 0)
+        {
+            if (request.squash_gb_to_rg)
+            {
+                stbir_resize_uint8_linear(
+                    squashed_data.data(), x, y, 0,
+                    mip_data.data(), size_x, size_y, 0,
+                    STBIR_2CHANNEL);
+            }
+            else
+            {
+                stbir_resize_uint8_srgb(
+                    original_data, x, y, 0,
+                    mip_data.data(), size_x, size_y, 0,
+                    STBIR_RGBA);
+            }
+        }
+        else
+        {
+            if (request.squash_gb_to_rg)
+            {
+                mip_data.assign(squashed_data.begin(), squashed_data.end());
+            }
+            else
+            {
+                memcpy(mip_data.data(), original_data, data_size);
+            }
+        }
+        image_data_size += data_size;
+    }
+
+    stbi_image_free(original_data);
+
+    std::vector<char> result;
+    result.resize(
+        sizeof(serialization::Image_Data_00)
+        + image_data_size);
+
+    spdlog::trace("Saving results. Image data size: {}, Total size: {}", image_data_size, result.size());
+
+    auto ptr = result.data();
+    memcpy(ptr, &image_data, sizeof(serialization::Image_Data_00));
+    auto* image_data_ptr = reinterpret_cast<serialization::Image_Data_00*>(ptr);
+    for (auto i = 0; i < image_data.mip_count; ++i)
+    {
+        memcpy(image_data_ptr->get_mip_data(i), mip_image_data[i].data(), mip_image_data[i].size());
+    }
+
+    return result;
+}
+
 std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf_model)
 {
     spdlog::debug("Serializing GLTF model '{}'.", name);
@@ -441,11 +635,9 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
     };
 
     // Name
-    spdlog::trace("Serializing name.");
     name.copy(serialized_model.name, std::min(name.length(), serialization::NAME_MAX_SIZE));
 
     // URI references
-    spdlog::trace("Serializing URI references.");
     std::vector<serialization::URI_Reference_00> uri_references;
     ankerl::unordered_dense::map<std::string, uint32_t> mapped_uris;
     {
@@ -476,7 +668,6 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
     serialized_model.referenced_uri_count = static_cast<uint32_t>(uri_references.size());
 
     // materials
-    spdlog::trace("Serializing materials.");
     std::vector<serialization::Mesh_Material_00> materials;
     materials.reserve(gltf_model.materials.size());
     for (const auto& material : gltf_model.materials)
@@ -509,7 +700,6 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
     serialized_model.material_count = static_cast<uint32_t>(materials.size());
 
     // instances
-    spdlog::trace("Serializing instances.");
     std::vector<serialization::Mesh_Instance_00> instances;
     instances.reserve(gltf_model.instances.size());
     for (const auto& instance : gltf_model.instances)
@@ -535,13 +725,11 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
     serialized_model.instance_count = static_cast<uint32_t>(instances.size());
 
     // submeshes and ranges
-    spdlog::trace("Serializing submeshes and ranges.");
     std::vector<serialization::Submesh_Data_Ranges_00> mesh_data_ranges;
     std::vector<std::array<float, 3>> mesh_positions;
     std::vector<uint32_t> mesh_indices;
     std::vector<serialization::Vertex_Attributes> mesh_attributes;
     std::vector<serialization::Vertex_Skin_Attributes> mesh_skin_attributes;
-    // std::vector<uint32_t> mesh_attribute_data;
 
     for (const auto& submesh : gltf_model.submeshes)
     {
@@ -647,79 +835,6 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
             .index_range_start = static_cast<uint32_t>(current_mesh_indices_count),
             .index_range_end = static_cast<uint32_t>(new_mesh_indices_count),
         });
-
-        /*
-
-        spdlog::trace("copying positions");
-        auto mesh_position_data = reinterpret_cast<char*>(&mesh_positions.data()[current_mesh_position_count]);
-        memcpy(mesh_position_data,
-            submesh.positions.data(),
-            submesh.positions.size() * sizeof(float) * 3);
-
-        spdlog::trace("copying indices");
-        auto mesh_indices_data = reinterpret_cast<char*>(&mesh_indices.data()[current_mesh_indices_count]);
-        memcpy(mesh_indices_data,
-            submesh.indices.data(),
-            submesh.indices.size() * sizeof(uint32_t));
-
-        serialization::Attribute_Flags attribute_flags = {};
-        auto add_flag = [&](const auto& data, auto flag)
-        {
-            attribute_flags = attribute_flags | (data.size() > 0 ? flag : serialization::Attribute_Flags::None);
-        };
-        add_flag(submesh.colors, serialization::Attribute_Flags::Color);
-        add_flag(submesh.normals, serialization::Attribute_Flags::Normal);
-        add_flag(submesh.tangents, serialization::Attribute_Flags::Tangent);
-        add_flag(submesh.tex_coords, serialization::Attribute_Flags::Tex_Coords);
-        add_flag(submesh.joints, serialization::Attribute_Flags::Joints);
-        add_flag(submesh.weights, serialization::Attribute_Flags::Weights);
-
-        auto current_mesh_attribute_start = mesh_attribute_data.size();
-        std::size_t current_mesh_attribute_count = serialization::calculate_total_attribute_size(attribute_flags);
-        auto current_mesh_attribute_end = current_mesh_attribute_start + current_mesh_attribute_count * submesh.positions.size();
-        mesh_attribute_data.resize(current_mesh_attribute_end);
-
-        spdlog::trace("copying attributes");
-        if (current_mesh_attribute_count > 0)
-        {
-            spdlog::trace("pos: {}", submesh.positions.size());
-            spdlog::trace("col: {}", submesh.colors.size());
-            spdlog::trace("nrm: {}", submesh.normals.size());
-            spdlog::trace("tan: {}", submesh.tangents.size());
-            spdlog::trace("uvs: {}", submesh.tex_coords.size());
-            spdlog::trace("jnt: {}", submesh.joints.size());
-            spdlog::trace("wgt: {}", submesh.weights.size());
-
-            auto* ptr = &mesh_attribute_data[current_mesh_attribute_start];
-            for (auto i = 0; i < submesh.positions.size(); ++i)
-            {
-                auto add_element = [&]<typename T, std::size_t N>(const std::vector<std::array<T, N>>& data)
-                {
-                    if (data.size() > 0)
-                    {
-                        memcpy(ptr, &data[i], N * sizeof(uint32_t));
-                        ptr += N;
-                    }
-                };
-                add_element(submesh.colors);
-                add_element(submesh.normals);
-                add_element(submesh.tangents);
-                add_element(submesh.tex_coords);
-                add_element(submesh.joints);
-                add_element(submesh.weights);
-            }
-        }
-
-        mesh_data_ranges.emplace_back( serialization::Submesh_Data_Ranges_00 {
-            .material_index = static_cast<uint32_t>(submesh.material_index),
-            .vertex_position_range_start = static_cast<uint32_t>(current_mesh_position_count),
-            .vertex_position_range_end = static_cast<uint32_t>(new_mesh_position_count),
-            .vertex_attribute_range_start = static_cast<uint32_t>(current_mesh_attribute_start),
-            .vertex_attribute_range_end = static_cast<uint32_t>(current_mesh_attribute_end),
-            .index_range_start = static_cast<uint32_t>(current_mesh_indices_count),
-            .index_range_end = static_cast<uint32_t>(new_mesh_indices_count),
-        });
-        */
     }
     serialized_model.submesh_count = static_cast<uint32_t>(mesh_data_ranges.size());
     serialized_model.vertex_position_count = static_cast<uint32_t>(mesh_positions.size());

@@ -23,19 +23,50 @@ void process_gltf(const Asset_Bake_Context& context, const std::filesystem::path
     auto gltf = process_gltf_from_file(input_file);
     if (gltf.has_value())
     {
-        const auto serialized_model = serialize_gltf_model(input_file.filename().string(), gltf.value());
-        const auto outfile_path = (context.output_directory / input_file.stem()).string() + serialization::MODEL_FILE_EXTENSION;
-        if (!std::filesystem::exists(outfile_path))
         {
-            spdlog::info("Directory '{}' does not exist, creating it.", context.output_directory.string());
-            std::filesystem::create_directory(context.output_directory);
+            const auto serialized_model = serialize_gltf_model(input_file.filename().string(), gltf.value());
+            const auto outfile_path = (context.output_directory / input_file.stem()).string() + serialization::MODEL_FILE_EXTENSION;
+            if (!std::filesystem::exists(outfile_path))
+            {
+                spdlog::info("Directory '{}' does not exist, creating it.", context.output_directory.string());
+                std::filesystem::create_directory(context.output_directory);
+            }
+            std::ofstream outfile(outfile_path, std::ios::binary | std::ios::out);
+            outfile.write(serialized_model.data(), serialized_model.size());
+            outfile.close();
+            spdlog::info("Successfully processed GLTF file '{}' and written it to '{}'",
+                input_file.string(),
+                outfile_path);
         }
-        std::ofstream outfile(outfile_path, std::ios::binary | std::ios::out);
-        outfile.write(serialized_model.data(), serialized_model.size());
-        outfile.close();
-        spdlog::info("Successfully processed GLTF file '{}' and written it to '{}'",
-            input_file.string(),
-            outfile_path);
+
+        spdlog::debug("Processing textures.");
+
+        for (auto& request : gltf.value().texture_load_requests)
+        {
+            spdlog::info("Processing texture '{}' with hash '{}'",
+                request.name,
+                std::string(request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE));
+
+            auto texture_data = process_and_serialize_gltf_texture(request);
+
+            if (texture_data.empty())
+            {
+                spdlog::debug("Skipping texture write");
+                continue;
+            }
+
+            const auto outfile_path = (context.output_directory
+                / std::string(request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE)).string()
+                + serialization::TEXTURE_FILE_EXTENSION;
+
+            std::ofstream outfile(outfile_path, std::ios::binary | std::ios::out);
+            outfile.write(texture_data.data(), texture_data.size());
+            outfile.close();
+
+            spdlog::info("Successfully processed texture of GLTF file '{}' and written it to '{}'",
+                input_file.string(),
+                outfile_path);
+        }
     }
     else
     {

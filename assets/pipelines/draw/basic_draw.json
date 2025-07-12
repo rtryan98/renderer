@@ -16,5 +16,8 @@
         "depth_enable": true,
         "depth_write_enable": true,
         "comparison_func": "Less"
+    },
+    "rasterizer_state": {
+        "cull_mode": "Back"
     }
 }

@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <vector>
 #include <expected>
+#include <rhi/resource.hpp>
 
 namespace asset_baker
 {
@@ -57,13 +58,24 @@ struct GLTF_Material
     std::string emissive_uri;
 };
 
+struct GLTF_Texture_Load_Request
+{
+    std::vector<char> data;
+    bool squash_gb_to_rg;
+    std::string name;
+    char hash_identifier[32ull]; // serialization::HASH_IDENTIFIER_FIELD_SIZE
+    rhi::Image_Format target_format;
+};
+
 struct GLTF_Model
 {
     std::vector<GLTF_Material> materials;
     std::vector<GLTF_Submesh> submeshes;
     std::vector<GLTF_Mesh_Instance> instances;
+    std::vector<GLTF_Texture_Load_Request> texture_load_requests;
 };
 
 std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesystem::path& path);
+std::vector<char> process_and_serialize_gltf_texture(const GLTF_Texture_Load_Request& request);
 std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf_model);
 }

@@ -53,7 +53,14 @@ Asset_Repository::Asset_Repository(
 }
 
 Asset_Repository::~Asset_Repository()
-{}
+{
+    for (auto& model : m_models)
+    {
+        m_graphics_device->destroy_buffer(model.indices);
+        m_graphics_device->destroy_buffer(model.vertex_positions);
+        m_graphics_device->destroy_buffer(model.vertex_attributes);
+    }
+}
 
 rhi::Shader_Blob* Asset_Repository::get_shader_blob(const std::string_view& name, const std::string_view& variant) const
 {
@@ -1095,15 +1102,15 @@ void Asset_Repository::load_model(const std::filesystem::path& path)
                 .heap = rhi::Memory_Heap_Type::GPU
             };
             model.vertex_positions = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-            m_graphics_device->name_resource(model.vertex_positions, (model_identifier + ":position").c_str());
+            m_graphics_device->name_resource(model.vertex_positions, (std::string("gltf:") + model_identifier + ":position").c_str());
 
             buffer_create_info.size = header->vertex_attribute_count * sizeof(serialization::Vertex_Attributes);
             model.vertex_attributes = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-            m_graphics_device->name_resource(model.vertex_attributes, (model_identifier + ":attributes").c_str());
+            m_graphics_device->name_resource(model.vertex_attributes, (std::string("gltf:") + model_identifier + ":attributes").c_str());
 
             buffer_create_info.size = header->index_count * sizeof(uint32_t);
             model.indices = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-            m_graphics_device->name_resource(model.indices, (model_identifier + ":indices").c_str());
+            m_graphics_device->name_resource(model.indices, (std::string("gltf:") + model_identifier + ":indices").c_str());
         }
 
         auto* referenced_uris = header->get_referenced_uris();

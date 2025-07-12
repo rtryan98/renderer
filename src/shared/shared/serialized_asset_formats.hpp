@@ -26,9 +26,59 @@ namespace serialization
 {
 constexpr static auto NAME_MAX_SIZE = 159ull;
 constexpr static auto NAME_FIELD_SIZE = NAME_MAX_SIZE + 1ull;
+constexpr static auto HASH_IDENTIFIER_FIELD_SIZE = 32ull;
+constexpr static auto TEXTURE_MAX_MIP_LEVELS = 14;
 
 constexpr static auto MODEL_FILE_EXTENSION = ".renmdl"; // renderer model container
 constexpr static auto TEXTURE_FILE_EXTENSION = ".rentex"; // renderer texture container
+
+struct Image_Mip_Data
+{
+    uint32_t width;
+    uint32_t height;
+    void* data;
+};
+
+struct Image_Header
+{
+    constexpr static uint32_t MAGIC = 0x58455452u; // RTEX
+
+    // can't directly set value, otherwise no longer trivial type
+    uint32_t magic;
+    uint32_t version;
+
+    bool validate()
+    {
+        return magic == MAGIC && version == 1;
+    }
+};
+
+struct Image_Mip_Metadata
+{
+    uint32_t width;
+    uint32_t height;
+};
+
+struct Image_Data_00
+{
+    Image_Header header;
+    uint32_t mip_count;
+    rhi::Image_Format format;
+    char name[NAME_FIELD_SIZE];
+    char hash_identifier[HASH_IDENTIFIER_FIELD_SIZE];
+    Image_Mip_Metadata mips[TEXTURE_MAX_MIP_LEVELS];
+
+    char* get_mip_data(const uint32_t mip_level)
+    {
+        auto ptr = reinterpret_cast<char*>(this);
+        ptr += sizeof(Image_Data_00);
+        for (uint32_t i = 0; i < mip_level; ++i)
+        {
+            ptr += rhi::get_image_format_info(format).bytes * mips[i].width * mips[i].height;
+        }
+        return ptr;
+    }
+};
 
 struct Vertex_Attributes
 {

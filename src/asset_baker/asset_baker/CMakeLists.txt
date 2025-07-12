@@ -3,4 +3,5 @@ target_sources(
     gltf_loader.cpp
     gltf_loader.hpp
     main.cpp
+    stb_impl.cpp
 )

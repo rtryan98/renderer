@@ -24,6 +24,7 @@ target_include_directories(
     src/shared
     thirdparty/spdlog/include
     thirdparty/tclap/include
+    thirdparty/stb
 )
 set_target_properties(
     asset_baker PROPERTIES
