@@ -42,4 +42,9 @@ struct Model
     rhi::Buffer* indices;
 };
 
+struct Texture
+{
+    rhi::Image* image;
+};
+
 }

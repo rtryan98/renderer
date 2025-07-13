@@ -38,7 +38,7 @@ public:
     [[nodiscard]] Asset_Repository& get_asset_repository() const { return *m_asset_repository; }
 
     void upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, uint64_t size, uint64_t offset) noexcept;
-
+    void upload_image_data_immediate_full(rhi::Image* image, void** data) noexcept;
 
 private:
     struct Frame
@@ -56,6 +56,12 @@ private:
         rhi::Buffer* dst;
         uint64_t offset;
         uint64_t size;
+    };
+
+    struct Image_Staging_Info
+    {
+        rhi::Buffer* src;
+        rhi::Image* dst;
     };
 
     std::string init_asset_path() const;
@@ -81,6 +87,7 @@ private:
     std::array<Frame, FRAME_IN_FLIGHT_COUNT> m_frames;
     std::array<std::vector<rhi::Buffer*>, FRAME_IN_FLIGHT_COUNT> m_staging_buffers;
     std::array<std::vector<Buffer_Staging_Info>, FRAME_IN_FLIGHT_COUNT> m_buffer_staging_infos;
+    std::array<std::vector<Image_Staging_Info>, FRAME_IN_FLIGHT_COUNT> m_image_staging_infos;
     uint64_t m_frame_counter;
     std::unique_ptr<Asset_Repository> m_asset_repository;
     std::unique_ptr<Render_Resource_Blackboard> m_resource_blackboard;

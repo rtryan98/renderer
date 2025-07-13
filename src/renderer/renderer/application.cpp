@@ -150,6 +150,39 @@ void Application::upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, 
         .size = size });
 }
 
+void Application::upload_image_data_immediate_full(rhi::Image* image, void** data) noexcept
+{
+    const auto byte_size = rhi::get_image_format_info(image->format).bytes;
+    std::size_t size = 0;
+    for (auto i = 0; i < image->mip_levels; ++i)
+    {
+        size += byte_size * (image->width / (1 << i)) * (image->height / (1 << i));
+    }
+
+    auto& staging_buffers = m_staging_buffers[m_frame_counter % FRAME_IN_FLIGHT_COUNT];
+    rhi::Buffer_Create_Info buffer_info = {
+        .size = std::max(4ull, size),
+        .heap = rhi::Memory_Heap_Type::CPU_Upload
+    };
+    auto staging_buffer = m_device->create_buffer(buffer_info).value_or(nullptr);
+
+    std::size_t offset = 0;
+    for (auto i = 0; i < image->mip_levels; ++i)
+    {
+        std::size_t current_size = byte_size * (image->width / (1 << i)) * (image->height / (1 << i));
+        if (i > 0)
+        {
+            offset += byte_size * (image->width / (1 << (i - 1))) * (image->height / (1 << (i - 1)));
+        }
+        memcpy(&static_cast<char*>(staging_buffer->data)[offset], data[i], current_size);
+    }
+
+    staging_buffers.push_back(staging_buffer);
+    m_image_staging_infos[m_frame_counter % FRAME_IN_FLIGHT_COUNT].push_back({
+        .src = staging_buffer,
+        .dst = image });
+}
+
 std::string Application::init_asset_path() const
 {
     auto dir = std::filesystem::path();
@@ -182,6 +215,7 @@ void Application::setup_frame(Frame& frame) noexcept
     {
         auto last_frame_in_flight = (m_frame_counter - FRAME_IN_FLIGHT_COUNT) % FRAME_IN_FLIGHT_COUNT;
         m_buffer_staging_infos[last_frame_in_flight].clear();
+        m_image_staging_infos[last_frame_in_flight].clear();
         for (auto staging_buffer : m_staging_buffers[last_frame_in_flight])
         {
             m_device->destroy_buffer(staging_buffer);
@@ -218,9 +252,89 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
 
 rhi::Command_List* Application::handle_immediate_uploads(Frame& frame) noexcept
 {
-    auto upload_cmd = frame.graphics_command_pool->acquire_command_list();
+    const auto upload_cmd = frame.graphics_command_pool->acquire_command_list();
+    const auto frame_idx = m_frame_counter % FRAME_IN_FLIGHT_COUNT;
+    std::vector<rhi::Image_Barrier_Info> image_barriers_before;
+    std::vector<rhi::Image_Barrier_Info> image_barriers_after;
+    image_barriers_before.reserve(m_image_staging_infos[frame_idx].size());
+    image_barriers_after.reserve(m_image_staging_infos[frame_idx].size());
+    for (const auto& image_staging_info : m_image_staging_infos[frame_idx])
+    {
+        image_barriers_before.emplace_back( rhi::Image_Barrier_Info {
+            .stage_before = rhi::Barrier_Pipeline_Stage::None,
+            .stage_after = rhi::Barrier_Pipeline_Stage::Copy,
+            .access_before = rhi::Barrier_Access::None,
+            .access_after = rhi::Barrier_Access::Transfer_Write,
+            .layout_before = rhi::Barrier_Image_Layout::Undefined,
+            .layout_after = rhi::Barrier_Image_Layout::Copy_Dst,
+            .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
+            .image = image_staging_info.dst,
+            .subresource_range = {
+                .first_mip_level = 0,
+                .mip_count = image_staging_info.dst->mip_levels,
+                .first_array_index = 0,
+                .array_size = image_staging_info.dst->array_size,
+                .first_plane = 0,
+                .plane_count = 1
+            },
+            .discard = true
+        });
+        image_barriers_after.emplace_back( rhi::Image_Barrier_Info {
+            .stage_before = rhi::Barrier_Pipeline_Stage::Copy,
+            .stage_after = rhi::Barrier_Pipeline_Stage::All_Commands,
+            .access_before = rhi::Barrier_Access::Transfer_Write,
+            .access_after = rhi::Barrier_Access::Shader_Read,
+            .layout_before = rhi::Barrier_Image_Layout::Copy_Dst,
+            .layout_after = rhi::Barrier_Image_Layout::Shader_Read_Only,
+            .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
+            .image = image_staging_info.dst,
+            .subresource_range = {
+                .first_mip_level = 0,
+                .mip_count = image_staging_info.dst->mip_levels,
+                .first_array_index = 0,
+                .array_size = image_staging_info.dst->array_size,
+                .first_plane = 0,
+                .plane_count = 1
+            },
+            .discard = false
+        });
+    }
+    if (image_barriers_before.size() > 0)
+    {
+        upload_cmd->barrier({
+            .image_barriers = image_barriers_before
+            });
+    }
 
-    for (auto& buffer_staging_info : m_buffer_staging_infos[m_frame_counter % FRAME_IN_FLIGHT_COUNT])
+    // TODO: this is temporary and will be reworked when uploads are moved to the copy queue
+    for (const auto& image_staging_info : m_image_staging_infos[frame_idx])
+    {
+        std::size_t offset = 0;
+        for (auto i = 0; i < image_staging_info.dst->mip_levels; ++i)
+        {
+            const auto byte_size = rhi::get_image_format_info(image_staging_info.dst->format).bytes;
+            const auto width = image_staging_info.dst->width / (1 << i);
+            const auto height = image_staging_info.dst->height / (1 << i);
+            if (i > 0)
+            {
+                offset += byte_size * (image_staging_info.dst->width / (1 << (i - 1))) * (image_staging_info.dst->height / (1 << (i - 1)));
+            }
+            upload_cmd->copy_buffer_to_image(
+                image_staging_info.src,
+                offset,
+                image_staging_info.dst,
+                {},
+                {
+                .x = width,
+                .y = height,
+                .z = 1
+                },
+                i,
+                0);
+        }
+    }
+
+    for (const auto& buffer_staging_info : m_buffer_staging_infos[frame_idx])
     {
         upload_cmd->copy_buffer(
             buffer_staging_info.src,
@@ -236,7 +350,8 @@ rhi::Command_List* Application::handle_immediate_uploads(Frame& frame) noexcept
         .access_after = rhi::Barrier_Access::Shader_Read
     };
     rhi::Barrier_Info barrier = {
-        .memory_barriers = { &mem_barrier, 1 }
+        .image_barriers = image_barriers_after,
+        .memory_barriers = { &mem_barrier, 1 },
     };
     upload_cmd->barrier(barrier);
     return upload_cmd;

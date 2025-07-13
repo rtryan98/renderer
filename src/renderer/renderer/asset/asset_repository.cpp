@@ -49,6 +49,7 @@ Asset_Repository::Asset_Repository(
 
     create_shader_and_compute_libraries();
     create_graphics_pipeline_libraries();
+    load_textures();
     load_models();
 }
 
@@ -1052,12 +1053,75 @@ void Asset_Repository::create_graphics_pipeline_libraries()
     }
 }
 
+void Asset_Repository::load_textures()
+{
+    auto directory = std::filesystem::path(m_paths.models);
+    for (auto& directory_entry : std::filesystem::recursive_directory_iterator(directory))
+    {
+        if (directory_entry.path().extension() == serialization::TEXTURE_FILE_EXTENSION)
+        {
+            m_logger->debug("Loading texture '{}'", directory_entry.path().string());
+            load_texture(directory_entry.path());
+        }
+    }
+}
+
+void Asset_Repository::load_texture(const std::filesystem::path& path)
+{
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file.is_open())
+    {
+        m_logger->error("Failed to open file '{}'", path.string());
+        return;
+    }
+    const std::streamsize stream_size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    std::vector<char> buffer(stream_size);
+    if (file.read(buffer.data(), stream_size))
+    {
+        auto* header = reinterpret_cast<serialization::Image_Header*>(buffer.data());
+        if (!header->validate())
+        {
+            m_logger->error("Failed to validate image '{}'", path.string());
+            file.close();
+            return;
+        }
+
+        auto* data = reinterpret_cast<serialization::Image_Data_00*>(buffer.data());
+
+        auto texture_identifier = path.filename().string();
+        if (!m_texture_ptrs.contains(texture_identifier))
+        {
+            m_texture_ptrs[texture_identifier] = m_textures.acquire();
+        }
+        auto& texture = *m_texture_ptrs.at(texture_identifier);
+        rhi::Image_Create_Info create_info = {
+            .format = data->format,
+            .width = data->mips[0].width,
+            .height = data->mips[0].height,
+            .depth = 1,
+            .array_size = 1,
+            .mip_levels = static_cast<uint16_t>(data->mip_count),
+            .usage = rhi::Image_Usage::Sampled,
+            .primary_view_type = rhi::Image_View_Type::Texture_2D
+        };
+        texture.image = m_graphics_device->create_image(create_info).value_or(nullptr);
+        m_graphics_device->name_resource(texture.image, (std::string("texture:") + data->name).c_str());
+        std::array<void*, 14> mip_data_ptrs;
+        for (uint32_t i = 0; i < texture.image->mip_levels; ++i)
+        {
+            mip_data_ptrs[i] = data->get_mip_data(i);
+        }
+        m_app.upload_image_data_immediate_full(texture.image, mip_data_ptrs.data());
+    }
+}
+
 void Asset_Repository::load_models()
 {
     auto directory = std::filesystem::path(m_paths.models);
     for (auto& directory_entry : std::filesystem::recursive_directory_iterator(directory))
     {
-        if (directory_entry.path().extension() == ".renmdl")
+        if (directory_entry.path().extension() == serialization::MODEL_FILE_EXTENSION)
         {
             m_logger->debug("Loading model '{}'", directory_entry.path().string());
             load_model(directory_entry.path());
@@ -1078,6 +1142,14 @@ void Asset_Repository::load_model(const std::filesystem::path& path)
     std::vector<char> buffer(stream_size);
     if (file.read(buffer.data(), stream_size))
     {
+        serialization::Model_Header* file_header = reinterpret_cast<serialization::Model_Header*>(buffer.data());
+        if (!file_header->validate())
+        {
+            m_logger->error("Failed to validate model '{}'", path.string());
+            file.close();
+            return;
+        }
+
         auto model_identifier = path.filename().string();
         if (!m_model_ptrs.contains(model_identifier))
         {
@@ -1085,13 +1157,6 @@ void Asset_Repository::load_model(const std::filesystem::path& path)
         }
         auto& model = *m_model_ptrs.at(model_identifier);
 
-        serialization::Model_Header* file_header = reinterpret_cast<serialization::Model_Header*>(buffer.data());
-        if (!file_header->validate())
-        {
-            m_logger->error("Failed to validate file '{}'", path.string());
-            file.close();
-            return;
-        }
         serialization::Model_Header_00* header = reinterpret_cast<serialization::Model_Header_00*>(buffer.data());
         m_logger->info("Loading model '{}'", header->name);
 

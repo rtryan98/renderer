@@ -519,7 +519,7 @@ std::vector<char> process_and_serialize_gltf_texture(const GLTF_Texture_Load_Req
         reinterpret_cast<const uint8_t*>(request.data.data()),
         static_cast<int>(request.data.size()),
         &x, &y, &comp,
-        4);
+        STBI_rgb_alpha);
     if (!original_data)
     {
         spdlog::error("Failed to load texture.");
@@ -546,10 +546,13 @@ std::vector<char> process_and_serialize_gltf_texture(const GLTF_Texture_Load_Req
     {
         squashed_data.resize(rhi::get_image_format_info(image_data.format).bytes * x * y);
         spdlog::trace("squashing texture");
-        for (auto i = 0; i < x * y; i += 4)
+        for (auto i = 0; i < y; ++i)
         {
-            squashed_data[i + 0] = original_data[i + 1];
-            squashed_data[i + 1] = original_data[i + 2];
+            for (auto j = 0; j < x; ++j)
+            {
+                squashed_data[(i * x + j) * 2 + 0] = original_data[(i * x + j) * 4 + 1];
+                squashed_data[(i * x + j) * 2 + 1] = original_data[(i * x + j) * 4 + 2];
+            }
         }
     }
 
@@ -574,17 +577,18 @@ std::vector<char> process_and_serialize_gltf_texture(const GLTF_Texture_Load_Req
 
         if (i > 0)
         {
+            auto& last_mip_data = mip_image_data[i - 1];
             if (request.squash_gb_to_rg)
             {
                 stbir_resize_uint8_linear(
-                    squashed_data.data(), x, y, 0,
+                    last_mip_data.data(), size_x << 1, size_y << 1, 0,
                     mip_data.data(), size_x, size_y, 0,
                     STBIR_2CHANNEL);
             }
             else
             {
                 stbir_resize_uint8_srgb(
-                    original_data, x, y, 0,
+                    last_mip_data.data(), size_x << 1, size_y << 1, 0,
                     mip_data.data(), size_x, size_y, 0,
                     STBIR_RGBA);
             }

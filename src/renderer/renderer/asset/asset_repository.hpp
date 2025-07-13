@@ -49,6 +49,9 @@ private:
     void create_shader_and_compute_libraries();
     void create_graphics_pipeline_libraries();
 
+    void load_textures();
+    void load_texture(const std::filesystem::path& path);
+
     void load_models();
     void load_model(const std::filesystem::path& path);
 
@@ -79,5 +82,8 @@ private:
 
     String_Map<Model*> m_model_ptrs = {};
     rhi::Array_Vector<Model, ARRAY_VECTOR_SIZE> m_models = {};
+
+    String_Map<Texture*> m_texture_ptrs = {};
+    rhi::Array_Vector<Texture, ARRAY_VECTOR_SIZE> m_textures = {};
 };
 }
