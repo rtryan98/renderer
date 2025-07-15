@@ -25,3 +25,9 @@
 [submodule "thirdparty/stb"]
 	path = thirdparty/stb
 	url = https://github.com/nothings/stb
+[submodule "thirdparty/gltf-sample-assets"]
+	path = thirdparty/gltf-sample-assets
+	url = https://github.com/KhronosGroup/glTF-Sample-Assets
+[submodule "thirdparty/enkiTS"]
+	path = thirdparty/enkiTS
+	url = https://github.com/dougbinks/enkiTS

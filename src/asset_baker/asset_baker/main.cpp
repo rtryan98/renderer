@@ -5,6 +5,7 @@
 #include "asset_baker/gltf_loader.hpp"
 #include <fstream>
 #include <shared/serialized_asset_formats.hpp>
+#include <TaskScheduler.h>
 
 namespace asset_baker
 {
@@ -14,9 +15,10 @@ struct Asset_Bake_Context
     std::filesystem::path input_directory;
     std::filesystem::path output_directory;
     // bool use_cache;
+    enki::TaskScheduler task_scheduler;
 };
 
-void process_gltf(const Asset_Bake_Context& context, const std::filesystem::path& input_file)
+void process_gltf(Asset_Bake_Context& context, const std::filesystem::path& input_file)
 {
     spdlog::info("Processing GLTF file '{}'", input_file.string());
     // TODO: check cache
@@ -32,7 +34,7 @@ void process_gltf(const Asset_Bake_Context& context, const std::filesystem::path
                 std::filesystem::create_directory(context.output_directory);
             }
             std::ofstream outfile(outfile_path, std::ios::binary | std::ios::out);
-            outfile.write(serialized_model.data(), serialized_model.size());
+            outfile.write(serialized_model.data(), static_cast<std::streamsize>(serialized_model.size()));
             outfile.close();
             spdlog::info("Successfully processed GLTF file '{}' and written it to '{}'",
                 input_file.string(),
@@ -41,32 +43,41 @@ void process_gltf(const Asset_Bake_Context& context, const std::filesystem::path
 
         spdlog::debug("Processing textures.");
 
+        std::vector<std::unique_ptr<enki::TaskSet>> tasks;
+        tasks.reserve(gltf.value().texture_load_requests.size());
         for (auto& request : gltf.value().texture_load_requests)
         {
-            spdlog::info("Processing texture '{}' with hash '{}'",
-                request.name,
-                std::string(request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE));
+            auto& task = tasks.emplace_back(std::make_unique<enki::TaskSet>(
+                1,
+                [&](enki::TaskSetPartition range, uint32_t thread_idx)
+                {
+                    spdlog::info("Processing texture '{}' with hash '{}'",
+                        request.name,
+                        std::string(request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE));
 
-            auto texture_data = process_and_serialize_gltf_texture(request);
+                    auto texture_data = process_and_serialize_gltf_texture(request);
 
-            if (texture_data.empty())
-            {
-                spdlog::debug("Skipping texture write");
-                continue;
-            }
+                    if (texture_data.empty())
+                    {
+                        spdlog::debug("Skipping texture write");
+                        return;
+                    }
 
-            const auto outfile_path = (context.output_directory
-                / std::string(request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE)).string()
-                + serialization::TEXTURE_FILE_EXTENSION;
+                    const auto outfile_path = (context.output_directory
+                        / std::string(request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE)).string()
+                        + serialization::TEXTURE_FILE_EXTENSION;
 
-            std::ofstream outfile(outfile_path, std::ios::binary | std::ios::out);
-            outfile.write(texture_data.data(), texture_data.size());
-            outfile.close();
+                    std::ofstream outfile(outfile_path, std::ios::binary | std::ios::out);
+                    outfile.write(texture_data.data(), static_cast<std::streamsize>(texture_data.size()));
+                    outfile.close();
 
-            spdlog::info("Successfully processed texture of GLTF file '{}' and written it to '{}'",
-                input_file.string(),
-                outfile_path);
+                    spdlog::info("Successfully processed texture of GLTF file '{}' and written it to '{}'",
+                        input_file.string(),
+                        outfile_path);
+                }));
+            context.task_scheduler.AddTaskSetToPipe(task.get());
         }
+        context.task_scheduler.WaitforAll();
     }
     else
     {
@@ -84,7 +95,7 @@ void process_gltf(const Asset_Bake_Context& context, const std::filesystem::path
     }
 }
 
-void process_file(const Asset_Bake_Context& context, const std::filesystem::path& input_file)
+void process_file(Asset_Bake_Context& context, const std::filesystem::path& input_file)
 {
     if (input_file.extension() == ".gltf")
     {
@@ -92,7 +103,7 @@ void process_file(const Asset_Bake_Context& context, const std::filesystem::path
     }
 }
 
-void process_files(const Asset_Bake_Context& context)
+void process_files(Asset_Bake_Context& context)
 {
     for (const auto& directory_entry : std::filesystem::recursive_directory_iterator(context.input_directory))
     {
@@ -143,11 +154,13 @@ int32_t main(const int32_t argc, char** argv) try
 
     spdlog::set_level(static_cast<spdlog::level::level_enum>(log_level_arg.getValue()));
 
-    const asset_baker::Asset_Bake_Context asset_bake_context = {
+    asset_baker::Asset_Bake_Context asset_bake_context = {
         .input_directory = input_directory_arg.getValue(),
         .output_directory = output_directory_arg.getValue(),
     //     .use_cache = use_cache_arg.getValue()
+        .task_scheduler = enki::TaskScheduler()
     };
+    asset_bake_context.task_scheduler.Initialize();
     asset_baker::process_files(asset_bake_context);
 
     return 0;
