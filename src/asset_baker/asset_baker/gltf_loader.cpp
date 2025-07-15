@@ -240,10 +240,31 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                     {
                         auto& colors = asset->accessors.at(color_attribute->accessorIndex);
                         mesh.colors.resize(colors.count);
-                        fastgltf::copyFromAccessor<fastgltf::math::fvec4>(
-                            asset.get(),
-                            colors,
-                            mesh.colors.data());
+                        if (colors.type == fastgltf::AccessorType::Vec4)
+                        {
+                            fastgltf::copyFromAccessor<fastgltf::math::fvec4>(
+                                asset.get(),
+                                colors,
+                                mesh.colors.data());
+                        }
+                        else
+                        {
+                            std::vector<std::array<float, 3>> colors_rgb;
+                            colors_rgb.resize(colors.count);
+                            fastgltf::copyFromAccessor<fastgltf::math::fvec3>(
+                                asset.get(),
+                                colors,
+                                colors_rgb.data());
+                            for (auto i = 0; i < colors.count; ++i)
+                            {
+                                mesh.colors[i] = {
+                                    colors_rgb[i][0],
+                                    colors_rgb[i][1],
+                                    colors_rgb[i][2],
+                                    1.f,
+                                };
+                            }
+                        }
                     }
                 }
 

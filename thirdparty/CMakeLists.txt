@@ -43,3 +43,5 @@ set_target_properties(
     mikktspace PROPERTIES
     CXX_STANDARD 23
 )
+
+add_subdirectory(enkiTS)

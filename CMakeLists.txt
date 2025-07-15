@@ -17,6 +17,7 @@ target_link_libraries(
     nlohmann_json
     xxHash::xxhash
     mikktspace
+    enkiTS
 )
 target_include_directories(
     asset_baker PUBLIC
@@ -30,6 +31,16 @@ set_target_properties(
     asset_baker PROPERTIES
     CXX_STANDARD 23
 )
+add_custom_command(
+    TARGET asset_baker
+    POST_BUILD
+    COMMAND $<TARGET_FILE:asset_baker> -i thirdparty/gltf-sample-assets/Models/ -o assets/cache
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+)
+# Asset baker is not supporting unicode right now.
+# So long as the support is not there, it will crash with unicode inputs.
+# To "remedy" it, delete this folder.
+file(REMOVE_RECURSE thirdparty/gltf-sample-assets/Models/Unicode❤♻Test)
 
 add_executable(renderer)
 target_link_libraries(
@@ -50,6 +61,9 @@ target_include_directories(
 set_target_properties(
     renderer PROPERTIES
     CXX_STANDARD 23
+)
+add_dependencies(
+    renderer asset_baker
 )
 
 add_subdirectory(src)
