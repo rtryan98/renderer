@@ -28,6 +28,7 @@
 [submodule "thirdparty/gltf-sample-assets"]
 	path = thirdparty/gltf-sample-assets
 	url = https://github.com/KhronosGroup/glTF-Sample-Assets
+	ignore = dirty
 [submodule "thirdparty/enkiTS"]
 	path = thirdparty/enkiTS
 	url = https://github.com/dougbinks/enkiTS
