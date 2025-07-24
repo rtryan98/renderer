@@ -2,22 +2,14 @@
 #include "shared/camera_shared_types.h"
 #include "shaders/ocean/ocean_patch_types.hlsli"
 #include "rhi/bindless.hlsli"
+#include "constants.hlsli"
+#include "ocean/ocean_render_utils.hlsli"
 
 DECLARE_PUSH_CONSTANTS(Ocean_Render_Patch_Push_Constants, pc);
 
-float2 calculate_slope(float z_dx, float z_dy, float x_dx, float y_dy)
-{
-    return float2(z_dx / 1.0 + /* lambda * */x_dx, z_dy / 1.0 + /* lambda * */y_dy);
-}
-
-float3 calculate_normals(float2 slope)
-{
-    return normalize(float3(-slope.x, -slope.y, 1.0));
-}
-
 float schlick_fresnel(float f0, float VdotH)
 {
-    return f0 + (1. - f0) * pow(1 - VdotH, 5.);
+    return f0 + (1. - f0) * pow(1 - abs(VdotH), 5.);
 }
 
 PS_Out main(PS_In ps_in)
@@ -45,6 +37,7 @@ PS_Out main(PS_In ps_in)
 
     float NdotL = saturate(dot(N, L));
     float NdotH = saturate(dot(N, H));
+    float VdotH = saturate(dot(V, H));
 
     float fresnel = schlick_fresnel(0.04, NdotH);
     
@@ -52,7 +45,8 @@ PS_Out main(PS_In ps_in)
     float3 ambient = 0.55 * color;
     float3 diffuse = NdotL * color;
 
-    //PS_Out result = { float4(saturate(ambient + diffuse),1.) };
+    // PS_Out result = { float4(saturate(ambient + diffuse),1.) };
     PS_Out result = { float4(fresnel,fresnel,fresnel,1.) };
+    // PS_Out result = { .5 + .5 * float4(N.x, N.y, N.z,1.) };
     return result;
 }

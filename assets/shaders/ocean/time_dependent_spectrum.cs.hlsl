@@ -21,7 +21,7 @@ void main(uint3 id : SV_DispatchThreadID)
     float omega_k = angular_frequency_tex.load_2d_array_uniform<float>(id);
 
     float2 arg = ren::cpolar(1., pc.time * omega_k);
-    float2 h = .5 * (ren::cadd(ren::cmul(spectrum, arg), ren::cmul(spectrum_minus_k, ren::cconjugate(arg))));
+    float2 h = ren::cadd(ren::cmul(spectrum, arg), ren::cmul(spectrum_minus_k, ren::cconjugate(arg)));
     float2 ih = ren::cmuli(h);
 
     float2 x    =  ih * k.x * rcp_wavenumber;

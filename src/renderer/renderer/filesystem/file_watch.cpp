@@ -97,6 +97,7 @@ public:
                 return notifications;
             }
         }
+        return {};
     }
 
 private:

@@ -6,20 +6,20 @@
 
 namespace ren
 {
-Application::Application() noexcept
+Application::Application(const Application_Create_Info& create_info) noexcept
     : m_logger(std::make_shared<Logger>())
     , m_asset_path(init_asset_path())
     , m_window(Window::create({
-        .width = 2560,
-        .height = 1440,
+        .width = create_info.width,
+        .height = create_info.height,
         .title = "Renderer",
         .dpi_aware_size = false
         }))
     , m_input_state(std::make_unique<Input_State>(*m_window))
     , m_device(rhi::Graphics_Device::create({
         .graphics_api = rhi::Graphics_API::D3D12,
-        .enable_validation = true,
-        .enable_gpu_validation = false,
+        .enable_validation = create_info.enable_validation,
+        .enable_gpu_validation = create_info.enable_gpu_validation,
         .enable_locking = false
         }))
     , m_swapchain(m_device->create_swapchain({

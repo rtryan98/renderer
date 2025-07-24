@@ -51,19 +51,18 @@ target_link_libraries(
     Shcore.lib
     unordered_dense
     nlohmann_json
+    offset_allocator
 )
 target_include_directories(
     renderer PUBLIC
     src/renderer
     src/shared
     thirdparty/spdlog/include
+    thirdparty/tclap/include
 )
 set_target_properties(
     renderer PROPERTIES
     CXX_STANDARD 23
-)
-add_dependencies(
-    renderer asset_baker
 )
 
 add_subdirectory(src)

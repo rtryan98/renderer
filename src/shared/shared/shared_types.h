@@ -5,7 +5,7 @@
     #include <DirectXMath.h>
     // Structs
     #ifndef SHADER_STRUCT_ALIGN
-        #define SHADER_STRUCT_ALIGN alignas(16) // HLSL structs are aligned to 16 bytes
+        #define SHADER_STRUCT_ALIGN alignas(16) // HLSL structs are aligned to 16 bytes in constant buffers
     #endif
     // Utilities
     #ifndef SHADER_ENUM_CLASS
@@ -41,6 +41,12 @@
     // Matrices
     #ifndef float3x3
         #define float3x3 DirectX::XMFLOAT3X3
+    #endif
+    #ifndef float3x4
+        #define float3x4 DirectX::XMFLOAT3X4
+    #endif
+    #ifndef float4x3
+        #define float4x3 DirectX::XMFLOAT4X3
     #endif
     #ifndef float4x4
         #define float4x4 DirectX::XMFLOAT4X4

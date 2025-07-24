@@ -32,3 +32,6 @@
 [submodule "thirdparty/enkiTS"]
 	path = thirdparty/enkiTS
 	url = https://github.com/dougbinks/enkiTS
+[submodule "thirdparty/OffsetAllocator"]
+	path = thirdparty/OffsetAllocator
+	url = https://github.com/sebbbi/OffsetAllocator

@@ -337,6 +337,7 @@ void Renderer::render_gbuffer_pass(rhi::Command_List* cmd)
     cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);
 
     // TODO: TESTING
+    /*
     auto draw_pipeline = m_app.get_asset_repository().get_graphics_pipeline("basic_draw");
     cmd->set_pipeline(draw_pipeline);
     auto* model = m_app.get_asset_repository().get_model("Sponza.renmdl");
@@ -361,6 +362,7 @@ void Renderer::render_gbuffer_pass(rhi::Command_List* cmd)
                 0);
         }
     }
+    */
     cmd->end_render_pass();
 
     cmd->end_debug_region();

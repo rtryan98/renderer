@@ -27,10 +27,18 @@ struct ImGui_Data
     } windows;
 };
 
+struct Application_Create_Info
+{
+    uint32_t width;
+    uint32_t height;
+    bool enable_validation;
+    bool enable_gpu_validation;
+};
+
 class Application
 {
 public:
-    Application() noexcept;
+    Application(const Application_Create_Info& create_info) noexcept;
     ~Application() noexcept;
 
     void run();

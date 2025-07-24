@@ -45,3 +45,18 @@ set_target_properties(
 )
 
 add_subdirectory(enkiTS)
+
+add_library(offset_allocator)
+target_sources(
+    offset_allocator PRIVATE
+    offsetAllocator/offsetAllocator.cpp
+    offsetAllocator/offsetAllocator.hpp
+)
+target_include_directories(
+    offset_allocator PUBLIC
+    offsetAllocator
+)
+set_target_properties(
+    offset_allocator PROPERTIES
+    CXX_STANDARD 23
+)

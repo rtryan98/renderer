@@ -36,7 +36,7 @@ public:
     [[nodiscard]] rhi::Shader_Blob* get_shader_blob(const std::string_view& name) const;
     [[nodiscard]] Compute_Pipeline get_compute_pipeline(const std::string_view& name) const;
     [[nodiscard]] Graphics_Pipeline get_graphics_pipeline(const std::string_view& name) const;
-    [[nodiscard]] Model* get_model(const std::string_view& name) const;
+    [[nodiscard]] Mapped_File* get_model(const std::string_view& name) const;
 
 private:
     void compile_shader_library(
@@ -49,11 +49,11 @@ private:
     void create_shader_and_compute_libraries();
     void create_graphics_pipeline_libraries();
 
-    void load_textures();
-    void load_texture(const std::filesystem::path& path);
+    void register_textures();
+    void register_texture(const std::filesystem::path& path);
 
-    void load_models();
-    void load_model(const std::filesystem::path& path);
+    void register_models();
+    void register_model(const std::filesystem::path& path);
 
 private:
     std::shared_ptr<Logger> m_logger;
@@ -80,10 +80,8 @@ private:
     String_Map<Graphics_Pipeline_Library*> m_pipeline_library_ptrs = {};
     rhi::Array_Vector<Graphics_Pipeline_Library, ARRAY_VECTOR_SIZE> m_pipeline_libraries = {};
 
-    String_Map<Model*> m_model_ptrs = {};
-    rhi::Array_Vector<Model, ARRAY_VECTOR_SIZE> m_models = {};
-
-    String_Map<Texture*> m_texture_ptrs = {};
-    rhi::Array_Vector<Texture, ARRAY_VECTOR_SIZE> m_textures = {};
+    String_Map<Mapped_File*> m_model_ptrs = {};
+    String_Map<Mapped_File*> m_texture_ptrs = {};
+    rhi::Array_Vector<Mapped_File, ARRAY_VECTOR_SIZE> m_files = {};
 };
 }

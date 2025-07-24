@@ -4,6 +4,7 @@
 #include <fstream>
 #include <shared/serialized_asset_formats.hpp>
 #include "renderer/application.hpp"
+#include "renderer/filesystem/mapped_file.hpp"
 
 #include "rhi/graphics_device.hpp"
 
@@ -49,17 +50,21 @@ Asset_Repository::Asset_Repository(
 
     create_shader_and_compute_libraries();
     create_graphics_pipeline_libraries();
-    load_textures();
-    load_models();
+    register_textures();
+    register_models();
 }
 
 Asset_Repository::~Asset_Repository()
 {
-    for (auto& model : m_models)
+    // for (auto& model : m_models)
+    // {
+    //     m_graphics_device->destroy_buffer(model.indices);
+    //     m_graphics_device->destroy_buffer(model.vertex_positions);
+    //     m_graphics_device->destroy_buffer(model.vertex_attributes);
+    // }
+    for (auto& file : m_files)
     {
-        m_graphics_device->destroy_buffer(model.indices);
-        m_graphics_device->destroy_buffer(model.vertex_positions);
-        m_graphics_device->destroy_buffer(model.vertex_attributes);
+        file.unmap();
     }
 }
 
@@ -93,7 +98,7 @@ Graphics_Pipeline Asset_Repository::get_graphics_pipeline(const std::string_view
     return Graphics_Pipeline(m_pipeline_library_ptrs.at(std::string(name)));
 }
 
-Model* Asset_Repository::get_model(const std::string_view& name) const
+Mapped_File* Asset_Repository::get_model(const std::string_view& name) const
 {
     return m_model_ptrs.at(std::string(name));
 }
@@ -1053,21 +1058,45 @@ void Asset_Repository::create_graphics_pipeline_libraries()
     }
 }
 
-void Asset_Repository::load_textures()
+void Asset_Repository::register_textures()
 {
     auto directory = std::filesystem::path(m_paths.models);
     for (auto& directory_entry : std::filesystem::recursive_directory_iterator(directory))
     {
         if (directory_entry.path().extension() == serialization::TEXTURE_FILE_EXTENSION)
         {
-            m_logger->debug("Loading texture '{}'", directory_entry.path().string());
-            load_texture(directory_entry.path());
+            m_logger->debug("Registering texture '{}'", directory_entry.path().string());
+            register_texture(directory_entry.path());
         }
     }
 }
 
-void Asset_Repository::load_texture(const std::filesystem::path& path)
+void Asset_Repository::register_texture(const std::filesystem::path& path)
 {
+    Mapped_File mapped_file = {};
+    mapped_file.map(path.string().c_str());
+    if (!mapped_file.data)
+    {
+        m_logger->error("Failed to open file '{}'", path.string());
+        return;
+    }
+
+    if (auto* file_header = static_cast<serialization::Image_Header*>(mapped_file.data); !file_header->validate())
+    {
+        m_logger->error("Failed to validate model '{}'", path.string());
+        mapped_file.unmap();
+        return;
+    }
+
+    const auto texture_identifier = path.filename().string();
+    if (!m_texture_ptrs.contains(texture_identifier))
+    {
+        m_texture_ptrs[texture_identifier] = m_files.acquire();
+    }
+    auto& texture = *m_texture_ptrs.at(texture_identifier);
+    texture = mapped_file;
+    m_logger->debug("Registered texture '{}'", path.string());
+    /*
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file.is_open())
     {
@@ -1089,7 +1118,7 @@ void Asset_Repository::load_texture(const std::filesystem::path& path)
 
         auto* data = reinterpret_cast<serialization::Image_Data_00*>(buffer.data());
 
-        auto texture_identifier = path.filename().string();
+        const auto texture_identifier = path.filename().string();
         if (!m_texture_ptrs.contains(texture_identifier))
         {
             m_texture_ptrs[texture_identifier] = m_textures.acquire();
@@ -1114,145 +1143,145 @@ void Asset_Repository::load_texture(const std::filesystem::path& path)
         }
         m_app.upload_image_data_immediate_full(texture.image, mip_data_ptrs.data());
     }
+    */
 }
 
-void Asset_Repository::load_models()
+void Asset_Repository::register_models()
 {
     auto directory = std::filesystem::path(m_paths.models);
     for (auto& directory_entry : std::filesystem::recursive_directory_iterator(directory))
     {
         if (directory_entry.path().extension() == serialization::MODEL_FILE_EXTENSION)
         {
-            m_logger->debug("Loading model '{}'", directory_entry.path().string());
-            load_model(directory_entry.path());
+            m_logger->info("Registering model '{}'", directory_entry.path().string());
+            register_model(directory_entry.path());
         }
     }
 }
 
-void Asset_Repository::load_model(const std::filesystem::path& path)
+void Asset_Repository::register_model(const std::filesystem::path& path)
 {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file.is_open())
+    Mapped_File mapped_file = {};
+    mapped_file.map(path.string().c_str());
+    if (!mapped_file.data)
     {
         m_logger->error("Failed to open file '{}'", path.string());
         return;
     }
-    const std::streamsize stream_size = file.tellg();
-    file.seekg(0, std::ios::beg);
-    std::vector<char> buffer(stream_size);
-    if (file.read(buffer.data(), stream_size))
+
+    if (auto* file_header = static_cast<serialization::Model_Header*>(mapped_file.data); !file_header->validate())
     {
-        serialization::Model_Header* file_header = reinterpret_cast<serialization::Model_Header*>(buffer.data());
-        if (!file_header->validate())
-        {
-            m_logger->error("Failed to validate model '{}'", path.string());
-            file.close();
-            return;
-        }
-
-        auto model_identifier = path.filename().string();
-        if (!m_model_ptrs.contains(model_identifier))
-        {
-            m_model_ptrs[model_identifier] = m_models.acquire();
-        }
-        auto& model = *m_model_ptrs.at(model_identifier);
-
-        serialization::Model_Header_00* header = reinterpret_cast<serialization::Model_Header_00*>(buffer.data());
-        m_logger->info("Loading model '{}'", header->name);
-
-        // create buffers
-        {
-            rhi::Buffer_Create_Info buffer_create_info = {
-                .size = header->vertex_position_count * sizeof(std::array<float, 3>),
-                .heap = rhi::Memory_Heap_Type::GPU
-            };
-            model.vertex_positions = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-            m_graphics_device->name_resource(model.vertex_positions, (std::string("gltf:") + model_identifier + ":position").c_str());
-
-            buffer_create_info.size = header->vertex_attribute_count * sizeof(serialization::Vertex_Attributes);
-            model.vertex_attributes = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-            m_graphics_device->name_resource(model.vertex_attributes, (std::string("gltf:") + model_identifier + ":attributes").c_str());
-
-            buffer_create_info.size = header->index_count * sizeof(uint32_t);
-            model.indices = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-            m_graphics_device->name_resource(model.indices, (std::string("gltf:") + model_identifier + ":indices").c_str());
-        }
-
-        auto* referenced_uris = header->get_referenced_uris();
-        auto* materials = header->get_materials();
-
-        model.submeshes.reserve(header->submesh_count);
-        auto* submeshes = header->get_submeshes();
-        for (auto i = 0; i < header->submesh_count; ++i)
-        {
-            const auto& submesh_data = submeshes[i];
-            model.submeshes.emplace_back( Submesh{
-                .vertex_position_range = {
-                    submesh_data.vertex_position_range_start,
-                    submesh_data.vertex_position_range_end
-                },
-                .vertex_attribute_range = {
-                    submesh_data.vertex_attribute_range_start,
-                    submesh_data.vertex_attribute_range_end
-                },
-                .index_range = {
-                    submesh_data.index_range_start,
-                    submesh_data.index_range_end
-                },
-                .material_index = submesh_data.material_index
-            } );
-        }
-
-        model.instances.reserve(header->instance_count);
-        auto* instances = header->get_instances();
-        for (auto i = 0; i < header->instance_count; ++i)
-        {
-            const auto& instance_data = instances[i];
-            model.instances.emplace_back( Instance{
-                .submeshes_range_start = instance_data.submeshes_range_start,
-                .submeshes_range_end  = instance_data.submeshes_range_end,
-                .parent_index = instance_data.parent_index,
-                .translation = {
-                    instance_data.translation[0],
-                    instance_data.translation[1],
-                    instance_data.translation[2]
-                },
-                .rotation = {
-                    instance_data.rotation[0],
-                    instance_data.rotation[1],
-                    instance_data.rotation[2],
-                    instance_data.rotation[3]
-                },
-                .scale = {
-                    instance_data.scale[0],
-                    instance_data.scale[1],
-                    instance_data.scale[2]
-                }
-            } );
-        }
-
-        auto* positions = header->get_vertex_positions();
-        m_app.upload_buffer_data_immediate(
-            model.vertex_positions,
-            positions,
-            header->vertex_position_count * sizeof(std::array<float, 3>),
-            0);
-
-        auto* attributes = header->get_vertex_attributes();
-        m_app.upload_buffer_data_immediate(
-            model.vertex_attributes,
-            attributes,
-            header->vertex_attribute_count * sizeof(serialization::Vertex_Attributes),
-            0);
-
-        auto* indices = header->get_indices();
-        m_app.upload_buffer_data_immediate(
-            model.indices,
-            indices,
-            header->index_count * sizeof(uint32_t),
-            0);
-
+        m_logger->error("Failed to validate model '{}'", path.string());
+        mapped_file.unmap();
+        return;
     }
-    file.close();
+
+    const auto model_identifier = path.filename().string();
+    if (!m_model_ptrs.contains(model_identifier))
+    {
+        m_model_ptrs[model_identifier] = m_files.acquire();
+    }
+    auto& model = *m_model_ptrs.at(model_identifier);
+    model = mapped_file;
+    m_logger->debug("Registered model '{}'", path.string());
+
+    /*
+
+    auto* header = static_cast<serialization::Model_Header_00*>(mapped_file.data);
+
+    // create buffers
+    {
+        rhi::Buffer_Create_Info buffer_create_info = {
+            .size = header->vertex_position_count * sizeof(std::array<float, 3>),
+            .heap = rhi::Memory_Heap_Type::GPU
+        };
+        model.vertex_positions = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+        m_graphics_device->name_resource(model.vertex_positions, (std::string("gltf:") + model_identifier + ":position").c_str());
+        buffer_create_info.size = header->vertex_attribute_count * sizeof(serialization::Vertex_Attributes);
+        model.vertex_attributes = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+        m_graphics_device->name_resource(model.vertex_attributes, (std::string("gltf:") + model_identifier + ":attributes").c_str());
+        buffer_create_info.size = header->index_count * sizeof(uint32_t);
+        model.indices = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+        m_graphics_device->name_resource(model.indices, (std::string("gltf:") + model_identifier + ":indices").c_str());
+    }
+
+    auto* referenced_uris = header->get_referenced_uris();
+    auto* materials = header->get_materials();
+    model.submeshes.reserve(header->submesh_count);
+    const auto* submeshes = header->get_submeshes();
+
+    for (auto i = 0; i < header->submesh_count; ++i)
+    {
+        const auto& submesh_data = submeshes[i];
+        model.submeshes.emplace_back( Loadable_Model_Submesh{
+            .vertex_position_range = {
+                submesh_data.vertex_position_range_start,
+                submesh_data.vertex_position_range_end
+            },
+            .vertex_attribute_range = {
+                submesh_data.vertex_attribute_range_start,
+                submesh_data.vertex_attribute_range_end
+            },
+            .index_range = {
+                submesh_data.index_range_start,
+                submesh_data.index_range_end
+            },
+            .material_index = submesh_data.material_index
+        } );
+    }
+
+    model.instances.reserve(header->instance_count);
+    const auto* instances = header->get_instances();
+
+    for (auto i = 0; i < header->instance_count; ++i)
+    {
+        const auto& instance_data = instances[i];
+        model.instances.emplace_back( Loadable_Model_Mesh_Instance{
+            .submeshes_range_start = instance_data.submeshes_range_start,
+            .submeshes_range_end  = instance_data.submeshes_range_end,
+            .parent_index = instance_data.parent_index,
+            .translation = {
+                instance_data.translation[0],
+                instance_data.translation[1],
+                instance_data.translation[2]
+            },
+            .rotation = {
+                instance_data.rotation[0],
+                instance_data.rotation[1],
+                instance_data.rotation[2],
+                instance_data.rotation[3]
+            },
+            .scale = {
+                instance_data.scale[0],
+                instance_data.scale[1],
+                instance_data.scale[2]
+            }
+        } );
+    }
+
+    auto* positions = header->get_vertex_positions();
+    m_app.upload_buffer_data_immediate(
+        model.vertex_positions,
+        positions,
+        header->vertex_position_count * sizeof(std::array<float, 3>),
+        0);
+
+    auto* attributes = header->get_vertex_attributes();
+    m_app.upload_buffer_data_immediate(
+        model.vertex_attributes,
+        attributes,
+        header->vertex_attribute_count * sizeof(serialization::Vertex_Attributes),
+        0);
+
+    auto* indices = header->get_indices();
+    m_app.upload_buffer_data_immediate(
+        model.indices,
+        indices,
+        header->index_count * sizeof(uint32_t),
+        0);
+
+    m_logger->info("Successfully loaded model '{}'", header->name);
+    mapped_file.unmap();
+    */
 }
 }
