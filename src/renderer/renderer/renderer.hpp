@@ -17,6 +17,7 @@ class Application;
 class Input_State;
 struct Render_Attachment;
 class Render_Resource_Blackboard;
+class Static_Scene_Data;
 
 class Renderer
 {
@@ -30,11 +31,11 @@ public:
     void update(const Input_State& input_state, double t, double dt) noexcept;
     void overlay_gui();
     void setup_frame();
-    void render(rhi::Command_List* cmd, double t, double dt) noexcept;
+    void render(Static_Scene_Data& scene, rhi::Command_List* cmd, double t, double dt) noexcept;
     void on_resize(uint32_t width, uint32_t height) noexcept;
 
 private:
-    void render_gbuffer_pass(rhi::Command_List* cmd);
+    void render_gbuffer_pass(Static_Scene_Data& scene, rhi::Command_List* cmd);
     void render_ocean_pass(rhi::Command_List* cmd);
     void render_swapchain_pass(rhi::Command_List* cmd);
 

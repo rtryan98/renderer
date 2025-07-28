@@ -5,6 +5,7 @@ project(
     VERSION 0.1.0
     LANGUAGES CXX
 )
+include(renderer.cmake)
 
 add_subdirectory(thirdparty)
 
@@ -18,6 +19,7 @@ target_link_libraries(
     xxHash::xxhash
     mikktspace
     enkiTS
+    glm
 )
 target_include_directories(
     asset_baker PUBLIC
@@ -34,7 +36,7 @@ set_target_properties(
 add_custom_command(
     TARGET asset_baker
     POST_BUILD
-    COMMAND $<TARGET_FILE:asset_baker> -i thirdparty/gltf-sample-assets/Models/ -o assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> -i thirdparty/gltf-sample-assets/Models/ -o ${CMAKE_BINARY_DIR}/assets/cache
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
 )
 # Asset baker is not supporting unicode right now.
@@ -52,6 +54,7 @@ target_link_libraries(
     unordered_dense
     nlohmann_json
     offset_allocator
+    glm
 )
 target_include_directories(
     renderer PUBLIC
@@ -74,4 +77,8 @@ source_group(TREE ${CMAKE_CURRENT_LIST_DIR}/src/renderer PREFIX src FILES ${REND
 
 set_property(DIRECTORY ${CMAKE_CURRENT_LIST_DIR} PROPERTY VS_STARTUP_PROJECT renderer)
 
+rhi_symlink_shaders(${CMAKE_SOURCE_DIR}/assets/shaders)
 core_deploy_d3d12(D3D12)
+
+renderer_setup()
+renderer_symlink_assets()

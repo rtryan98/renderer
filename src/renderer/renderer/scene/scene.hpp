@@ -6,6 +6,7 @@
 #include <rhi/resource.hpp>
 #include <shared/draw_shared_types.h>
 #include <offsetAllocator.hpp>
+#include "renderer/logger.hpp"
 
 namespace rhi
 {
@@ -32,6 +33,7 @@ struct TRS
     DirectX::XMFLOAT3 scale;
 
     [[nodiscard]] DirectX::XMMATRIX to_mat() const noexcept;
+    [[nodiscard]] DirectX::XMFLOAT3X4 to_transform(const DirectX::XMMATRIX& parent = DirectX::XMMatrixIdentity()) const noexcept;
     [[nodiscard]] DirectX::XMFLOAT3X3 to_transposed_adjugate(
         const DirectX::XMMATRIX& parent = DirectX::XMMatrixIdentity()) const noexcept;
 };
@@ -99,7 +101,8 @@ public:
     constexpr static auto MAX_INSTANCES = 1 << 21; // ~2M instances
     constexpr static auto INSTANCE_TRANSFORM_BUFFER_SIZE = sizeof(GPU_Instance) * MAX_INSTANCES; // ~168 MiB
 
-    Static_Scene_Data(Application& app, Asset_Repository& asset_repository, rhi::Graphics_Device* graphics_device);
+    Static_Scene_Data(Application& app, std::shared_ptr<Logger> logger,
+        Asset_Repository& asset_repository, rhi::Graphics_Device* graphics_device);
     ~Static_Scene_Data();
 
     Static_Scene_Data(const Static_Scene_Data&) = delete;
@@ -120,6 +123,7 @@ private:
 
 private:
     Application& m_app;
+    std::shared_ptr<Logger> m_logger;
     Asset_Repository& m_asset_repository;
     rhi::Graphics_Device* m_graphics_device;
     OffsetAllocator::Allocator m_index_buffer_allocator;

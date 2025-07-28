@@ -28,7 +28,7 @@ void process_gltf(Asset_Bake_Context& context, const std::filesystem::path& inpu
         {
             const auto serialized_model = serialize_gltf_model(input_file.filename().string(), gltf.value());
             const auto outfile_path = (context.output_directory / input_file.stem()).string() + serialization::MODEL_FILE_EXTENSION;
-            if (!std::filesystem::exists(outfile_path))
+            if (!std::filesystem::exists(context.output_directory))
             {
                 spdlog::info("Directory '{}' does not exist, creating it.", context.output_directory.string());
                 std::filesystem::create_directory(context.output_directory);
@@ -53,7 +53,7 @@ void process_gltf(Asset_Bake_Context& context, const std::filesystem::path& inpu
                 {
                     spdlog::info("Processing texture '{}' with hash '{}'",
                         request.name,
-                        std::string(request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE));
+                        request.hash_identifier);
 
                     auto texture_data = process_and_serialize_gltf_texture(request);
 
@@ -63,8 +63,8 @@ void process_gltf(Asset_Bake_Context& context, const std::filesystem::path& inpu
                         return;
                     }
 
-                    const auto outfile_path = (context.output_directory
-                        / std::string(request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE)).string()
+                    const auto outfile_path = context.output_directory.string()
+                        + "/" + request.hash_identifier
                         + serialization::TEXTURE_FILE_EXTENSION;
 
                     std::ofstream outfile(outfile_path, std::ios::binary | std::ios::out);
@@ -84,10 +84,13 @@ void process_gltf(Asset_Bake_Context& context, const std::filesystem::path& inpu
         switch (gltf.error())
         {
         case GLTF_Error::File_Load_Failed:
-            spdlog::error("GLTF file '{}' failed to load.", input_file.string());
+            spdlog::warn("GLTF file '{}' failed to load. Skip processing.", input_file.string());
             break;
         case GLTF_Error::Parse_Failed:
-            spdlog::error("GLTF file '{}' failed to parse.", input_file.string());
+            spdlog::warn("GLTF file '{}' failed to parse. Skip processing.", input_file.string());
+            break;
+        case GLTF_Error::Unsupported_Extension:
+            spdlog::warn("GLTF file '{}' requires an unsupported extension. Skip processing.", input_file.string());
             break;
         default:
             break;

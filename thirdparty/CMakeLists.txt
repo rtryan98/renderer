@@ -60,3 +60,5 @@ set_target_properties(
     offset_allocator PROPERTIES
     CXX_STANDARD 23
 )
+
+add_subdirectory(glm)

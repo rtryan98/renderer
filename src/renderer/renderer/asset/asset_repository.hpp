@@ -1,4 +1,5 @@
 #pragma once
+#include <filesystem>
 #include <ankerl/unordered_dense.h>
 #include "renderer/asset/shader_library.hpp"
 #include "renderer/asset/compute_library.hpp"
@@ -37,6 +38,7 @@ public:
     [[nodiscard]] Compute_Pipeline get_compute_pipeline(const std::string_view& name) const;
     [[nodiscard]] Graphics_Pipeline get_graphics_pipeline(const std::string_view& name) const;
     [[nodiscard]] Mapped_File* get_model(const std::string_view& name) const;
+    [[nodiscard]] std::vector<std::string> get_model_files() const;
 
 private:
     void compile_shader_library(

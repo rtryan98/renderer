@@ -39,8 +39,8 @@ std::string base_16_string(const T& input)
         const char data = reinterpret_cast<const char*>(&input)[i];
         const char lower = (data & 0x0F) >> 0;
         const char upper = (data & 0xF0) >> 4;
-        result.append(&TABLE[upper]);
-        result.append(&TABLE[lower]);
+        result += TABLE[upper];
+        result += TABLE[lower];
     }
     return result;
 };
@@ -65,7 +65,15 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
     auto asset = parser.loadGltf(data.get(), path.parent_path(), options);
     if (asset.error() != fastgltf::Error::None)
     {
-        return std::unexpected(GLTF_Error::Parse_Failed);
+        switch (asset.error())
+        {
+        case fastgltf::Error::MissingExtensions:
+            [[fallthrough]];
+        case fastgltf::Error::UnknownRequiredExtension:
+            return std::unexpected(GLTF_Error::Unsupported_Extension);
+        default:
+            return std::unexpected(GLTF_Error::Parse_Failed);
+        }
     }
 
     GLTF_Model result = {};
@@ -137,17 +145,15 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 return "";
             }
 
-            const auto hash_base16 = base_16_string(XXH3_128bits(request.data.data(), request.data.size()));
-            hash_base16.copy(
-                request.hash_identifier,
-                std::min(serialization::HASH_IDENTIFIER_FIELD_SIZE, hash_base16.size()));
+            const auto hash = XXH3_128bits(request.data.data(), request.data.size());
+            request.hash_identifier = base_16_string(hash);
 
             spdlog::trace("Mangled name of texture '{}' to '{}'",
                 texture_name,
                 std::string(request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE));
 
-            result.texture_load_requests.emplace_back(std::move(request));
-            return hash_base16 + serialization::TEXTURE_FILE_EXTENSION;
+            result.texture_load_requests.emplace_back(request);
+            return request.hash_identifier + serialization::TEXTURE_FILE_EXTENSION;
         };
 
         result.materials.emplace_back( GLTF_Material {
@@ -286,22 +292,11 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                     if (tangent_attribute != primitive.attributes.end())
                     {
                         auto& tangents = asset->accessors.at(tangent_attribute->accessorIndex);
-                        std::vector<std::array<float, 4>> tangents_vec4{};
-                        tangents_vec4.resize(tangents.count);
+                        mesh.tangents.resize(tangents.count);
                         fastgltf::copyFromAccessor<fastgltf::math::fvec4>(
                             asset.get(),
                             tangents,
-                            tangents_vec4.data());
-                        mesh.tangents.reserve(tangents_vec4.size());
-                        for (auto i = 0; i < tangents_vec4.size(); ++i)
-                        {
-                            auto& mesh_tangent = mesh.tangents.emplace_back();
-                            mesh_tangent = {
-                                tangents_vec4[i][0] * tangents_vec4[i][3],
-                                tangents_vec4[i][1] * tangents_vec4[i][3],
-                                tangents_vec4[i][2] * tangents_vec4[i][3],
-                            };
-                        }
+                            mesh.tangents.data());
                     }
                 }
 
@@ -366,9 +361,9 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                         std::vector<std::array<float, 3>>& positions;
                         std::vector<std::array<float, 3>>& normals;
                         std::vector<std::array<float, 2>>& tex_coords;
-                        std::vector<std::array<float, 3>>& tangents;
+                        std::vector<std::array<float, 4>>& tangents;
                         std::vector<uint32_t>& indices;
-                    } user_data = {
+                    } mikkt_space_user_data = {
                         .positions = mesh.positions,
                         .normals = mesh.normals,
                         .tex_coords = mesh.tex_coords,
@@ -376,74 +371,82 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                         .indices = mesh.indices,
                     };
 
+                    auto get_num_faces = [](
+                        const SMikkTSpaceContext* mikktspace_context) -> int32_t
+                    {
+                        const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
+                        return static_cast<int32_t>(user_data.indices.size() / 3);
+                    };
+                    auto get_num_vertices_of_face = [](
+                        const SMikkTSpaceContext* mikktspace_context,
+                        const int face_idx) -> int32_t
+                    {
+                        (void)mikktspace_context;
+                        (void)face_idx;
+                        return 3;
+                    };
+                    auto get_position = [](
+                        const SMikkTSpaceContext* mikktspace_context,
+                        float fv_pos_out[],
+                        const int face_idx,
+                        const int vert_idx) -> void
+                    {
+                        const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
+                        const auto& position = user_data.positions[user_data.indices[face_idx * 3 + vert_idx]];
+                        fv_pos_out[0] = position[0];
+                        fv_pos_out[1] = position[1];
+                        fv_pos_out[2] = position[2];
+                    };
+                    auto get_normal = [](
+                        const SMikkTSpaceContext* mikktspace_context,
+                        float fv_norm_out[],
+                        const int face_idx,
+                        const int vert_idx) -> void
+                    {
+                        const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
+                        const auto& normal = user_data.normals[user_data.indices[face_idx * 3 + vert_idx]];
+                        fv_norm_out[0] = normal[0];
+                        fv_norm_out[1] = normal[1];
+                        fv_norm_out[2] = normal[2];
+                    };
+                    auto get_tex_coord = [](
+                        const SMikkTSpaceContext* mikktspace_context,
+                        float fv_tex_coord_out[],
+                        const int face_idx,
+                        const int vert_idx) -> void
+                    {
+                        const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
+                        const auto& tex_coord = user_data.tex_coords[user_data.indices[face_idx * 3 + vert_idx]];
+                        fv_tex_coord_out[0] = tex_coord[0];
+                        fv_tex_coord_out[1] = tex_coord[1];
+                    };
+                    auto set_tangent_space = [](
+                        const SMikkTSpaceContext* mikktspace_context,
+                        const float fv_tangent[],
+                        const float sign,
+                        const int face_idx,
+                        const int vert_idx) -> void
+                    {
+                        const auto& data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
+                        auto& tangent = data.tangents[data.indices[face_idx * 3 + vert_idx]];
+                        tangent[0] = fv_tangent[0];
+                        tangent[1] = fv_tangent[1];
+                        tangent[2] = fv_tangent[2];
+                        tangent[3] = sign;
+                    };
+
                     SMikkTSpaceInterface mikktspace_interface = {
-                        .m_getNumFaces = [](
-                            const SMikkTSpaceContext* mikktspace_context) -> int32_t
-                        {
-                            const auto& data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-                            return static_cast<int32_t>(data.indices.size() / 3);
-                        },
-                        .m_getNumVerticesOfFace = [](
-                            const SMikkTSpaceContext* mikktspace_context,
-                            const int face_idx) -> int32_t
-                        {
-                            (void)mikktspace_context;
-                            (void)face_idx;
-                            return 3;
-                        },
-                        .m_getPosition = [](
-                            const SMikkTSpaceContext* mikktspace_context,
-                            float fv_pos_out[],
-                            const int face_idx,
-                            const int vert_idx) -> void
-                        {
-                            const auto& data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-                            auto& position = data.positions[data.indices[face_idx * 3 + vert_idx]];
-                            fv_pos_out[0] = position[0];
-                            fv_pos_out[1] = position[1];
-                            fv_pos_out[2] = position[2];
-                        },
-                        .m_getNormal = [](
-                            const SMikkTSpaceContext* mikktspace_context,
-                            float fv_norm_out[],
-                            const int face_idx,
-                            const int vert_idx) -> void
-                        {
-                            const auto& data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-                            auto& normal = data.normals[data.indices[face_idx * 3 + vert_idx]];
-                            fv_norm_out[0] = normal[0];
-                            fv_norm_out[1] = normal[1];
-                            fv_norm_out[2] = normal[2];
-                        },
-                        .m_getTexCoord = [](
-                            const SMikkTSpaceContext* mikktspace_context,
-                            float fv_tex_coord_out[],
-                            const int face_idx,
-                            const int vert_idx) -> void
-                        {
-                            const auto& data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-                            auto& tex_coord = data.tex_coords[data.indices[face_idx * 3 + vert_idx]];
-                            fv_tex_coord_out[0] = tex_coord[0];
-                            fv_tex_coord_out[1] = tex_coord[1];
-                        },
-                        .m_setTSpaceBasic = [](
-                            const SMikkTSpaceContext* mikktspace_context,
-                            const float fv_tangent[],
-                            const float sign,
-                            const int face_idx,
-                            const int vert_idx) -> void
-                        {
-                            const auto& data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-                            auto& tangent = data.tangents[data.indices[face_idx * 3 + vert_idx]];
-                            tangent[0] = sign * fv_tangent[0]; // TODO: handedness?
-                            tangent[1] = sign * fv_tangent[1];
-                            tangent[2] = sign * fv_tangent[2];
-                        },
+                        .m_getNumFaces = get_num_faces,
+                        .m_getNumVerticesOfFace = get_num_vertices_of_face,
+                        .m_getPosition = get_position,
+                        .m_getNormal = get_normal,
+                        .m_getTexCoord = +get_tex_coord,
+                        .m_setTSpaceBasic = set_tangent_space,
                         .m_setTSpace = nullptr,
                     };
                     SMikkTSpaceContext mikktspace_context = {
                         .m_pInterface = &mikktspace_interface,
-                        .m_pUserData = &user_data
+                        .m_pUserData = &mikkt_space_user_data
                     };
                     auto has_tangents = genTangSpaceDefault(&mikktspace_context);
 
@@ -535,7 +538,6 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
 std::vector<char> process_and_serialize_gltf_texture(const GLTF_Texture_Load_Request& request)
 {
     int32_t x = 0, y = 0, comp = 0;
-    stbi_set_flip_vertically_on_load(true);
     auto original_data = stbi_load_from_memory(
         reinterpret_cast<const uint8_t*>(request.data.data()),
         static_cast<int>(request.data.size()),
@@ -560,7 +562,7 @@ std::vector<char> process_and_serialize_gltf_texture(const GLTF_Texture_Load_Req
         .format = request.target_format,
     };
     request.name.copy(image_data.name, std::min(request.name.size(), serialization::NAME_MAX_SIZE));
-    memcpy(image_data.hash_identifier, request.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE);
+    request.hash_identifier.copy(image_data.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE);
 
     std::vector<uint8_t> squashed_data;
     if (request.squash_gb_to_rg)

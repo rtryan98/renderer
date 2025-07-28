@@ -83,7 +83,7 @@ struct Image_Data_00
 struct Vertex_Attributes
 {
     std::array<float, 3> normal;
-    std::array<float, 3> tangent;
+    std::array<float, 4> tangent;
     std::array<float, 2> tex_coords;
     std::array<uint8_t, 4> color;
 };

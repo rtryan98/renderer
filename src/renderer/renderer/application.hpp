@@ -13,6 +13,8 @@
 #include <rhi/swapchain.hpp>
 #include <rhi/resource.hpp>
 
+#include "scene/scene.hpp"
+
 namespace ren
 {
 constexpr static std::size_t FRAME_IN_FLIGHT_COUNT = 2;
@@ -25,6 +27,10 @@ struct ImGui_Data
         bool renderer_settings = false;
         bool tool_cbt_vis = false;
     } windows;
+    struct
+    {
+        bool add_model = false;
+    } modals;
 };
 
 struct Application_Create_Info
@@ -81,6 +87,7 @@ private:
     void update(double t, double dt) noexcept;
 
     void imgui_close_all_windows() noexcept;
+    void imgui_process_modals() noexcept;
 
     void imgui_setup_style() noexcept;
     void imgui_menubar() noexcept;
@@ -98,6 +105,7 @@ private:
     std::array<std::vector<Image_Staging_Info>, FRAME_IN_FLIGHT_COUNT> m_image_staging_infos;
     uint64_t m_frame_counter;
     std::unique_ptr<Asset_Repository> m_asset_repository;
+    std::unique_ptr<Static_Scene_Data> m_static_scene_data;
     std::unique_ptr<Render_Resource_Blackboard> m_resource_blackboard;
     Renderer m_renderer;
     bool m_is_running;

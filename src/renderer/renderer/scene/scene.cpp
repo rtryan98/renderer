@@ -15,9 +15,16 @@ XMMATRIX TRS::to_mat() const noexcept
         XMLoadFloat3(&translation));
 }
 
+XMFLOAT3X4 TRS::to_transform(const XMMATRIX& parent) const noexcept
+{
+    XMFLOAT3X4 result;
+    XMStoreFloat3x4(&result, XMMatrixMultiplyTranspose(parent, to_mat()));
+    return result;
+}
+
 XMFLOAT3X3 TRS::to_transposed_adjugate(const XMMATRIX& parent) const noexcept
 {
-    const auto intermediate = XMMatrixMultiply(to_mat(), parent);
+    const auto intermediate = XMMatrixMultiply(parent, to_mat());
     XMFLOAT3 r0 = {};
     XMStoreFloat3(&r0, XMVector3Cross(intermediate.r[1], intermediate.r[2]));
     XMFLOAT3 r1 = {};
@@ -36,6 +43,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
     auto* model = m_models.acquire();
     auto* loadable_model = static_cast<serialization::Model_Header_00*>(
         m_asset_repository.get_model(model_descriptor.name)->data);
+    m_logger->info("Loading model '{}'", model_descriptor.name);
 
     // create buffers and upload the data
     {
@@ -81,7 +89,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
         material.unused = 42;
     }
 
-    model->submeshes.reserve(loadable_model->submesh_count);
+    model->submeshes.resize(loadable_model->submesh_count);
     for (auto i = 0; i < loadable_model->submesh_count; ++i)
     {
         const auto& loadable_submesh = loadable_model->get_submeshes()[i];
@@ -100,7 +108,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
     for (auto i = 0; i < loadable_model->instance_count; ++i)
     {
         const auto& loadable_mesh_instance = loadable_model->get_instances()[i];
-        auto& mesh = model->meshes.emplace_back();
+        auto& mesh = model->meshes[i];
         mesh.parent = loadable_mesh_instance.parent_index != MESH_PARENT_INDEX_NO_PARENT
             ? &model->meshes[loadable_mesh_instance.parent_index]
             : nullptr;
@@ -168,8 +176,10 @@ uint32_t Static_Scene_Data::acquire_instance_transform_index()
     return val;
 }
 
-Static_Scene_Data::Static_Scene_Data(Application& app, Asset_Repository& asset_repository, rhi::Graphics_Device* graphics_device)
+Static_Scene_Data::Static_Scene_Data(Application& app, std::shared_ptr<Logger> logger,
+    Asset_Repository& asset_repository, rhi::Graphics_Device* graphics_device)
     : m_app(app)
+    , m_logger(std::move(logger))
     , m_asset_repository(asset_repository)
     , m_graphics_device(graphics_device)
     , m_index_buffer_allocator(MAX_INDICES)
@@ -193,5 +203,10 @@ Static_Scene_Data::~Static_Scene_Data()
     m_graphics_device->wait_idle();
     m_graphics_device->destroy_buffer(m_global_index_buffer);
     m_graphics_device->destroy_buffer(m_global_instance_transform_buffer);
+    for (auto& model : m_models)
+    {
+        m_graphics_device->destroy_buffer(model.vertex_positions);
+        m_graphics_device->destroy_buffer(model.vertex_attributes);
+    }
 }
 }

@@ -3,9 +3,11 @@
 #include "renderer/application.hpp"
 #include "renderer/window.hpp"
 #include "renderer/input_codes.hpp"
+#include "renderer/scene/scene.hpp"
 
 #include "shared/draw_shared_types.h"
 #include "shared/camera_shared_types.h"
+#include <ranges>
 
 #undef near
 #undef far
@@ -96,7 +98,7 @@ void Renderer::setup_frame()
     m_imgui_renderer.next_frame();
 }
 
-void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
+void Renderer::render(Static_Scene_Data& scene, rhi::Command_List* cmd, double t, double dt) noexcept
 {
     constexpr static rhi::Image_Barrier_Subresource_Range RT_DEFAULT_SUBRESOURCE_RANGE = {
         .first_mip_level = 0,
@@ -151,7 +153,7 @@ void Renderer::render(rhi::Command_List* cmd, double t, double dt) noexcept
             .memory_barriers = {}
             });
     }
-    render_gbuffer_pass(cmd);
+    render_gbuffer_pass(scene, cmd);
     /* Transition ocean pass attachments for rendering */ {
         rhi::Image_Barrier_Info ocean_color_barrier = {
             .stage_before = rhi::Barrier_Pipeline_Stage::None,
@@ -303,7 +305,7 @@ void Renderer::on_resize(uint32_t width, uint32_t height) noexcept
     resize_target(m_g_buffer.depth_stencil);
 }
 
-void Renderer::render_gbuffer_pass(rhi::Command_List* cmd)
+void Renderer::render_gbuffer_pass(Static_Scene_Data& scene, rhi::Command_List* cmd)
 {
     cmd->begin_debug_region("GBuffer Pass", 1.f, .5f, 1.f);
 
@@ -337,32 +339,63 @@ void Renderer::render_gbuffer_pass(rhi::Command_List* cmd)
     cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);
 
     // TODO: TESTING
-    /*
     auto draw_pipeline = m_app.get_asset_repository().get_graphics_pipeline("basic_draw");
     cmd->set_pipeline(draw_pipeline);
-    auto* model = m_app.get_asset_repository().get_model("Sponza.renmdl");
-    for (auto& instance : model->instances)
+
+    cmd->set_index_buffer(scene.get_index_buffer(), rhi::Index_Type::U32);
+    for (auto& model_instance : scene.get_instances())
     {
-        cmd->set_index_buffer(model->indices, rhi::Index_Type::U32);
-        for (auto i = instance.submeshes_range_start; i < instance.submeshes_range_end; ++i)
+        auto* const model = model_instance.model;
+        for (auto& mesh_instance : model_instance.mesh_instances)
         {
-            auto& submesh = model->submeshes[i];
-            auto index_count = submesh.index_range[1] - submesh.index_range[0];
-            cmd->set_push_constants<Immediate_Draw_Push_Constants>({
-                .position_buffer = model->vertex_positions->buffer_view->bindless_index,
-                .attribute_buffer = model->vertex_attributes->buffer_view->bindless_index,
-                .camera_buffer = m_camera_buffer,
-                .vertex_offset = submesh.vertex_position_range[0]
-            }, rhi::Pipeline_Bind_Point::Graphics);
-            cmd->draw_indexed(
-                index_count,
-                1,
-                submesh.index_range[0],
-                0,
-                0);
+            // TODO: this is really bad, slow, and only for testing.
+            // Upload only deltas later on instead and disperse via compute shader.
+            XMMATRIX transform_matrix = model_instance.trs.to_mat();
+            std::vector<Mesh_Instance*> transform_path;
+            Mesh_Instance* current_parent = mesh_instance.parent;
+            while (current_parent != nullptr)
+            {
+                transform_path.push_back(current_parent);
+                current_parent = current_parent->parent;
+            }
+            for (const auto* instance : transform_path | std::views::reverse)
+            {
+                transform_matrix = XMMatrixMultiply(transform_matrix, instance->trs.to_mat());
+            }
+
+            GPU_Instance gpu_instance = {
+                .mesh_to_world = mesh_instance.trs.to_transform(transform_matrix),
+                .normal_to_world = mesh_instance.trs.to_transposed_adjugate(transform_matrix)
+            };
+
+            m_app.upload_buffer_data_immediate(
+                scene.get_instance_transform_buffer(),
+                &gpu_instance,
+                sizeof(GPU_Instance),
+                mesh_instance.instance_transform_index * sizeof(GPU_Instance)
+                );
+
+            for (auto& submesh_instance : mesh_instance.submesh_instances)
+            {
+                auto* const submesh = submesh_instance.submesh;
+
+                cmd->set_push_constants<Immediate_Draw_Push_Constants>({
+                    .position_buffer = model->vertex_positions->buffer_view->bindless_index,
+                    .attribute_buffer = model->vertex_attributes->buffer_view->bindless_index,
+                    .camera_buffer = m_camera_buffer,
+                    .instance_transform_buffer = scene.get_instance_transform_buffer()->buffer_view->bindless_index,
+                    .vertex_offset = submesh->first_vertex
+                }, rhi::Pipeline_Bind_Point::Graphics);
+                cmd->draw_indexed(
+                    submesh->index_count,
+                    1,
+                    submesh->first_index,
+                    0,
+                    mesh_instance.instance_transform_index);
+            }
         }
     }
-    */
+
     cmd->end_render_pass();
 
     cmd->end_debug_region();

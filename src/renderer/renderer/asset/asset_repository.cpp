@@ -5,6 +5,7 @@
 #include <shared/serialized_asset_formats.hpp>
 #include "renderer/application.hpp"
 #include "renderer/filesystem/mapped_file.hpp"
+#include "renderer/filesystem/file_util.hpp"
 
 #include "rhi/graphics_device.hpp"
 
@@ -56,12 +57,6 @@ Asset_Repository::Asset_Repository(
 
 Asset_Repository::~Asset_Repository()
 {
-    // for (auto& model : m_models)
-    // {
-    //     m_graphics_device->destroy_buffer(model.indices);
-    //     m_graphics_device->destroy_buffer(model.vertex_positions);
-    //     m_graphics_device->destroy_buffer(model.vertex_attributes);
-    // }
     for (auto& file : m_files)
     {
         file.unmap();
@@ -103,73 +98,42 @@ Mapped_File* Asset_Repository::get_model(const std::string_view& name) const
     return m_model_ptrs.at(std::string(name));
 }
 
-enum class Shader_Type
+std::vector<std::string> Asset_Repository::get_model_files() const
 {
-    Vertex,
-    Pixel,
-    Compute,
-    Task,
-    Mesh,
-    Library,
-    Unknown
-};
+    std::vector<std::string> result;
+    result.reserve(m_model_ptrs.size());
+    for (const auto& key : m_model_ptrs.values() | std::views::keys)
+    {
+        result.push_back(key);
+    }
+    return result;
+}
 
-Shader_Type shader_type_from_string(std::string_view type)
+rhi::dxc::Shader_Type shader_type_from_string(std::string_view type)
 {
     if (type == "vs")
-        return Shader_Type::Vertex;
-    else if (type == "ps")
-        return Shader_Type::Pixel;
-    else if (type == "cs")
-        return Shader_Type::Compute;
-    else if (type == "ts")
-        return Shader_Type::Task;
-    else if (type == "ms")
-        return Shader_Type::Mesh;
-    else if (type == "lib")
-        return Shader_Type::Library;
-    return Shader_Type::Unknown;
-}
-
-std::wstring shader_model_from_shader_type(Shader_Type type)
-{
-    switch (type)
-    {
-    case ren::Shader_Type::Vertex:
-        return L"vs_6_8";
-    case ren::Shader_Type::Pixel:
-        return L"ps_6_8";
-    case ren::Shader_Type::Compute:
-        return L"cs_6_8";
-    case ren::Shader_Type::Task:
-        return L"as_6_8";
-    case ren::Shader_Type::Mesh:
-        return L"ms_6_8";
-    case ren::Shader_Type::Library:
-        return L"lib_6_8";
-    case ren::Shader_Type::Unknown:
-        std::unreachable();
-    default:
-        std::unreachable();
-    }
-}
-
-std::vector<uint8_t> load_file_binary_unsafe(const char* path)
-{
-    std::vector<uint8_t> result;
-    std::ifstream file(path, std::ios::binary);
-    file.unsetf(std::ios::skipws);
-    std::streampos file_size;
-    file.seekg(0, std::ios::end);
-    file_size = file.tellg();
-    file.seekg(0, std::ios::beg);
-    result.reserve(file_size);
-    result.insert(
-        result.begin(),
-        std::istream_iterator<uint8_t>(file),
-        std::istream_iterator<uint8_t>());
-    file.close();
-    return result;
+        return rhi::dxc::Shader_Type::Vertex;
+    if (type == "ps")
+        return rhi::dxc::Shader_Type::Pixel;
+    if (type == "cs")
+        return rhi::dxc::Shader_Type::Compute;
+    if (type == "ts")
+        return rhi::dxc::Shader_Type::Task;
+    if (type == "ms")
+        return rhi::dxc::Shader_Type::Mesh;
+    if (type == "rgen")
+        return rhi::dxc::Shader_Type::Ray_Gen;
+    if (type == "rahit")
+        return rhi::dxc::Shader_Type::Ray_Any_Hit;
+    if (type == "rchit")
+        return rhi::dxc::Shader_Type::Ray_Closest_Hit;
+    if (type == "rmiss")
+        return rhi::dxc::Shader_Type::Ray_Miss;
+    if (type == "rint")
+        return rhi::dxc::Shader_Type::Ray_Intersection;
+    if (type == "rcall")
+        return rhi::dxc::Shader_Type::Ray_Callable;
+    std::unreachable();
 }
 
 void Asset_Repository::compile_shader_library(
@@ -287,9 +251,6 @@ void Asset_Repository::compile_shader_library(
         }
 
         m_logger->debug("Enumerating shader permutations.");
-        // index, divisor
-        // std::vector<std::tuple<std::size_t, std::size_t>> permutation_iter_indices;
-        // permutation_iter_indices.reserve(permutation_groups.size());
         std::vector<std::size_t> permutation_value_indices;
         permutation_value_indices.reserve(permutation_groups.size());
         auto permutation_count = 1ull;
@@ -321,7 +282,6 @@ void Asset_Repository::compile_shader_library(
             for (auto j = 0; j < permutation_groups.size(); ++j)
             {
                 auto& permutation_group = permutation_groups[j];
-                // auto& [index, divisor] = permutation_iter_indices[j];
                 auto index = permutation_value_indices[j] % permutation_group.define_values[0].size();
 
                 // Add the permutation defines for the given permutation group and index
@@ -376,7 +336,10 @@ void Asset_Repository::compile_shader_library(
             .data = file.data(),
             .data_size = file.size(),
             .entrypoint = std::wstring(entry_point.begin(), entry_point.end()),
-            .shader_model = shader_model_from_shader_type(shader_type)
+            .matrix_majorness = rhi::dxc::Matrix_Majorness::Column_Major,
+            .shader_type = shader_type,
+            .version = rhi::dxc::Shader_Version::SM6_8,
+            .embed_debug = true
         };
         rhi::dxc::Shader_Compiler_Settings settings = {
             .include_dirs = include_dirs
@@ -415,7 +378,7 @@ void Asset_Repository::compile_shader_library(
     shader_library->json_path = json_path;
     m_logger->info("Successfully created shader library '{}'", shader_library_lookup_name);
 
-    if (shader_type == Shader_Type::Compute)
+    if (shader_type == rhi::dxc::Shader_Type::Compute)
     {
         m_logger->debug("Creating or updating associated compute library.");
         if (!m_compute_library_ptrs.contains(name))
@@ -427,274 +390,6 @@ void Asset_Repository::compile_shader_library(
         compute_library->create_pipelines(m_graphics_device, shader_library);
         m_logger->info("Successfully created compute library '{}'", name);
     }
-}
-
-rhi::Image_Format image_format_from_string(std::string_view str)
-{
-    constexpr static auto IMAGE_FORMATS =
-        std::to_array<std::pair<const std::string_view, const rhi::Image_Format>>(
-        {
-            {"Undefined", rhi::Image_Format::Undefined},
-            {"R8_UNORM", rhi::Image_Format::R8_UNORM},
-            {"R8_SNORM",rhi::Image_Format::R8_SNORM},
-            {"R8_UINT", rhi::Image_Format::R8_UINT},
-            {"R8_SINT", rhi::Image_Format::R8_SINT},
-            {"R8G8_UNORM", rhi::Image_Format::R8G8_UNORM},
-            {"R8G8_SNORM", rhi::Image_Format::R8G8_SNORM},
-            {"R8G8_UINT", rhi::Image_Format::R8G8_UINT},
-            {"R8G8_SINT", rhi::Image_Format::R8G8_SINT},
-            {"R8G8B8A8_UNORM", rhi::Image_Format::R8G8B8A8_UNORM},
-            {"R8G8B8A8_SNORM", rhi::Image_Format::R8G8B8A8_SNORM},
-            {"R8G8B8A8_UINT", rhi::Image_Format::R8G8B8A8_UINT},
-            {"R8G8B8A8_SINT", rhi::Image_Format::R8G8B8A8_SINT},
-            {"R8G8B8A8_SRGB", rhi::Image_Format::R8G8B8A8_SRGB},
-            {"B8G8R8A8_UNORM", rhi::Image_Format::B8G8R8A8_UNORM},
-            {"B8G8R8A8_SNORM", rhi::Image_Format::B8G8R8A8_SNORM},
-            {"B8G8R8A8_UINT", rhi::Image_Format::B8G8R8A8_UINT},
-            {"B8G8R8A8_SINT", rhi::Image_Format::B8G8R8A8_SINT},
-            {"B8G8R8A8_SRGB", rhi::Image_Format::B8G8R8A8_SRGB},
-            {"A2R10G10B10_UNORM_PACK32", rhi::Image_Format::A2R10G10B10_UNORM_PACK32},
-            {"R16_UNORM", rhi::Image_Format::R16_UNORM},
-            {"R16_SNORM", rhi::Image_Format::R16_SNORM},
-            {"R16_UINT", rhi::Image_Format::R16_UINT},
-            {"R16_SINT", rhi::Image_Format::R16_SINT},
-            {"R16_SFLOAT", rhi::Image_Format::R16_SFLOAT},
-            {"R16G16_UNORM", rhi::Image_Format::R16G16_UNORM},
-            {"R16G16_SNORM", rhi::Image_Format::R16G16_SNORM},
-            {"R16G16_UINT", rhi::Image_Format::R16G16_UINT},
-            {"R16G16_SINT", rhi::Image_Format::R16G16_SINT},
-            {"R16G16_SFLOAT", rhi::Image_Format::R16G16_SFLOAT},
-            {"R16G16B16A16_UNORM", rhi::Image_Format::R16G16B16A16_UNORM},
-            {"R16G16B16A16_SNORM", rhi::Image_Format::R16G16B16A16_SNORM},
-            {"R16G16B16A16_UINT", rhi::Image_Format::R16G16B16A16_UINT},
-            {"R16G16B16A16_SINT", rhi::Image_Format::R16G16B16A16_SINT},
-            {"R16G16B16A16_SFLOAT", rhi::Image_Format::R16G16B16A16_SFLOAT},
-            {"R32_UINT", rhi::Image_Format::R32_UINT},
-            {"R32_SINT", rhi::Image_Format::R32_SINT},
-            {"R32_SFLOAT", rhi::Image_Format::R32_SFLOAT},
-            {"R32G32_UINT", rhi::Image_Format::R32G32_UINT},
-            {"R32G32_SINT", rhi::Image_Format::R32G32_SINT},
-            {"R32G32_SFLOAT", rhi::Image_Format::R32G32_SFLOAT},
-            {"R32G32B32A32_UINT", rhi::Image_Format::R32G32B32A32_UINT},
-            {"R32G32B32A32_SINT", rhi::Image_Format::R32G32B32A32_SINT},
-            {"R32G32B32A32_SFLOAT", rhi::Image_Format::R32G32B32A32_SFLOAT},
-            {"B10G11R11_UFLOAT_PACK32", rhi::Image_Format::B10G11R11_UFLOAT_PACK32},
-            {"E5B9G9R9_UFLOAT_PACK32", rhi::Image_Format::E5B9G9R9_UFLOAT_PACK32},
-            {"D16_UNORM", rhi::Image_Format::D16_UNORM},
-            {"D32_SFLOAT", rhi::Image_Format::D32_SFLOAT},
-            {"D24_UNORM_S8_UINT", rhi::Image_Format::D24_UNORM_S8_UINT},
-            {"D32_SFLOAT_S8_UINT", rhi::Image_Format::D32_SFLOAT_S8_UINT},
-            {"BC1_RGB_UNORM_BLOCK", rhi::Image_Format::BC1_RGB_UNORM_BLOCK},
-            {"BC1_RGB_SRGB_BLOCK", rhi::Image_Format::BC1_RGB_SRGB_BLOCK},
-            {"BC1_RGBA_UNORM_BLOCK", rhi::Image_Format::BC1_RGBA_UNORM_BLOCK},
-            {"BC1_RGBA_SRGB_BLOCK", rhi::Image_Format::BC1_RGBA_SRGB_BLOCK},
-            {"BC2_UNORM_BLOCK", rhi::Image_Format::BC2_UNORM_BLOCK},
-            {"BC2_SRGB_BLOCK", rhi::Image_Format::BC2_SRGB_BLOCK},
-            {"BC3_UNORM_BLOCK", rhi::Image_Format::BC3_UNORM_BLOCK},
-            {"BC3_SRGB_BLOCK", rhi::Image_Format::BC3_SRGB_BLOCK},
-            {"BC4_UNORM_BLOCK", rhi::Image_Format::BC4_UNORM_BLOCK},
-            {"BC4_SNORM_BLOCK", rhi::Image_Format::BC4_SNORM_BLOCK},
-            {"BC5_UNORM_BLOCK", rhi::Image_Format::BC5_UNORM_BLOCK},
-            {"BC5_SNORM_BLOCK", rhi::Image_Format::BC5_SNORM_BLOCK},
-            {"BC6H_UFLOAT_BLOCK", rhi::Image_Format::BC6H_UFLOAT_BLOCK},
-            {"BC6H_SFLOAT_BLOCK", rhi::Image_Format::BC6H_SFLOAT_BLOCK},
-            {"BC7_UNORM_BLOCK", rhi::Image_Format::BC7_UNORM_BLOCK},
-            {"BC7_SRGB_BLOCK", rhi::Image_Format::BC7_SRGB_BLOCK}
-        });
-        for (const auto& [string_val, enum_val] : IMAGE_FORMATS)
-        {
-            if (string_val == str)
-                return enum_val;
-        }
-        return rhi::Image_Format::Undefined;
-}
-
-rhi::Blend_Factor blend_factor_from_string(std::string_view str)
-{
-    constexpr static auto BLEND_FACTORS =
-        std::to_array<std::pair<const std::string_view, const rhi::Blend_Factor>>(
-        {
-            {"Zero", rhi::Blend_Factor::Zero},
-            {"One", rhi::Blend_Factor::One},
-            {"Src_Color", rhi::Blend_Factor::Src_Color},
-            {"One_Minus_Src_Color", rhi::Blend_Factor::One_Minus_Src_Color},
-            {"Dst_Color", rhi::Blend_Factor::Dst_Color},
-            {"One_Minus_Dst_Color", rhi::Blend_Factor::One_Minus_Dst_Color},
-            {"Src_Alpha", rhi::Blend_Factor::Src_Alpha},
-            {"One_Minus_Src_Alpha", rhi::Blend_Factor::One_Minus_Src_Alpha},
-            {"Dst_Alpha", rhi::Blend_Factor::Dst_Alpha},
-            {"One_Minus_Dst_Alpha", rhi::Blend_Factor::One_Minus_Dst_Alpha},
-            {"Constant_Color", rhi::Blend_Factor::Constant_Color},
-            {"One_Minus_Constant_Color", rhi::Blend_Factor::One_Minus_Constant_Color},
-            {"Constant_Alpha", rhi::Blend_Factor::Constant_Alpha},
-            {"One_Minus_Constant_Alpha", rhi::Blend_Factor::One_Minus_Constant_Alpha},
-            {"Src1_Color", rhi::Blend_Factor::Src1_Color},
-            {"One_Minus_Src1_Color", rhi::Blend_Factor::One_Minus_Src1_Color},
-            {"Src1_Alpha", rhi::Blend_Factor::Src1_Alpha},
-            {"One_Minus_Src1_Alpha", rhi::Blend_Factor::One_Minus_Src1_Alpha}
-        });
-    for (const auto& [string_val, enum_val] : BLEND_FACTORS)
-    {
-        if (string_val == str)
-            return enum_val;
-    }
-    return rhi::Blend_Factor::Zero;
-}
-
-rhi::Blend_Op blend_op_from_string(std::string_view str)
-{
-    constexpr static auto BLEND_OPS =
-        std::to_array<std::pair<const std::string_view, const rhi::Blend_Op>>(
-        {
-            {"Add", rhi::Blend_Op::Add},
-            {"Sub", rhi::Blend_Op::Sub},
-            {"Reverse_Sub", rhi::Blend_Op::Reverse_Sub},
-            {"Min", rhi::Blend_Op::Min},
-            {"Max", rhi::Blend_Op::Max},
-        });
-    for (const auto& [string_val, enum_val] : BLEND_OPS)
-    {
-        if (string_val == str)
-            return enum_val;
-    }
-    return rhi::Blend_Op::Add;
-}
-
-rhi::Logic_Op logic_op_from_string(std::string_view str)
-{
-    constexpr static auto LOGIC_OPS =
-        std::to_array<std::pair<const std::string_view, const rhi::Logic_Op>>(
-        {
-            {"Clear", rhi::Logic_Op::Clear},
-            {"Set", rhi::Logic_Op::Set},
-            {"Copy", rhi::Logic_Op::Copy},
-            {"Copy_Inverted", rhi::Logic_Op::Copy_Inverted},
-            {"Noop", rhi::Logic_Op::Noop},
-            {"Invert", rhi::Logic_Op::Invert},
-            {"AND", rhi::Logic_Op::AND},
-            {"NAND", rhi::Logic_Op::NAND},
-            {"OR", rhi::Logic_Op::OR},
-            {"NOR", rhi::Logic_Op::NOR},
-            {"XOR", rhi::Logic_Op::XOR},
-            {"Equiv", rhi::Logic_Op::Equiv},
-            {"AND_Reverse", rhi::Logic_Op::AND_Reverse},
-            {"AND_Inverted", rhi::Logic_Op::AND_Inverted},
-            {"OR_Reverse", rhi::Logic_Op::OR_Reverse},
-            {"OR_Inverted", rhi::Logic_Op::OR_Inverted},
-        });
-    for (const auto& [string_val, enum_val] : LOGIC_OPS)
-    {
-        if (string_val == str)
-            return enum_val;
-    }
-    return rhi::Logic_Op::Clear;
-}
-
-rhi::Color_Component color_component_from_string(std::string_view str)
-{
-    rhi::Color_Component components{0};
-    if (str.contains('R') || str.contains('r') ) components = components | rhi::Color_Component::R_Bit;
-    if (str.contains('G') || str.contains('g') ) components = components | rhi::Color_Component::G_Bit;
-    if (str.contains('B') || str.contains('b') ) components = components | rhi::Color_Component::B_Bit;
-    if (str.contains('A') || str.contains('a') ) components = components | rhi::Color_Component::A_Bit;
-    return components;
-}
-
-rhi::Comparison_Func comparison_func_from_string(const std::string_view str)
-{
-    constexpr static auto COMPARISON_FUNCS =
-        std::to_array<std::pair<const std::string_view, const rhi::Comparison_Func>>(
-        {
-            {"None", rhi::Comparison_Func::None},
-            {"Never", rhi::Comparison_Func::Never},
-            {"Less", rhi::Comparison_Func::Less},
-            {"Equal", rhi::Comparison_Func::Equal},
-            {"Less_Equal", rhi::Comparison_Func::Less_Equal},
-            {"Greater", rhi::Comparison_Func::Greater},
-            {"Not_Equal", rhi::Comparison_Func::Not_Equal},
-            {"Greater_Equal", rhi::Comparison_Func::Greater_Equal},
-            {"Always", rhi::Comparison_Func::Always},
-        });
-    for (const auto& [string_val, enum_val] : COMPARISON_FUNCS)
-    {
-        if (string_val == str)
-            return enum_val;
-    }
-    return rhi::Comparison_Func::None;
-}
-
-rhi::Stencil_Op stencil_op_from_string(const std::string_view str)
-{
-    constexpr static auto STENCIL_OPS =
-        std::to_array<std::pair<const std::string_view, const rhi::Stencil_Op>>(
-        {
-            {"Keep", rhi::Stencil_Op::Keep},
-            {"Zero", rhi::Stencil_Op::Zero},
-            {"Replace", rhi::Stencil_Op::Replace},
-            {"Incr_Sat", rhi::Stencil_Op::Incr_Sat},
-            {"Decr_Sat", rhi::Stencil_Op::Decr_Sat},
-            {"Invert", rhi::Stencil_Op::Invert},
-            {"Incr", rhi::Stencil_Op::Incr},
-            {"Decr", rhi::Stencil_Op::Decr},
-        });
-    for (const auto& [string_val, enum_val] : STENCIL_OPS)
-    {
-        if (string_val == str)
-            return enum_val;
-    }
-    return rhi::Stencil_Op::Keep;
-}
-
-rhi::Depth_Bounds_Test_Mode depth_bounds_test_mode_from_string(const std::string_view str)
-{
-    constexpr static auto DEPTH_BOUNDS_TEST_MODES =
-        std::to_array<std::pair<const std::string_view, const rhi::Depth_Bounds_Test_Mode>>(
-        {
-            {"Disabled", rhi::Depth_Bounds_Test_Mode::Disabled},
-            {"Static", rhi::Depth_Bounds_Test_Mode::Static},
-            {"Dynamic", rhi::Depth_Bounds_Test_Mode::Dynamic},
-        });
-    for (const auto& [string_val, enum_val] : DEPTH_BOUNDS_TEST_MODES)
-    {
-        if (string_val == str)
-            return enum_val;
-    }
-    return rhi::Depth_Bounds_Test_Mode::Disabled;
-}
-
-rhi::Cull_Mode cull_mode_from_string(const std::string_view str)
-{
-    constexpr static auto CULL_MODES =
-        std::to_array<std::pair<const std::string_view, const rhi::Cull_Mode>>(
-        {
-            {"None", rhi::Cull_Mode::None},
-            {"Front", rhi::Cull_Mode::Front},
-            {"Back", rhi::Cull_Mode::Back},
-        });
-    for (const auto& [string_val, enum_val] : CULL_MODES)
-    {
-        if (string_val == str)
-            return enum_val;
-    }
-    return rhi::Cull_Mode::None;
-}
-
-rhi::Primitive_Topology_Type primitive_topology_from_string(const std::string_view str)
-{
-    constexpr static auto PRIMITIVE_TOPOLOGY_TYPES =
-        std::to_array<std::pair<const std::string_view, const rhi::Primitive_Topology_Type>>(
-        {
-            {"Point", rhi::Primitive_Topology_Type::Point},
-            {"Line", rhi::Primitive_Topology_Type::Line},
-            {"Triangle", rhi::Primitive_Topology_Type::Triangle},
-            {"Patch", rhi::Primitive_Topology_Type::Patch},
-        });
-    for (const auto& [string_val, enum_val] : PRIMITIVE_TOPOLOGY_TYPES)
-    {
-        if (string_val == str)
-            return enum_val;
-    }
-    return rhi::Primitive_Topology_Type::Triangle;
 }
 
 void Asset_Repository::compile_graphics_pipeline_library(const std::string_view& json_path)
@@ -768,33 +463,33 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
                 ? color_attachment_json["logic_op_enable"].get<bool>()
                 : false;
             ca_blend.color_src_blend = color_attachment_json.contains("color_src_blend")
-                ? blend_factor_from_string(color_attachment_json["color_src_blend"].get<std::string>())
+                ? rhi::blend_factor_from_string(color_attachment_json["color_src_blend"].get<std::string>())
                 : rhi::Blend_Factor::Zero;
             ca_blend.color_dst_blend = color_attachment_json.contains("color_dst_blend")
-                ? blend_factor_from_string(color_attachment_json["color_dst_blend"].get<std::string>())
+                ? rhi::blend_factor_from_string(color_attachment_json["color_dst_blend"].get<std::string>())
                 : rhi::Blend_Factor::Zero;
             ca_blend.color_blend_op = color_attachment_json.contains("color_blend_op")
-                ? blend_op_from_string(color_attachment_json["color_blend_op"].get<std::string>())
+                ? rhi::blend_op_from_string(color_attachment_json["color_blend_op"].get<std::string>())
                 : rhi::Blend_Op::Add;
             ca_blend.alpha_src_blend = color_attachment_json.contains("alpha_src_blend")
-                ? blend_factor_from_string(color_attachment_json["alpha_src_blend"].get<std::string>())
+                ? rhi::blend_factor_from_string(color_attachment_json["alpha_src_blend"].get<std::string>())
                 : rhi::Blend_Factor::Zero;
             ca_blend.alpha_dst_blend = color_attachment_json.contains("alpha_dst_blend")
-                ? blend_factor_from_string(color_attachment_json["alpha_dst_blend"].get<std::string>())
+                ? rhi::blend_factor_from_string(color_attachment_json["alpha_dst_blend"].get<std::string>())
                 : rhi::Blend_Factor::Zero;
             ca_blend.alpha_blend_op = color_attachment_json.contains("alpha_blend_op")
-                ? blend_op_from_string(color_attachment_json["alpha_blend_op"].get<std::string>())
+                ? rhi::blend_op_from_string(color_attachment_json["alpha_blend_op"].get<std::string>())
                 : rhi::Blend_Op::Add;
             ca_blend.logic_op = color_attachment_json.contains("logic_op")
-                ? logic_op_from_string(color_attachment_json["logic_op"].get<std::string>())
+                ? rhi::logic_op_from_string(color_attachment_json["logic_op"].get<std::string>())
                 : rhi::Logic_Op::Clear;
             ca_blend.color_write_mask = color_attachment_json.contains("color_write_mask")
-                ? color_component_from_string(color_attachment_json["color_write_mask"].get<std::string>())
+                ? rhi::color_component_from_string(color_attachment_json["color_write_mask"].get<std::string>())
                 : rhi::Color_Component::Enable_All;
 
             auto& ca_format = color_attachments[color_attachment_count];
             ca_format = color_attachment_json.contains("format")
-                ? image_format_from_string(color_attachment_json["format"].get<std::string>())
+                ? rhi::get_image_format_info(color_attachment_json["format"].get<std::string>()).format
                 : rhi::Image_Format::Undefined;
 
             color_attachment_count += 1;
@@ -806,7 +501,7 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
         auto& depth_stencil_json = pipeline_json["depth_stencil"];
 
         depth_stencil_format = depth_stencil_json.contains("format")
-            ? image_format_from_string(depth_stencil_json["format"].get<std::string>())
+            ? rhi::get_image_format_info(depth_stencil_json["format"].get<std::string>()).format
             : rhi::Image_Format::Undefined;
 
         depth_stencil_info.depth_enable = depth_stencil_json.contains("depth_enable")
@@ -816,7 +511,7 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
             ? depth_stencil_json["depth_write_enable"].get<bool>()
             : false;
         depth_stencil_info.comparison_func = depth_stencil_json.contains("comparison_func")
-            ? comparison_func_from_string(depth_stencil_json["comparison_func"].get<std::string>())
+            ? rhi::comparison_func_from_string(depth_stencil_json["comparison_func"].get<std::string>())
             : rhi::Comparison_Func::None;
         depth_stencil_info.stencil_enable = depth_stencil_json.contains("stencil_enable")
             ? depth_stencil_json["stencil_enable"].get<bool>()
@@ -828,16 +523,16 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
                 return;
             auto& stencil_json = depth_stencil_json[stencil_info_str];
             stencil_face_info.fail = depth_stencil_json.contains("fail")
-                ? stencil_op_from_string(stencil_json["fail"].get<std::string>())
+                ? rhi::stencil_op_from_string(stencil_json["fail"].get<std::string>())
                 : rhi::Stencil_Op::Keep;
             stencil_face_info.depth_fail = depth_stencil_json.contains("depth_fail")
-                ? stencil_op_from_string(stencil_json["depth_fail"].get<std::string>())
+                ? rhi::stencil_op_from_string(stencil_json["depth_fail"].get<std::string>())
                 : rhi::Stencil_Op::Keep;
             stencil_face_info.pass = depth_stencil_json.contains("pass")
-                ? stencil_op_from_string(stencil_json["pass"].get<std::string>())
+                ? rhi::stencil_op_from_string(stencil_json["pass"].get<std::string>())
                 : rhi::Stencil_Op::Keep;
             stencil_face_info.comparison_func = depth_stencil_json.contains("comparison_func")
-                ? comparison_func_from_string(depth_stencil_json["comparison_func"].get<std::string>())
+                ? rhi::comparison_func_from_string(depth_stencil_json["comparison_func"].get<std::string>())
                 : rhi::Comparison_Func::None;
             stencil_face_info.stencil_read_mask = depth_stencil_json.contains("stencil_read_mask")
                 ? uint8_t(stencil_json["stencil_read_mask"].get<uint32_t>())
@@ -850,7 +545,7 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
         set_stencil_info(depth_stencil_info.stencil_back_face, "stencil_back_face");
 
         depth_stencil_info.depth_bounds_test_mode = depth_stencil_json.contains("depth_bounds_test_mode")
-            ? depth_bounds_test_mode_from_string(depth_stencil_json["depth_bounds_test_mode"].get<std::string>())
+            ? rhi::depth_bounds_test_mode_from_string(depth_stencil_json["depth_bounds_test_mode"].get<std::string>())
             : rhi::Depth_Bounds_Test_Mode::Disabled;
         depth_stencil_info.depth_bounds_min = depth_stencil_json.contains("depth_bounds_min")
             ? depth_stencil_json["depth_bounds_min"].get<float>()
@@ -867,7 +562,7 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
             ? static_cast<rhi::Fill_Mode>(rasterizer_json["wireframe"].get<bool>())
             : rhi::Fill_Mode::Solid;
         rasterizer_state_info.cull_mode = rasterizer_json.contains("cull_mode")
-            ? cull_mode_from_string(rasterizer_json["cull_mode"].get<std::string>())
+            ? rhi::cull_mode_from_string(rasterizer_json["cull_mode"].get<std::string>())
             : rhi::Cull_Mode::None;
         rasterizer_state_info.winding_order = rasterizer_json.contains("front_face_cw")
             ? static_cast<rhi::Winding_Order>(rasterizer_json["front_face_cw"].get<bool>())
@@ -887,7 +582,7 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
     }
 
     primitive_topology = pipeline_json.contains("primitive_topology")
-        ? primitive_topology_from_string(pipeline_json["primitive_topology"].get<std::string>())
+        ? rhi::primitive_topology_from_string(pipeline_json["primitive_topology"].get<std::string>())
         : rhi::Primitive_Topology_Type::Triangle;
 
     rhi::Pipeline* pipeline = nullptr;
@@ -1096,54 +791,6 @@ void Asset_Repository::register_texture(const std::filesystem::path& path)
     auto& texture = *m_texture_ptrs.at(texture_identifier);
     texture = mapped_file;
     m_logger->debug("Registered texture '{}'", path.string());
-    /*
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file.is_open())
-    {
-        m_logger->error("Failed to open file '{}'", path.string());
-        return;
-    }
-    const std::streamsize stream_size = file.tellg();
-    file.seekg(0, std::ios::beg);
-    std::vector<char> buffer(stream_size);
-    if (file.read(buffer.data(), stream_size))
-    {
-        auto* header = reinterpret_cast<serialization::Image_Header*>(buffer.data());
-        if (!header->validate())
-        {
-            m_logger->error("Failed to validate image '{}'", path.string());
-            file.close();
-            return;
-        }
-
-        auto* data = reinterpret_cast<serialization::Image_Data_00*>(buffer.data());
-
-        const auto texture_identifier = path.filename().string();
-        if (!m_texture_ptrs.contains(texture_identifier))
-        {
-            m_texture_ptrs[texture_identifier] = m_textures.acquire();
-        }
-        auto& texture = *m_texture_ptrs.at(texture_identifier);
-        rhi::Image_Create_Info create_info = {
-            .format = data->format,
-            .width = data->mips[0].width,
-            .height = data->mips[0].height,
-            .depth = 1,
-            .array_size = 1,
-            .mip_levels = static_cast<uint16_t>(data->mip_count),
-            .usage = rhi::Image_Usage::Sampled,
-            .primary_view_type = rhi::Image_View_Type::Texture_2D
-        };
-        texture.image = m_graphics_device->create_image(create_info).value_or(nullptr);
-        m_graphics_device->name_resource(texture.image, (std::string("texture:") + data->name).c_str());
-        std::array<void*, 14> mip_data_ptrs;
-        for (uint32_t i = 0; i < texture.image->mip_levels; ++i)
-        {
-            mip_data_ptrs[i] = data->get_mip_data(i);
-        }
-        m_app.upload_image_data_immediate_full(texture.image, mip_data_ptrs.data());
-    }
-    */
 }
 
 void Asset_Repository::register_models()
@@ -1184,104 +831,5 @@ void Asset_Repository::register_model(const std::filesystem::path& path)
     auto& model = *m_model_ptrs.at(model_identifier);
     model = mapped_file;
     m_logger->debug("Registered model '{}'", path.string());
-
-    /*
-
-    auto* header = static_cast<serialization::Model_Header_00*>(mapped_file.data);
-
-    // create buffers
-    {
-        rhi::Buffer_Create_Info buffer_create_info = {
-            .size = header->vertex_position_count * sizeof(std::array<float, 3>),
-            .heap = rhi::Memory_Heap_Type::GPU
-        };
-        model.vertex_positions = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-        m_graphics_device->name_resource(model.vertex_positions, (std::string("gltf:") + model_identifier + ":position").c_str());
-        buffer_create_info.size = header->vertex_attribute_count * sizeof(serialization::Vertex_Attributes);
-        model.vertex_attributes = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-        m_graphics_device->name_resource(model.vertex_attributes, (std::string("gltf:") + model_identifier + ":attributes").c_str());
-        buffer_create_info.size = header->index_count * sizeof(uint32_t);
-        model.indices = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-        m_graphics_device->name_resource(model.indices, (std::string("gltf:") + model_identifier + ":indices").c_str());
-    }
-
-    auto* referenced_uris = header->get_referenced_uris();
-    auto* materials = header->get_materials();
-    model.submeshes.reserve(header->submesh_count);
-    const auto* submeshes = header->get_submeshes();
-
-    for (auto i = 0; i < header->submesh_count; ++i)
-    {
-        const auto& submesh_data = submeshes[i];
-        model.submeshes.emplace_back( Loadable_Model_Submesh{
-            .vertex_position_range = {
-                submesh_data.vertex_position_range_start,
-                submesh_data.vertex_position_range_end
-            },
-            .vertex_attribute_range = {
-                submesh_data.vertex_attribute_range_start,
-                submesh_data.vertex_attribute_range_end
-            },
-            .index_range = {
-                submesh_data.index_range_start,
-                submesh_data.index_range_end
-            },
-            .material_index = submesh_data.material_index
-        } );
-    }
-
-    model.instances.reserve(header->instance_count);
-    const auto* instances = header->get_instances();
-
-    for (auto i = 0; i < header->instance_count; ++i)
-    {
-        const auto& instance_data = instances[i];
-        model.instances.emplace_back( Loadable_Model_Mesh_Instance{
-            .submeshes_range_start = instance_data.submeshes_range_start,
-            .submeshes_range_end  = instance_data.submeshes_range_end,
-            .parent_index = instance_data.parent_index,
-            .translation = {
-                instance_data.translation[0],
-                instance_data.translation[1],
-                instance_data.translation[2]
-            },
-            .rotation = {
-                instance_data.rotation[0],
-                instance_data.rotation[1],
-                instance_data.rotation[2],
-                instance_data.rotation[3]
-            },
-            .scale = {
-                instance_data.scale[0],
-                instance_data.scale[1],
-                instance_data.scale[2]
-            }
-        } );
-    }
-
-    auto* positions = header->get_vertex_positions();
-    m_app.upload_buffer_data_immediate(
-        model.vertex_positions,
-        positions,
-        header->vertex_position_count * sizeof(std::array<float, 3>),
-        0);
-
-    auto* attributes = header->get_vertex_attributes();
-    m_app.upload_buffer_data_immediate(
-        model.vertex_attributes,
-        attributes,
-        header->vertex_attribute_count * sizeof(serialization::Vertex_Attributes),
-        0);
-
-    auto* indices = header->get_indices();
-    m_app.upload_buffer_data_immediate(
-        model.indices,
-        indices,
-        header->index_count * sizeof(uint32_t),
-        0);
-
-    m_logger->info("Successfully loaded model '{}'", header->name);
-    mapped_file.unmap();
-    */
 }
 }

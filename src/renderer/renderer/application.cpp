@@ -3,6 +3,7 @@
 #include <chrono>
 #include <filesystem>
 #include <imgui.h>
+#include "renderer/imgui/imgui_util.hpp"
 
 namespace ren
 {
@@ -41,10 +42,15 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         .shader_include_paths = {
             "../",
             "../../src/shared/",
-            "../../thirdparty/rhi/src/shaders/"
+            //"../../thirdparty/rhi/src/shaders/"
         },
         .models = m_asset_path + "/cache/"},
         *this))
+    , m_static_scene_data(std::make_unique<Static_Scene_Data>(
+        *this,
+        m_logger,
+        *m_asset_repository,
+        m_device.get()))
     , m_resource_blackboard(std::make_unique<Render_Resource_Blackboard>(m_device.get()))
     , m_renderer(*this, *m_swapchain, *m_resource_blackboard, Imgui_Renderer_Create_Info{
         .device = m_device.get(),
@@ -188,7 +194,7 @@ std::string Application::init_asset_path() const
     auto dir = std::filesystem::path();
     for (uint32_t back_search = 0; back_search < 5; ++back_search)
     {
-        if (auto path_marker = dir / "assets" / "meta"; std::filesystem::exists(path_marker))
+        if (auto path_marker = dir / "assets" / "cache"; std::filesystem::exists(path_marker))
             break;
         dir = dir / "..";
     }
@@ -230,7 +236,7 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
 {
     auto graphics_cmd = frame.graphics_command_pool->acquire_command_list();
 
-    m_renderer.render(graphics_cmd, t, dt);
+    m_renderer.render(*m_static_scene_data, graphics_cmd, t, dt);
 
     auto cmds = std::to_array({ handle_immediate_uploads(frame), graphics_cmd });
 
@@ -375,6 +381,9 @@ void Application::process_gui() noexcept
     }
     if (m_imgui_data.windows.demo)
         ImGui::ShowDemoWindow(&m_imgui_data.windows.demo);
+
+    imgui_process_modals();
+
     ImGui::EndFrame();
 }
 
@@ -388,6 +397,56 @@ void Application::imgui_close_all_windows() noexcept
     m_imgui_data.windows.demo = false;
     m_imgui_data.windows.renderer_settings = false;
     m_imgui_data.windows.tool_cbt_vis = false;
+}
+
+void Application::imgui_process_modals() noexcept
+{
+    constexpr static auto MODAL_FLAGS = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+    constexpr static auto MODAL_WIDTH = 1280.f;
+    constexpr static auto MODAL_HEIGHT = 720.f;
+    if (m_imgui_data.modals.add_model)
+    {
+        constexpr static auto SCENE_SELECT_NAME = "Add Model";
+        ImGui::OpenPopup(SCENE_SELECT_NAME);
+        ImGui::SetNextWindowSize({MODAL_WIDTH, MODAL_HEIGHT}, ImGuiCond_Always);
+        ImGui::SetNextWindowPos({
+            (m_window->get_window_data().width - MODAL_WIDTH) / 2.f,
+            (m_window->get_window_data().height - MODAL_HEIGHT) / 2.f});
+        if (ImGui::BeginPopupModal(SCENE_SELECT_NAME, &m_imgui_data.modals.add_model, MODAL_FLAGS))
+        {
+            const auto model_files =  m_asset_repository->get_model_files();
+            static std::string selected = "";
+            if (ImGui::BeginListBox("Models"))
+            {
+                for (auto& file : model_files)
+                {
+                    auto is_selected = file == selected;
+                    if (ImGui::Selectable(file.c_str(), is_selected))
+                    {
+                        selected = file;
+                    }
+                }
+                ImGui::EndListBox();
+            }
+            if (ImGui::Button("Add"))
+            {
+                m_imgui_data.modals.add_model = false;
+                const Model_Descriptor descriptor = {
+                    .name = selected,
+                    .instances = {
+                        {
+                            .translation = { 0.f, 0.f, 0.f },
+                            .rotation = { 0.f, 0.f, 0.f, 1.f },
+                            .scale = { 1.f, 1.f, 1.f }
+                        }
+                    }
+                };
+                if (!selected.empty())
+                    m_static_scene_data->add_model(descriptor);
+            }
+            ImGui::EndPopup();
+        }
+    }
 }
 
 void Application::imgui_setup_style() noexcept
@@ -495,9 +554,9 @@ void Application::imgui_menubar() noexcept
     {
         if (ImGui::BeginMenu("Scene"))
         {
-            if (ImGui::MenuItem("Import Model..."))
+            if (ImGui::MenuItem("Add Model..."))
             {
-
+                m_imgui_data.modals.add_model = true;
             }
             ImGui::EndMenu();
         }

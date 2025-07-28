@@ -13,6 +13,7 @@ enum class GLTF_Error
     No_Error = 0,
     File_Load_Failed,
     Parse_Failed,
+    Unsupported_Extension,
     Non_Supported_Primitive,
     Non_Supported_Accessor,
     No_Buffer_View,
@@ -28,7 +29,7 @@ struct GLTF_Submesh
     std::vector<std::array<float, 3>> positions;
     std::vector<std::array<float, 4>> colors;
     std::vector<std::array<float, 3>> normals;
-    std::vector<std::array<float, 3>> tangents;
+    std::vector<std::array<float, 4>> tangents;
     std::vector<std::array<float, 2>> tex_coords;
     std::vector<std::array<uint32_t, 4>> joints;
     std::vector<std::array<float, 4>> weights;
@@ -63,7 +64,7 @@ struct GLTF_Texture_Load_Request
     std::vector<char> data;
     bool squash_gb_to_rg;
     std::string name;
-    char hash_identifier[32ull]; // serialization::HASH_IDENTIFIER_FIELD_SIZE
+    std::string hash_identifier;
     rhi::Image_Format target_format;
 };
 
