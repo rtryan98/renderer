@@ -389,7 +389,7 @@ void Renderer::render_gbuffer_pass(Static_Scene_Data& scene, rhi::Command_List* 
                 cmd->draw_indexed(
                     submesh->index_count,
                     1,
-                    submesh->first_index,
+                    submesh->first_index + model->index_buffer_allocation.offset,
                     0,
                     mesh_instance.instance_transform_index);
             }
@@ -433,6 +433,12 @@ void Renderer::render_ocean_pass(rhi::Command_List* cmd)
     cmd->set_viewport(0.f, 0.f, float(window_data.width) * scale, float(window_data.height) * scale, 0.f, 1.f);
     cmd->set_scissor(0, 0, window_data.width * scale, window_data.height * scale);
     m_ocean_renderer.render_patch(cmd, m_camera_buffer);
+
+    cmd->begin_debug_region("Ocean Debug Renderer", 1.f, .75f, .75f);
+    m_ocean_renderer.debug_render_slope(cmd, m_camera_buffer);
+    m_ocean_renderer.debug_render_normal(cmd, m_camera_buffer);
+    cmd->end_debug_region();
+
     cmd->end_render_pass();
 
     cmd->end_debug_region();
@@ -469,11 +475,6 @@ void Renderer::render_swapchain_pass(rhi::Command_List* cmd)
         m_ocean_rendertargets.depth_stencil,
         m_g_buffer.target0,
         m_g_buffer.depth_stencil);
-
-    cmd->begin_debug_region("Debug Renderer", 1.f, .75f, .75f);
-    m_ocean_renderer.debug_render_slope(cmd, m_camera_buffer);
-    m_ocean_renderer.debug_render_normal(cmd, m_camera_buffer);
-    cmd->end_debug_region();
 
     cmd->add_debug_marker("Dear ImGui", .5f, 1.f, .0f);
     m_imgui_renderer.render(cmd);

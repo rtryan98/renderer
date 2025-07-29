@@ -17,8 +17,7 @@ const static float2 OFFSETS[6] = {
 
 VS_Out main(uint vertex_id : SV_VertexID)
 {
-    rhi::Raw_Buffer camera_buffer = { pc.camera };
-    GPU_Camera_Data camera = camera_buffer.load_nuri<GPU_Camera_Data>();
+    GPU_Camera_Data camera = rhi::buf_load<GPU_Camera_Data>(pc.camera);
 
     uint quad_index = vertex_id / 6;
     uint triangle_vertex_index = vertex_id % 6;
@@ -31,15 +30,14 @@ VS_Out main(uint vertex_id : SV_VertexID)
         vertex_pos / pc.length_scales[2],
         vertex_pos / pc.length_scales[3]
     };
-    SamplerState tex_sampler = rhi::Sampler(pc.tex_sampler).get_nuri();
 
     float4 x_y_z_xdx = float4(0.,0.,0.,0.);
     float4 ydx_zdx_ydy_zdy = float4(0.,0.,0.,0.);
 
     for (uint i = 0; i < 4; ++i)
     {
-        x_y_z_xdx += rhi::Texture(pc.x_y_z_xdx_tex).sample_level_2d_array_uniform<float4>(tex_sampler, uvs[i], 0, i);
-        ydx_zdx_ydy_zdy += rhi::Texture(pc.ydx_zdx_ydy_zdy_tex).sample_level_2d_array_uniform<float4>(tex_sampler, uvs[i], 0, i);
+        x_y_z_xdx += rhi::uni::tex_sample_level_arr<float4>(pc.x_y_z_xdx_tex, pc.tex_sampler, uvs[i], i, 0.);
+        ydx_zdx_ydy_zdy += rhi::uni::tex_sample_level_arr<float4>(pc.ydx_zdx_ydy_zdy_tex, pc.tex_sampler, uvs[i], i, 0.);
     }
 
     float x_dx = x_y_z_xdx.w;

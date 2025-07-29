@@ -3,12 +3,12 @@
 #include <array>
 #include <memory>
 #include <DirectXMath.h>
+#include "renderer/input_codes.hpp"
 
 namespace ren
 {
 using namespace DirectX;
 
-enum class Key_Code : uint8_t;
 enum class Mouse_Button : uint8_t;
 
 struct Window_Create_Info
@@ -62,8 +62,10 @@ public:
 
 private:
     Window& m_window;
-    std::array<uint8_t, 256> m_current_state = {};
-    std::array<uint8_t, 256> m_last_state = {};
+    std::array<bool, 512> m_current_state = {};
+    std::array<bool, 512> m_last_state = {};
+    uint32_t m_current_mouse_state = {};
+    uint32_t m_last_mouse_state = {};
     XMFLOAT2 m_current_mouse_pos = {};
     XMFLOAT2 m_last_mouse_pos = {};
 };

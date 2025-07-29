@@ -55,6 +55,7 @@ target_link_libraries(
     nlohmann_json
     offset_allocator
     glm
+    SDL3::SDL3-static
 )
 target_include_directories(
     renderer PUBLIC

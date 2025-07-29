@@ -15,12 +15,10 @@ struct PS_Out {
 
 PS_Out main(PS_In ps_in)
 {
-    SamplerState tex_sampler = rhi::Sampler(pc.tex_sampler).get_nuri();
-
-    float4 ocean_color = rhi::Texture(pc.ocean_color_tex).sample_2d_uniform<float4>(tex_sampler, ps_in.uv);
-    float4 geom_color = rhi::Texture(pc.geom_color_tex).sample_2d_uniform<float4>(tex_sampler, ps_in.uv);
-    float ocean_depth = rhi::Texture(pc.ocean_depth_tex).sample_2d_uniform<float>(tex_sampler, ps_in.uv);
-    float geom_depth = rhi::Texture(pc.geom_depth_tex).sample_2d_uniform<float>(tex_sampler, ps_in.uv);
+    float4 ocean_color = rhi::uni::tex_sample<float4>(pc.ocean_color_tex, pc.tex_sampler, ps_in.uv);
+    float4 geom_color = rhi::uni::tex_sample<float4>(pc.geom_color_tex, pc.tex_sampler, ps_in.uv);
+    float ocean_depth = rhi::uni::tex_sample<float>(pc.ocean_depth_tex, pc.tex_sampler, ps_in.uv);
+    float geom_depth = rhi::uni::tex_sample<float>(pc.geom_depth_tex, pc.tex_sampler, ps_in.uv);
 
     float4 color;
     if (geom_depth < ocean_depth)

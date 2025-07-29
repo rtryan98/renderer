@@ -5,11 +5,16 @@
 
 DECLARE_PUSH_CONSTANTS(Ocean_Initial_Spectrum_Push_Constants, pc);
 
-static const float MAX_LENGTHSCALE = 100000.;
-
-float pcgnoise(int3 a)
+float random_uniform(inout uint3 rng_state)
 {
-    return ren::box_muller_12(1.0/float(0xffffffffu) * float2(ren::pcg3d(a).xy));
+    static const float NORMALIZATION_FACTOR = 1.0/float(0xffffffffu);
+    rng_state = ren::pcg3d(rng_state);
+    return NORMALIZATION_FACTOR * ren::pcg(ren::pcg(rng_state.x) + ren::pcg(rng_state.y) + ren::pcg(rng_state.z));
+}
+
+float random_gaussian(inout uint3 rng_state)
+{
+    return ren::box_muller_12(float2(random_uniform(rng_state), random_uniform(rng_state)));
 }
 
 float2 calculate_dispersion_and_derivative(float wavenumber, float g, float h)
@@ -113,10 +118,7 @@ float calculate_max_wavenumber(float length_scale, float texture_size)
 [numthreads(32, 32, 1)]
 void main(uint3 id : SV_DispatchThreadID)
 {
-    rhi::RW_Texture spectrum_tex = { pc.spectrum_tex };
-    rhi::RW_Texture angular_frequency_tex = { pc.angular_frequency_tex };
-    rhi::Raw_Buffer initial_spectrum_buffer = { pc.data };
-    Ocean_Initial_Spectrum_Data data = initial_spectrum_buffer.load<Ocean_Initial_Spectrum_Data>();
+    Ocean_Initial_Spectrum_Data data = rhi::uni::buf_load<Ocean_Initial_Spectrum_Data>(pc.data);
 
     int2 id_shifted = int2(id.xy) - int2(data.texture_size, data.texture_size) / 2;
     float delta_k = ren::TWO_PI / data.length_scales[id.z];
@@ -133,19 +135,32 @@ void main(uint3 id : SV_DispatchThreadID)
         calculate_spectrum(dispersion, delta_k, theta, data.g, data.h, data.spectrum, data.directional_spreading_function, data.spectra[1]));
     float spectrum = sqrt(2. * (spectra[0] + spectra[1]) * abs(omega_ddk / wavenumber) * delta_k * delta_k);
 
-    float2 noise = float2(pcgnoise(id), pcgnoise(id + uint3(0,0,4)));
+    uint3 rng_state = id;
+    float amplitude = random_gaussian(rng_state);
+    float phase = ren::TWO_PI * random_uniform(rng_state);
+    float2 noise = float2(amplitude, cos(phase) - sin(phase));
     float2 initial_spectral_state = rcp(sqrt(2)) * noise * spectrum * float(data.active_cascades[id.z]);
 
     float min_wavenumber = calculate_min_wavenumber(data.length_scales[id.z]);
     float max_wavenumber = calculate_max_wavenumber(data.length_scales[id.z], data.texture_size);
     float max_wavenumber_prev_cascade = id.z <= 0 ? 0.f : calculate_max_wavenumber(data.length_scales[id.z - 1], data.texture_size);
-    bool overlap_low = wavenumber > max_wavenumber_prev_cascade;
-    if (wavenumber < min_wavenumber || wavenumber > max_wavenumber || overlap_low)
+    if (wavenumber < min_wavenumber || wavenumber > max_wavenumber)
     {
         initial_spectral_state = float2(0.,0.);
         omega = 0.0;
     }
+    else
+    {
+        float cumulative_contribution = 0.;
+        for (uint i = 0; i < 4; ++i)
+        {
+            float cascade_min = calculate_min_wavenumber(data.length_scales[i]);
+            float cascade_max = calculate_max_wavenumber(data.length_scales[i], data.texture_size);
+            cumulative_contribution += data.active_cascades[i] * (wavenumber >= cascade_min && wavenumber <= cascade_max);
+        }
+        initial_spectral_state /= cumulative_contribution;
+    }
 
-    spectrum_tex.store_2d_array_uniform(id, float4(initial_spectral_state, k));
-    angular_frequency_tex.store_2d_array_uniform(id, omega);
+    rhi::uni::tex_store_arr(pc.spectrum_tex, id.xy, id.z, float4(initial_spectral_state, k));
+    rhi::uni::tex_store_arr(pc.angular_frequency_tex, id.xy, id.z, omega);
 }

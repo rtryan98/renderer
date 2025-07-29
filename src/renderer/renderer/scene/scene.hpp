@@ -96,8 +96,8 @@ struct Model_Descriptor
 class Static_Scene_Data
 {
 public:
-    constexpr static auto MAX_INDICES = 1 << 20; // ~1M indices
-    constexpr static auto INDEX_BUFFER_SIZE = sizeof(uint32_t) * MAX_INDICES; // 4 MiB
+    constexpr static auto MAX_INDICES = 1 << 25; // ~32M indices
+    constexpr static auto INDEX_BUFFER_SIZE = sizeof(uint32_t) * MAX_INDICES; // 128 MiB
     constexpr static auto MAX_INSTANCES = 1 << 21; // ~2M instances
     constexpr static auto INSTANCE_TRANSFORM_BUFFER_SIZE = sizeof(GPU_Instance) * MAX_INSTANCES; // ~168 MiB
 

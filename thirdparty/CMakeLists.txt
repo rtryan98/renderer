@@ -14,12 +14,16 @@ target_sources(
     imgui/imstb_rectpack.h
     imgui/imstb_textedit.h
     imgui/imstb_truetype.h
-    imgui/backends/imgui_impl_win32.cpp
-    imgui/backends/imgui_impl_win32.h
+    imgui/backends/imgui_impl_sdl3.cpp
+    imgui/backends/imgui_impl_sdl3.h
 )
 target_include_directories(
     imgui PUBLIC
     imgui
+)
+target_link_libraries(
+    imgui PUBLIC
+    SDL3::SDL3-static
 )
 
 add_subdirectory(fastgltf)
@@ -62,3 +66,4 @@ set_target_properties(
 )
 
 add_subdirectory(glm)
+add_subdirectory(sdl)

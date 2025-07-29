@@ -1,12 +1,7 @@
 #include <cstdint>
-#include "renderer/imgui/imgui_util.hpp"
-
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <Windows.h>
 #include <TClap/CmdLine.h>
 
+#include "renderer/imgui/imgui_util.hpp"
 #include "renderer/application.hpp"
 
 int32_t main(uint32_t argc, const char* argv[])
@@ -61,8 +56,6 @@ int32_t main(uint32_t argc, const char* argv[])
     }
     catch (...)
     {} // do nothing on error.
-
-    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
 
     auto imgui_ctx = ren::imutil::Context_Wrapper();
     auto& io = ImGui::GetIO();

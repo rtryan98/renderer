@@ -15,23 +15,19 @@ struct Vertex_Attribute_Data
 
 VS_Out main(uint vertex_id : SV_VertexID, uint instance_index : SV_StartInstanceLocation)
 {
-    rhi::Array_Buffer vertex_position_buffer = { pc.position_buffer };
-    rhi::Array_Buffer vertex_attribute_buffer = { pc.attribute_buffer };
-    rhi::Array_Buffer instance_transform_buffer = { pc.instance_transform_buffer };
-    rhi::Raw_Buffer camera_buffer = { pc.camera_buffer };
     uint vertex_index = vertex_id + pc.vertex_offset;
 
-    GPU_Camera_Data camera = camera_buffer.load_nuri<GPU_Camera_Data>();
-    GPU_Instance instance_transform = instance_transform_buffer.load_nuri<GPU_Instance>(instance_index);
+    GPU_Camera_Data camera = rhi::uni::buf_load<GPU_Camera_Data>(pc.camera_buffer);
+    GPU_Instance instance_transform = rhi::uni::buf_load_arr<GPU_Instance>(pc.instance_transform_buffer, instance_index);
 
-    float4 vertex_pos = float4(vertex_position_buffer.load_nuri<float3>(vertex_index), 1.0);
+    float4 vertex_pos = float4(rhi::uni::buf_load_arr<float3>(pc.position_buffer, vertex_index), 1.0);
     float4x4 mesh_to_world = float4x4(
         instance_transform.mesh_to_world[0],
         instance_transform.mesh_to_world[1],
         instance_transform.mesh_to_world[2],
         float4(0.0, 0.0, 0.0, 1.0));
     vertex_pos = mul(vertex_pos, mesh_to_world);
-    Vertex_Attribute_Data vertex_attributes = vertex_attribute_buffer.load_nuri<Vertex_Attribute_Data>(vertex_index);
+    Vertex_Attribute_Data vertex_attributes = rhi::uni::buf_load_arr<Vertex_Attribute_Data>(pc.attribute_buffer, vertex_index);
     vertex_attributes.normal = normalize(mul(vertex_attributes.normal, instance_transform.normal_to_world));
 
     VS_Out result = {

@@ -336,7 +336,7 @@ void Asset_Repository::compile_shader_library(
             .data = file.data(),
             .data_size = file.size(),
             .entrypoint = std::wstring(entry_point.begin(), entry_point.end()),
-            .matrix_majorness = rhi::dxc::Matrix_Majorness::Column_Major,
+            .matrix_majorness = rhi::dxc::Matrix_Majorness::Row_Major,
             .shader_type = shader_type,
             .version = rhi::dxc::Shader_Version::SM6_8,
             .embed_debug = true

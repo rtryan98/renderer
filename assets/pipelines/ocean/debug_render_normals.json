@@ -8,10 +8,14 @@
     },
     "color_attachments": [
         {
-            "format": "R8G8B8A8_UNORM"
+            "format": "B10G11R11_UFLOAT_PACK32"
         }
     ],
     "depth_stencil": {
+        "format": "D32_SFLOAT",
+        "depth_enable": true,
+        "depth_write_enable": true,
+        "comparison_func": "Less"
     },
     "primitive_topology": "Line"
 }

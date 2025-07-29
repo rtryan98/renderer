@@ -35,8 +35,7 @@ void main(uint3 id : SV_DispatchThreadID)
 {
     bool ping_pong = false;
     uint2 texpos = bool(pc.vertical_or_horizontal) ? id.xy : id.yx;
-    rhi::RW_Texture image = { pc.image };
-    ping_pong_buffer[ping_pong][reversebits(id.x) >> (32 - FFT_LOG_SIZE)] = image.load_2d_array_uniform<FFT_VECTOR_TYPE>(uint3(texpos, id.z));
+    ping_pong_buffer[ping_pong][reversebits(id.x) >> (32 - FFT_LOG_SIZE)] = rhi::uni::tex_load_arr<FFT_VECTOR_TYPE>(pc.image, texpos, id.z);
     GroupMemoryBarrierWithGroupSync();
 
     [unroll(FFT_LOG_SIZE)] for (uint i = 0; i < FFT_LOG_SIZE; ++i)
@@ -56,5 +55,5 @@ void main(uint3 id : SV_DispatchThreadID)
         ping_pong = !ping_pong;
     }
 
-    image.store_2d_array_uniform(uint3(texpos, id.z), ping_pong_buffer[ping_pong][id.x]);
+    rhi::uni::tex_store_arr(pc.image, texpos, id.z, ping_pong_buffer[ping_pong][id.x]);
 }

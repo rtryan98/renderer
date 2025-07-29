@@ -23,13 +23,13 @@ struct Camera_Data
 
 struct Camera_Input_Mapping
 {
-    Key_Code move_forward = Key_Code::Key_W;
-    Key_Code move_backward = Key_Code::Key_S;
-    Key_Code move_right = Key_Code::Key_A;
-    Key_Code move_left = Key_Code::Key_D;
-    Key_Code move_up = Key_Code::Key_E;
-    Key_Code move_down = Key_Code::Key_Q;
-    Key_Code sprint = Key_Code::Key_Left_Shift;
+    SDL_Scancode move_forward = SDL_SCANCODE_W;
+    Key_Code move_backward = SDL_SCANCODE_S;
+    Key_Code move_right = SDL_SCANCODE_A;
+    Key_Code move_left = SDL_SCANCODE_D;
+    Key_Code move_up = SDL_SCANCODE_E;
+    Key_Code move_down = SDL_SCANCODE_Q;
+    Key_Code sprint = SDL_SCANCODE_LSHIFT;
     Mouse_Button enable_rotate = Mouse_Button::Mouse_Left;
 };
 

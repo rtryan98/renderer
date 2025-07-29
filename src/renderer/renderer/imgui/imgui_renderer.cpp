@@ -178,7 +178,7 @@ void Imgui_Renderer::render(rhi::Command_List* cmd) noexcept
                 // TODO: only send changed data
                 Imgui_Push_Constants push_consts = {
                     .vertex_buffer = vertex_buffer->buffer_view->bindless_index,
-                    .texture = uint32_t(reinterpret_cast<uint64_t>(imgui_cmd.GetTexID())),
+                    .texture = uint32_t(imgui_cmd.GetTexID()),
                     .sampler = m_sampler->bindless_index,
                     .left = left,
                     .top = top,
@@ -290,7 +290,7 @@ void Imgui_Renderer::create_fonts_texture() noexcept
     m_device->queue_wait_idle(rhi::Queue_Type::Graphics, ~0ull);
     m_device->destroy_buffer(staging_buffer);
     m_images.push_back(font_image);
-    io.Fonts->SetTexID(reinterpret_cast<ImTextureID>(uint64_t(font_image->image_view->bindless_index)));
+    io.Fonts->SetTexID(uint64_t(font_image->image_view->bindless_index));
 }
 
 void Imgui_Renderer::setup_render_state(
