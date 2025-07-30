@@ -1,33 +1,27 @@
 #include "renderer/scene/camera.hpp"
 
+#include "glm/ext/matrix_clip_space.hpp"
+#include "glm/ext/matrix_transform.hpp"
 #include "renderer/window.hpp"
 
 namespace ren
 {
 void Fly_Camera::update()
 {
-    forward = {
-        XMScalarCos(XMConvertToRadians(yaw)) * XMScalarCos(XMConvertToRadians(pitch)),
-        XMScalarSin(XMConvertToRadians(yaw)) * XMScalarCos(XMConvertToRadians(pitch)),
-        XMScalarSin(XMConvertToRadians(pitch)),
-    };
-    XMStoreFloat3(&forward,
-        XMVector3Normalize(XMLoadFloat3(&forward)));
-    XMStoreFloat3(&right,
-        XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&WORLD_UP), XMLoadFloat3(&forward))));
-    XMStoreFloat3(&up,
-        XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&forward), XMLoadFloat3(&right))));
-
-    XMStoreFloat4x4(&camera_data.proj, XMMatrixPerspectiveFovRH(
-        XMConvertToRadians(fov_y), aspect, near, far));
-    XMStoreFloat4x4(&camera_data.view, XMMatrixLookAtRH(
-        XMLoadFloat3(&position),
-        XMVectorAdd(
-            XMLoadFloat3(&position),
-            XMLoadFloat3(&forward)),
-        XMLoadFloat3(&up)));
-    XMStoreFloat4x4(&camera_data.view_proj, XMMatrixMultiply(
-        XMLoadFloat4x4(&camera_data.view), XMLoadFloat4x4(&camera_data.proj)));
+    forward = glm::normalize(glm::vec3{
+        glm::sin(glm::radians(yaw)) * glm::cos(glm::radians(pitch)),
+        glm::cos(glm::radians(yaw)) * glm::cos(glm::radians(pitch)),
+        glm::sin(glm::radians(pitch))
+    });
+    right = glm::normalize(glm::cross(WORLD_UP, forward));
+    up = glm::normalize(glm::cross(forward, right));
+    camera_data.proj = glm::infinitePerspectiveRH(glm::radians(fov_y), aspect, near_plane);
+    camera_data.proj = glm::perspectiveRH(glm::radians(fov_y), aspect, near_plane, 1000.f);
+    camera_data.view = glm::lookAtRH(
+        position,
+        position + forward,
+        up);
+    camera_data.view_proj = camera_data.proj * camera_data.view;
     camera_data.position = { position.x, position.y, position.z, 0.0f };
 }
 
@@ -42,7 +36,7 @@ void Fly_Camera::update_rotation(const Input_State& input_state)
     if (input_state.is_mouse_pressed(input_map.enable_rotate))
     {
         auto mouse_delta = input_state.get_mouse_pos_delta();
-        yaw -= sensitivity * mouse_delta.x;
+        yaw += sensitivity * mouse_delta.x;
         if (yaw > 360.0f)
         {
             yaw -= 360.0f;
@@ -52,7 +46,7 @@ void Fly_Camera::update_rotation(const Input_State& input_state)
             yaw += 360.0f;
         }
         pitch -= sensitivity * mouse_delta.y;
-        pitch = XMMax(XMMin(pitch, 89.0f), -89.0f);
+        pitch = glm::clamp(pitch, -89.0f, 89.0f);
     }
 }
 
@@ -71,48 +65,44 @@ void Fly_Camera::update_position(const Input_State& input_state, float dt)
         speed *= 2.0f;
     }
 
-    XMFLOAT3 movement = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 movement = { 0.0f, 0.0f, 0.0f };
 
     if (inp_forward && inp_back)
         ;
     else if (inp_forward)
     {
-        XMStoreFloat3(&movement,
-            XMVectorAdd(XMLoadFloat3(&forward), XMLoadFloat3(&movement)));
+        movement += forward;
     }
     else if (inp_back)
     {
-        XMStoreFloat3(&movement,
-            XMVectorAdd(-1.0f * XMLoadFloat3(&forward), XMLoadFloat3(&movement)));
+        movement -= forward;
     }
 
     if (inp_left && inp_right)
         ;
     else if (inp_right)
     {
-        XMStoreFloat3(&movement,
-            XMVectorAdd(XMLoadFloat3(&right), XMLoadFloat3(&movement)));
+        movement += right;
     }
     else if (inp_left)
     {
-        XMStoreFloat3(&movement,
-            XMVectorAdd(-1.0f * XMLoadFloat3(&right), XMLoadFloat3(&movement)));
+        movement -= right;
     }
 
     if (inp_up && inp_down)
         ;
     else if (inp_up)
     {
-        XMStoreFloat3(&movement,
-            XMVectorAdd(XMLoadFloat3(&WORLD_UP), XMLoadFloat3(&movement)));
+        movement += WORLD_UP;
     }
     else if (inp_down)
     {
-        XMStoreFloat3(&movement,
-            XMVectorAdd(-1.0f * XMLoadFloat3(&WORLD_UP), XMLoadFloat3(&movement)));
+        movement -= WORLD_UP;
     }
 
-    XMStoreFloat3(&position,
-        XMVectorAdd(XMLoadFloat3(&position), speed * XMVector3Normalize(XMLoadFloat3(&movement))));
+    if (glm::length(movement) > 0.0f)
+    {
+        position += speed * glm::normalize(movement);
+    }
 }
 }

@@ -98,6 +98,18 @@ Mapped_File* Asset_Repository::get_model(const std::string_view& name) const
     return m_model_ptrs.at(std::string(name));
 }
 
+Mapped_File* Asset_Repository::get_texture(const std::string_view& name) const
+{
+    return m_texture_ptrs.at(std::string(name));
+}
+
+Mapped_File* Asset_Repository::get_texture_safe(const std::string_view& name) const
+{
+    if (!m_texture_ptrs.contains(std::string(name)))
+        return nullptr;
+    return m_texture_ptrs.at(std::string(name));
+}
+
 std::vector<std::string> Asset_Repository::get_model_files() const
 {
     std::vector<std::string> result;
@@ -336,7 +348,7 @@ void Asset_Repository::compile_shader_library(
             .data = file.data(),
             .data_size = file.size(),
             .entrypoint = std::wstring(entry_point.begin(), entry_point.end()),
-            .matrix_majorness = rhi::dxc::Matrix_Majorness::Row_Major,
+            .matrix_majorness = rhi::dxc::Matrix_Majorness::Column_Major,
             .shader_type = shader_type,
             .version = rhi::dxc::Shader_Version::SM6_8,
             .embed_debug = true

@@ -13,28 +13,24 @@ struct Vertex_Attribute_Data
     uint color;
 };
 
-VS_Out main(uint vertex_id : SV_VertexID, uint instance_index : SV_StartInstanceLocation)
+VS_Out main(uint vertex_id : SV_VertexID, uint vertex_offset : SV_StartVertexLocation, uint instance_index : SV_StartInstanceLocation)
 {
-    uint vertex_index = vertex_id + pc.vertex_offset;
+    uint vertex_index = vertex_id + vertex_offset;
 
     GPU_Camera_Data camera = rhi::uni::buf_load<GPU_Camera_Data>(pc.camera_buffer);
     GPU_Instance instance_transform = rhi::uni::buf_load_arr<GPU_Instance>(pc.instance_transform_buffer, instance_index);
 
     float4 vertex_pos = float4(rhi::uni::buf_load_arr<float3>(pc.position_buffer, vertex_index), 1.0);
-    float4x4 mesh_to_world = float4x4(
-        instance_transform.mesh_to_world[0],
-        instance_transform.mesh_to_world[1],
-        instance_transform.mesh_to_world[2],
-        float4(0.0, 0.0, 0.0, 1.0));
-    vertex_pos = mul(vertex_pos, mesh_to_world);
+    vertex_pos = mul(camera.view_proj, mul(instance_transform.mesh_to_world, vertex_pos));
     Vertex_Attribute_Data vertex_attributes = rhi::uni::buf_load_arr<Vertex_Attribute_Data>(pc.attribute_buffer, vertex_index);
     vertex_attributes.normal = normalize(mul(vertex_attributes.normal, instance_transform.normal_to_world));
 
     VS_Out result = {
-        mul(float4(vertex_pos.x, vertex_pos.y, vertex_pos.z, 1.0), camera.view_proj),
+        vertex_pos,
         vertex_attributes.normal,
         vertex_attributes.tangent,
-        vertex_attributes.tex_coord
+        vertex_attributes.tex_coord,
+        instance_index
     };
     return result;
 }

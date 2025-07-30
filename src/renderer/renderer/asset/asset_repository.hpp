@@ -7,7 +7,7 @@
 #include <rhi/common/array_vector.hpp>
 #include "renderer/logger.hpp"
 #include "renderer/asset/pipeline.hpp"
-#include "renderer/asset/asset_formats.hpp"
+#include "renderer/filesystem/mapped_file.hpp"
 
 namespace rhi
 {
@@ -38,6 +38,8 @@ public:
     [[nodiscard]] Compute_Pipeline get_compute_pipeline(const std::string_view& name) const;
     [[nodiscard]] Graphics_Pipeline get_graphics_pipeline(const std::string_view& name) const;
     [[nodiscard]] Mapped_File* get_model(const std::string_view& name) const;
+    [[nodiscard]] Mapped_File* get_texture(const std::string_view& name) const;
+    [[nodiscard]] Mapped_File* get_texture_safe(const std::string_view& name) const;
     [[nodiscard]] std::vector<std::string> get_model_files() const;
 
 private:

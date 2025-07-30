@@ -129,12 +129,12 @@ bool Input_State::is_mouse_clicked(Mouse_Button mb) const noexcept
         & SDL_BUTTON_MASK(static_cast<int32_t>(mb)) & m_current_mouse_state) > 0;
 }
 
-const XMFLOAT2 Input_State::get_mouse_pos() const noexcept
+const glm::vec2 Input_State::get_mouse_pos() const noexcept
 {
     return m_current_mouse_pos;
 }
 
-const XMFLOAT2 Input_State::get_mouse_pos_delta() const noexcept
+const glm::vec2 Input_State::get_mouse_pos_delta() const noexcept
 {
     return { m_current_mouse_pos.x - m_last_mouse_pos.x, m_current_mouse_pos.y - m_last_mouse_pos.y };
 }

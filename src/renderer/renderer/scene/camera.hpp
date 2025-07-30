@@ -1,24 +1,18 @@
 #pragma once
 
-#include <DirectXMath.h>
+#include <glm/glm.hpp>
 #include "renderer/input_codes.hpp"
-
-// Thanks WinDef.h
-#undef near
-#undef far
 
 namespace ren
 {
 class Input_State;
 
-using namespace DirectX;
-
 struct Camera_Data
 {
-    XMFLOAT4X4 proj;
-    XMFLOAT4X4 view;
-    XMFLOAT4X4 view_proj;
-    XMFLOAT4 position;
+    glm::mat4 proj;
+    glm::mat4 view;
+    glm::mat4 view_proj;
+    glm::vec4 position;
 };
 
 struct Camera_Input_Mapping
@@ -36,23 +30,22 @@ struct Camera_Input_Mapping
 struct Fly_Camera
 {
 public:
-    constexpr static XMFLOAT3 WORLD_UP = { .0f, .0f, 1.f };
+    constexpr static glm::vec3 WORLD_UP = { .0f, .0f, 1.f };
 
     Camera_Input_Mapping input_map;
 
     float fov_y;
     float aspect;
-    float near;
-    float far;
+    float near_plane;
     float sensitivity;
     float movement_speed;
     float pitch;
     float yaw;
 
-    XMFLOAT3 position;
-    XMFLOAT3 forward;
-    XMFLOAT3 right;
-    XMFLOAT3 up;
+    glm::vec3 position{};
+    glm::vec3 forward{};
+    glm::vec3 right{};
+    glm::vec3 up{};
 
     Camera_Data camera_data;
 

@@ -1,36 +1,34 @@
 #include "renderer/scene/scene.hpp"
 
 #include <numeric>
+#include <ranges>
 #include <shared/serialized_asset_formats.hpp>
+
+#include "glm/gtc/quaternion.hpp"
 #include "renderer/application.hpp"
+#include "renderer/asset/asset_formats.hpp"
 
 namespace ren
 {
-XMMATRIX TRS::to_mat() const noexcept
+glm::mat4 TRS::to_mat() const noexcept
 {
-    return XMMatrixAffineTransformation(
-        XMLoadFloat3(&scale),
-        XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
-        XMLoadFloat4(&rotation),
-        XMLoadFloat3(&translation));
+    auto s = glm::scale(glm::identity<glm::mat4>(), scale);
+    auto r = glm::mat4_cast(rotation);
+    auto t = glm::translate(glm::identity<glm::mat4>(), translation);
+    return t * r * s;
 }
 
-XMFLOAT3X4 TRS::to_transform(const XMMATRIX& parent) const noexcept
+glm::mat4 TRS::to_transform(const glm::mat4& parent) const noexcept
 {
-    XMFLOAT3X4 result;
-    XMStoreFloat3x4(&result, XMMatrixMultiplyTranspose(parent, to_mat()));
-    return result;
+    return parent * to_mat();
 }
 
-XMFLOAT3X3 TRS::to_transposed_adjugate(const XMMATRIX& parent) const noexcept
+glm::mat3 TRS::to_transposed_adjugate(const glm::mat4& parent) const noexcept
 {
-    const auto intermediate = XMMatrixMultiply(parent, to_mat());
-    XMFLOAT3 r0 = {};
-    XMStoreFloat3(&r0, XMVector3Cross(intermediate.r[1], intermediate.r[2]));
-    XMFLOAT3 r1 = {};
-    XMStoreFloat3(&r1, XMVector3Cross(intermediate.r[2], intermediate.r[0]));
-    XMFLOAT3 r2 = {};
-    XMStoreFloat3(&r2, XMVector3Cross(intermediate.r[0], intermediate.r[1]));
+    const glm::mat3 intermediate = to_transform(parent);
+    glm::vec3 r0 = glm::cross(intermediate[1], intermediate[2]);
+    glm::vec3 r1 = glm::cross(intermediate[2], intermediate[0]);
+    glm::vec3 r2 = glm::cross(intermediate[0], intermediate[1]);
     return { // already transposed
         r0.x, r1.x, r2.x,
         r0.y, r1.y, r2.y,
@@ -86,7 +84,54 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
         const auto& loadable_material = loadable_model->get_materials()[i];
         model->materials[i] = m_materials.acquire();
         auto& material = *model->materials[i];
-        material.unused = 42;
+
+        auto get_material_texture = [&](uint32_t index) -> rhi::Image* {
+            const auto* uris = loadable_model->get_referenced_uris();
+            if (index == ~0u)
+            {
+                return nullptr;
+            }
+            return get_or_create_image(uris[index].value);
+        };
+
+        rhi::Sampler_Create_Info default_sampler_create_info = {
+            .filter_min = rhi::Sampler_Filter::Linear,
+            .filter_mag = rhi::Sampler_Filter::Linear,
+            .filter_mip = rhi::Sampler_Filter::Linear,
+            .address_mode_u = rhi::Image_Sample_Address_Mode::Wrap,
+            .address_mode_v = rhi::Image_Sample_Address_Mode::Wrap,
+            .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
+            .mip_lod_bias = 0.f,
+            .max_anisotropy = 16,
+            .comparison_func = rhi::Comparison_Func::None,
+            .reduction = rhi::Sampler_Reduction_Type::Standard,
+            .border_color = {},
+            .min_lod = 0.f,
+            .max_lod = 1000.f,
+            .anisotropy_enable = true
+        };
+
+        material = {
+            .base_color_factor = {
+                loadable_material.base_color_factor[0],
+                loadable_material.base_color_factor[1],
+                loadable_material.base_color_factor[2],
+                loadable_material.base_color_factor[3]
+            },
+            .pbr_roughness = loadable_material.pbr_roughness,
+            .pbr_metallic = loadable_material.pbr_metallic,
+            .emissive_color = {
+                loadable_material.emissive_color[0],
+                loadable_material.emissive_color[1],
+                loadable_material.emissive_color[2]
+            },
+            .emissive_strength = loadable_material.emissive_strength,
+            .albedo = get_material_texture(loadable_material.albedo_uri_index),
+            .normal = get_material_texture(loadable_material.normal_uri_index),
+            .metallic_roughness = get_material_texture(loadable_material.metallic_roughness_uri_index),
+            .emissive = get_material_texture(loadable_material.emissive_uri_index),
+            .sampler = m_render_resource_blackboard.get_sampler(default_sampler_create_info)
+        };
     }
 
     model->submeshes.resize(loadable_model->submesh_count);
@@ -118,12 +163,12 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
                 loadable_mesh_instance.translation[1],
                 loadable_mesh_instance.translation[2]
             },
-            .rotation = {
+            .rotation = glm::quat(
                 loadable_mesh_instance.rotation[0],
                 loadable_mesh_instance.rotation[1],
                 loadable_mesh_instance.rotation[2],
                 loadable_mesh_instance.rotation[3]
-            },
+            ),
             .scale = {
                 loadable_mesh_instance.scale[0],
                 loadable_mesh_instance.scale[1],
@@ -157,30 +202,68 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
                 mesh_instance.parent = &model_instance->mesh_instances[index];
             }
             mesh_instance.trs = mesh.trs;
-            mesh_instance.instance_transform_index = acquire_instance_transform_index();
             mesh_instance.submesh_instances.reserve(mesh.submeshes.size());
             for (auto* submesh : mesh.submeshes)
             {
                 auto& submesh_instance = mesh_instance.submesh_instances.emplace_back();
                 submesh_instance.submesh = submesh;
                 submesh_instance.material = submesh->default_material;
+                submesh_instance.instance_index = acquire_instance_index();
             }
         }
     }
 }
 
-uint32_t Static_Scene_Data::acquire_instance_transform_index()
+uint32_t Static_Scene_Data::acquire_instance_index()
 {
     const auto val = m_instance_freelist.back();
     m_instance_freelist.pop_back();
     return val;
 }
 
+rhi::Image* Static_Scene_Data::get_or_create_image(const std::string& uri)
+{
+    if (m_images.contains(uri))
+    {
+        return m_images[uri];
+    }
+
+    const auto texture_file = m_asset_repository.get_texture_safe(uri);
+    if (!texture_file)
+        return nullptr;
+
+    m_logger->info("Loading texture {}", uri);
+    auto loadable_image = static_cast<serialization::Image_Data_00*>(texture_file->data);
+    rhi::Image_Create_Info texture_create_info = {
+        .format = loadable_image->format,
+        .width = loadable_image->mips[0].width,
+        .height = loadable_image->mips[0].height,
+        .depth = 1,
+        .array_size = 1,
+        .mip_levels = static_cast<uint16_t>(loadable_image->mip_count),
+        .usage = rhi::Image_Usage::Sampled,
+        .primary_view_type = rhi::Image_View_Type::Texture_2D
+    };
+    auto image = m_graphics_device->create_image(texture_create_info).value_or(nullptr);
+    std::array<void*, 14> mip_data;
+    for (auto mip = 0; mip < loadable_image->mip_count; ++mip)
+    {
+        mip_data[mip] = loadable_image->get_mip_data(mip);
+    }
+    m_app.upload_image_data_immediate_full(image, mip_data.data());
+    m_images[uri] = image;
+
+    return m_images[uri];
+}
+
 Static_Scene_Data::Static_Scene_Data(Application& app, std::shared_ptr<Logger> logger,
-    Asset_Repository& asset_repository, rhi::Graphics_Device* graphics_device)
+                                     Asset_Repository& asset_repository,
+                                     Render_Resource_Blackboard& render_resource_blackboard,
+                                     rhi::Graphics_Device* graphics_device)
     : m_app(app)
     , m_logger(std::move(logger))
     , m_asset_repository(asset_repository)
+    , m_render_resource_blackboard(render_resource_blackboard)
     , m_graphics_device(graphics_device)
     , m_index_buffer_allocator(MAX_INDICES)
 {
@@ -196,6 +279,9 @@ Static_Scene_Data::Static_Scene_Data(Application& app, std::shared_ptr<Logger> l
     buffer_create_info.size = INSTANCE_TRANSFORM_BUFFER_SIZE;
     m_global_instance_transform_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
     m_graphics_device->name_resource(m_global_instance_transform_buffer, "scene:global_instance_transform_buffer");
+    buffer_create_info.size = MATERIAL_INSTANCE_BUFFER_SIZE;
+    m_global_material_instance_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+    m_graphics_device->name_resource(m_global_material_instance_buffer, "scene:global_material_instance_buffer");
 }
 
 Static_Scene_Data::~Static_Scene_Data()
@@ -203,10 +289,15 @@ Static_Scene_Data::~Static_Scene_Data()
     m_graphics_device->wait_idle();
     m_graphics_device->destroy_buffer(m_global_index_buffer);
     m_graphics_device->destroy_buffer(m_global_instance_transform_buffer);
-    for (auto& model : m_models)
+    m_graphics_device->destroy_buffer(m_global_material_instance_buffer);
+    for (const auto& model : m_models)
     {
         m_graphics_device->destroy_buffer(model.vertex_positions);
         m_graphics_device->destroy_buffer(model.vertex_attributes);
+    }
+    for (const auto image : m_images | std::views::values)
+    {
+        m_graphics_device->destroy_image(image);
     }
 }
 }

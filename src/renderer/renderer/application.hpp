@@ -105,8 +105,8 @@ private:
     std::array<std::vector<Image_Staging_Info>, FRAME_IN_FLIGHT_COUNT> m_image_staging_infos;
     uint64_t m_frame_counter;
     std::unique_ptr<Asset_Repository> m_asset_repository;
-    std::unique_ptr<Static_Scene_Data> m_static_scene_data;
     std::unique_ptr<Render_Resource_Blackboard> m_resource_blackboard;
+    std::unique_ptr<Static_Scene_Data> m_static_scene_data;
     Renderer m_renderer;
     bool m_is_running;
     ImGui_Data m_imgui_data = {};

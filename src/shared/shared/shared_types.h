@@ -2,7 +2,7 @@
 #define SHARED_TYPES_HLSLI
 
 #if __cplusplus
-    #include <DirectXMath.h>
+    #include <glm/glm.hpp>
     // Structs
     #ifndef SHADER_STRUCT_ALIGN
         #define SHADER_STRUCT_ALIGN alignas(16) // HLSL structs are aligned to 16 bytes in constant buffers
@@ -21,35 +21,35 @@
     #endif
     // Vectors
     #ifndef float2
-        #define float2 DirectX::XMFLOAT2
+        #define float2 glm::vec2
     #endif
     #ifndef float3
-        #define float3 alignas(DirectX::XMFLOAT4) DirectX::XMFLOAT3
+        #define float3 glm::vec3
     #endif
     #ifndef float4
-        #define float4 DirectX::XMFLOAT4
+        #define float4 glm::vec4
     #endif
     #ifndef uint2
-        #define uint2 DirectX::XMUINT2
+        #define uint2 glm::uvec2
     #endif
     #ifndef uint3
-        #define uint3 alignas(DirectX::XMUINT4) DirectX::XMUINT3
+        #define uint3 glm::uvec3
     #endif
     #ifndef uint4
-        #define uint4 DirectX::XMUINT4
+        #define uint4 glm::uvec4
     #endif
     // Matrices
     #ifndef float3x3
-        #define float3x3 DirectX::XMFLOAT3X3
+        #define float3x3 glm::mat3
     #endif
     #ifndef float3x4
-        #define float3x4 DirectX::XMFLOAT3X4
+        #define float3x4 glm::mat3x4
     #endif
     #ifndef float4x3
-        #define float4x3 DirectX::XMFLOAT4X3
+        #define float4x3 glm::mat4x3
     #endif
     #ifndef float4x4
-        #define float4x4 DirectX::XMFLOAT4X4
+        #define float4x4 glm::mat4
     #endif
 #else // HLSL
     // Structs

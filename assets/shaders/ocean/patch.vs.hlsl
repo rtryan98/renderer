@@ -53,7 +53,7 @@ VS_Out main(uint vertex_id : SV_VertexID)
     // displacement.xy += loop_remove;
     float4 pos_ws = float4(vertex_pos.x + displacement.x, vertex_pos.y + displacement.y, displacement.z, 1.);
 
-    float4 pos = mul(pos_ws, camera.view_proj);
+    float4 pos = mul(camera.view_proj, pos_ws);
     VS_Out result = { pos, uvs, pos_ws, camera.position };
     return result;
 }

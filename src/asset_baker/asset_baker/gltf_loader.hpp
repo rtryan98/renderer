@@ -5,6 +5,7 @@
 #include <vector>
 #include <expected>
 #include <rhi/resource.hpp>
+#include <glm/glm.hpp>
 
 namespace asset_baker
 {
@@ -26,13 +27,13 @@ enum class GLTF_Error
 struct GLTF_Submesh
 {
     std::size_t material_index;
-    std::vector<std::array<float, 3>> positions;
-    std::vector<std::array<float, 4>> colors;
-    std::vector<std::array<float, 3>> normals;
-    std::vector<std::array<float, 4>> tangents;
-    std::vector<std::array<float, 2>> tex_coords;
-    std::vector<std::array<uint32_t, 4>> joints;
-    std::vector<std::array<float, 4>> weights;
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec4> colors;
+    std::vector<glm::vec3> normals;
+    std::vector<glm::vec4> tangents;
+    std::vector<glm::vec2> tex_coords;
+    std::vector<glm::uvec4> joints;
+    std::vector<glm::vec4> weights;
     std::vector<uint32_t> indices;
 };
 
@@ -48,7 +49,7 @@ struct GLTF_Mesh_Instance
 
 struct GLTF_Material
 {
-    std::array<float, 4> base_color_factor;
+    glm::u8vec4 base_color_factor;
     float pbr_roughness;
     float pbr_metallic;
     std::array<float, 3> emissive_color;

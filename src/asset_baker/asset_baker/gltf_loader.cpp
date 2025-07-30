@@ -1,7 +1,6 @@
 #include "asset_baker/gltf_loader.hpp"
 
 #include <spdlog/spdlog.h>
-#include <DirectXPackedVector.h>
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
 #include <shared/serialized_asset_formats.hpp>
@@ -12,18 +11,54 @@
 #include <stb_image_resize2.h>
 #include <vector>
 #include <xxhash.h>
+#include <glm/gtc/quaternion.hpp>
+
+#include "asset_baker/gltf_accessor.hpp"
 
 namespace asset_baker
 {
-constexpr static auto GLTF_ATTRIBUTE_POSITION = "POSITION";
-constexpr static auto GLTF_ATTRIBUTE_COLOR_0 = "COLOR_0";
-constexpr static auto GLTF_ATTRIBUTE_NORMAL = "NORMAL";
-constexpr static auto GLTF_ATTRIBUTE_TANGENT = "TANGENT";
-constexpr static auto GLTF_ATTRIBUTE_TEXCOORD_0 = "TEXCOORD_0";
-constexpr static auto GLTF_ATTRIBUTE_JOINTS_0 = "JOINTS_0";
-constexpr static auto GLTF_ATTRIBUTE_WEIGHTS_0 = "WEIGHTS_0";
-
 constexpr static auto NO_INDEX = ~0ull;
+
+auto gltf_to_renderer_permutation_matrix()
+{
+    return glm::mat4(
+        -1.0f,  0.0f,  0.0f,  0.0f,
+         0.0f,  0.0f,  1.0f,  0.0f,
+         0.0f,  1.0f,  0.0f,  0.0f,
+         0.0f,  0.0f,  0.0f,  1.0f
+    );
+}
+
+template<typename T>
+auto gltf_to_renderer(const T& t) = delete;
+
+template<>
+auto gltf_to_renderer(const glm::vec3& vec3)
+{
+    return glm::vec3(gltf_to_renderer_permutation_matrix() * glm::vec4(vec3, 0.0f));
+}
+
+template<>
+auto gltf_to_renderer(const glm::vec4& vec4)
+{
+    return gltf_to_renderer_permutation_matrix() * vec4;
+}
+
+template<>
+auto gltf_to_renderer(const glm::quat& gltf_rotation)
+{
+    auto gltf_angle = glm::angle(gltf_rotation);
+    auto gltf_axis = glm::axis(gltf_rotation);
+
+    if (glm::length(gltf_axis) < glm::epsilon<float>())
+    {
+        return glm::identity<glm::quat>();
+    }
+
+    auto renderer_axis = glm::normalize(gltf_to_renderer(gltf_axis));
+    auto rotation = glm::angleAxis(gltf_angle, renderer_axis);
+    return rotation;
+}
 
 template <typename T>
 std::string base_16_string(const T& input)
@@ -43,7 +78,130 @@ std::string base_16_string(const T& input)
         result += TABLE[lower];
     }
     return result;
-};
+}
+
+glm::u8vec4 pack_4x8u(float a, float b, float c, float d)
+{
+    return {
+        static_cast<uint8_t>(a * 255.f),
+        static_cast<uint8_t>(b * 255.f),
+        static_cast<uint8_t>(c * 255.f),
+        static_cast<uint8_t>(d * 255.f)
+    };
+}
+
+void generate_tangents_for_submesh(GLTF_Submesh& submesh, const std::vector<GLTF_Material>& materials)
+{
+    if (submesh.tangents.size() == 0 &&                         // Mesh has no tangents
+        submesh.normals.size() > 0 &&                           // and it has normals
+        submesh.tex_coords.size() > 0 &&                        // and texture coordinates
+        submesh.material_index != NO_INDEX &&                   // and a material
+        !materials[submesh.material_index].normal_uri.empty())  // that contains a normal map
+    {
+        submesh.tangents.resize(submesh.normals.size());
+
+        if (!(submesh.normals.size() == submesh.tangents.size() &&
+            submesh.tangents.size() == submesh.tex_coords.size()))
+        {
+            // spdlog::error("GLTF file '{}' has no tangents and they failed to generate.", path.string());
+            // return std::unexpected(GLTF_Error::Tangent_Generation_Failed);
+        }
+
+        struct Mikkt_Space_User_Data
+        {
+            std::vector<glm::vec3>& positions;
+            std::vector<glm::vec3>& normals;
+            std::vector<glm::vec2>& tex_coords;
+            std::vector<glm::vec4>& tangents;
+            std::vector<uint32_t>& indices;
+        } mikkt_space_user_data = {
+                .positions = submesh.positions,
+                .normals = submesh.normals,
+                .tex_coords = submesh.tex_coords,
+                .tangents = submesh.tangents,
+                .indices = submesh.indices,
+            };
+
+        auto get_num_faces = [](
+            const SMikkTSpaceContext* mikktspace_context) -> int32_t
+        {
+            const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
+            return static_cast<int32_t>(user_data.indices.size() / 3);
+        };
+        auto get_num_vertices_of_face = [](
+            const SMikkTSpaceContext* mikktspace_context,
+            const int face_idx) -> int32_t
+        {
+            (void)mikktspace_context;
+            (void)face_idx;
+            return 3;
+        };
+        auto get_position = [](
+            const SMikkTSpaceContext* mikktspace_context,
+            float fv_pos_out[],
+            const int face_idx,
+            const int vert_idx) -> void
+        {
+            const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
+            const auto& position = user_data.positions[user_data.indices[face_idx * 3 + vert_idx]];
+            fv_pos_out[0] = position[0];
+            fv_pos_out[1] = position[1];
+            fv_pos_out[2] = position[2];
+        };
+        auto get_normal = [](
+            const SMikkTSpaceContext* mikktspace_context,
+            float fv_norm_out[],
+            const int face_idx,
+            const int vert_idx) -> void
+        {
+            const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
+            const auto& normal = user_data.normals[user_data.indices[face_idx * 3 + vert_idx]];
+            fv_norm_out[0] = normal[0];
+            fv_norm_out[1] = normal[1];
+            fv_norm_out[2] = normal[2];
+        };
+        auto get_tex_coord = [](
+            const SMikkTSpaceContext* mikktspace_context,
+            float fv_tex_coord_out[],
+            const int face_idx,
+            const int vert_idx) -> void
+        {
+            const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
+            const auto& tex_coord = user_data.tex_coords[user_data.indices[face_idx * 3 + vert_idx]];
+            fv_tex_coord_out[0] = tex_coord[0];
+            fv_tex_coord_out[1] = tex_coord[1];
+        };
+        auto set_tangent_space = [](
+            const SMikkTSpaceContext* mikktspace_context,
+            const float fv_tangent[],
+            const float sign,
+            const int face_idx,
+            const int vert_idx) -> void
+        {
+            const auto& data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
+            auto& tangent = data.tangents[data.indices[face_idx * 3 + vert_idx]];
+            tangent[0] = fv_tangent[0];
+            tangent[1] = fv_tangent[1];
+            tangent[2] = fv_tangent[2];
+            tangent[3] = sign;
+        };
+
+        SMikkTSpaceInterface mikktspace_interface = {
+            .m_getNumFaces = get_num_faces,
+            .m_getNumVerticesOfFace = get_num_vertices_of_face,
+            .m_getPosition = get_position,
+            .m_getNormal = get_normal,
+            .m_getTexCoord = +get_tex_coord,
+            .m_setTSpaceBasic = set_tangent_space,
+            .m_setTSpace = nullptr,
+        };
+        SMikkTSpaceContext mikktspace_context = {
+            .m_pInterface = &mikktspace_interface,
+            .m_pUserData = &mikkt_space_user_data
+        };
+        genTangSpaceDefault(&mikktspace_context);
+    }
+}
 
 std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesystem::path& path)
 {
@@ -157,10 +315,10 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
         };
 
         result.materials.emplace_back( GLTF_Material {
-            .base_color_factor = {{
+            .base_color_factor = pack_4x8u(
                 material.pbrData.baseColorFactor[0], material.pbrData.baseColorFactor[1],
                 material.pbrData.baseColorFactor[2], material.pbrData.baseColorFactor[3]
-            }},
+            ),
             .pbr_roughness = material.pbrData.roughnessFactor,
             .pbr_metallic = material.pbrData.metallicFactor,
             .emissive_color = {{
@@ -184,6 +342,7 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 material.emissiveTexture,
                 false,
                 rhi::Image_Format::R8G8B8A8_SRGB),
+
         });
     }
 
@@ -196,7 +355,7 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
         else
             spdlog::debug("Processing unnamed mesh.");
 
-        auto range = std::make_pair(result.submeshes.size(), result.submeshes.size());
+        auto submesh_range_start = result.submeshes.size();
 
         for (auto& primitive : gltf_mesh.primitives)
         {
@@ -210,277 +369,32 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
 
             mesh.material_index = primitive.materialIndex.value_or(NO_INDEX);
 
-            if (auto position_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_POSITION))
+            get_indices(asset.get(), primitive, mesh.indices);
+            get_positions(asset.get(), primitive, mesh.positions);
+            get_colors(asset.get(), primitive, mesh.colors);
+            get_normals(asset.get(), primitive, mesh.normals);
+            get_tangents(asset.get(), primitive, mesh.tangents);
+            get_tex_coords(asset.get(), primitive, mesh.tex_coords);
+            get_joints(asset.get(), primitive, mesh.joints);
+            get_weights(asset.get(), primitive, mesh.weights);
+
+            generate_tangents_for_submesh(mesh, result.materials);
+
+            for (auto& position : mesh.positions)
             {
-                auto& positions = asset->accessors.at(position_attribute->accessorIndex);
-                mesh.positions.resize(positions.count);
-                fastgltf::copyFromAccessor<fastgltf::math::fvec3>(
-                    asset.get(),
-                    positions,
-                    mesh.positions.data());
+                position = gltf_to_renderer(position);
             }
-
-            if (primitive.indicesAccessor.has_value())
+            for (auto& normal : mesh.normals)
             {
-                auto& indices = asset->accessors.at(primitive.indicesAccessor.value());
-                mesh.indices.resize(indices.count);
-                fastgltf::copyFromAccessor<uint32_t>(
-                    asset.get(),
-                    indices,
-                    mesh.indices.data());
-                for (auto i = 0; i < indices.count; i += 3)
-                {
-                    auto a = mesh.indices[i + 0];
-                    auto b = mesh.indices[i + 1];
-                    auto c = mesh.indices[i + 2];
-                    mesh.indices[i + 0] = c;
-                    mesh.indices[i + 1] = b;
-                    mesh.indices[i + 2] = a;
-                }
+                normal = glm::normalize(gltf_to_renderer(normal));
             }
-
-            { // Attributes
-                if (auto color_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_COLOR_0))
-                {
-                    if (color_attribute != primitive.attributes.end())
-                    {
-                        auto& colors = asset->accessors.at(color_attribute->accessorIndex);
-                        mesh.colors.resize(colors.count);
-                        if (colors.type == fastgltf::AccessorType::Vec4)
-                        {
-                            fastgltf::copyFromAccessor<fastgltf::math::fvec4>(
-                                asset.get(),
-                                colors,
-                                mesh.colors.data());
-                        }
-                        else
-                        {
-                            std::vector<std::array<float, 3>> colors_rgb;
-                            colors_rgb.resize(colors.count);
-                            fastgltf::copyFromAccessor<fastgltf::math::fvec3>(
-                                asset.get(),
-                                colors,
-                                colors_rgb.data());
-                            for (auto i = 0; i < colors.count; ++i)
-                            {
-                                mesh.colors[i] = {
-                                    colors_rgb[i][0],
-                                    colors_rgb[i][1],
-                                    colors_rgb[i][2],
-                                    1.f,
-                                };
-                            }
-                        }
-                    }
-                }
-
-                if (auto normal_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_NORMAL))
-                {
-                    if (normal_attribute != primitive.attributes.end())
-                    {
-                        auto& normals = asset->accessors.at(normal_attribute->accessorIndex);
-                        mesh.normals.resize(normals.count);
-                        fastgltf::copyFromAccessor<fastgltf::math::fvec3>(
-                            asset.get(),
-                            normals,
-                            mesh.normals.data());
-                    }
-                }
-
-                if (auto tangent_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_TANGENT))
-                {
-                    if (tangent_attribute != primitive.attributes.end())
-                    {
-                        auto& tangents = asset->accessors.at(tangent_attribute->accessorIndex);
-                        mesh.tangents.resize(tangents.count);
-                        fastgltf::copyFromAccessor<fastgltf::math::fvec4>(
-                            asset.get(),
-                            tangents,
-                            mesh.tangents.data());
-                    }
-                }
-
-                if (auto tex_coord_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_TEXCOORD_0))
-                {
-                    if (tex_coord_attribute != primitive.attributes.end())
-                    {
-                        auto& tex_coords = asset->accessors.at(tex_coord_attribute->accessorIndex);
-                        mesh.tex_coords.resize(tex_coords.count);
-                        fastgltf::copyFromAccessor<fastgltf::math::fvec2>(
-                            asset.get(),
-                            tex_coords,
-                            mesh.tex_coords.data());
-                    }
-                }
-
-                if (auto joint_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_JOINTS_0))
-                {
-                    if (joint_attribute != primitive.attributes.end())
-                    {
-                        auto& joints = asset->accessors.at(joint_attribute->accessorIndex);
-                        mesh.joints.resize(joints.count);
-                        fastgltf::copyFromAccessor<fastgltf::math::uvec4>(
-                            asset.get(),
-                            joints,
-                            mesh.joints.data());
-                    }
-                }
-
-                if (auto weights_attribute = primitive.findAttribute(GLTF_ATTRIBUTE_WEIGHTS_0))
-                {
-                    if (weights_attribute != primitive.attributes.end())
-                    {
-                        auto& weights = asset->accessors.at(weights_attribute->accessorIndex);
-                        mesh.weights.resize(weights.count);
-                        fastgltf::copyFromAccessor<fastgltf::math::fvec4>(
-                            asset.get(),
-                            weights,
-                            mesh.weights.data());
-                    }
-                }
-
-                if (mesh.tangents.size() == 0 &&                                // Mesh has no tangents
-                    mesh.normals.size() > 0 &&                                  // and it has normals
-                    mesh.tex_coords.size() > 0 &&                               // and texture coordinates
-                    mesh.material_index != NO_INDEX &&                          // and a material
-                    !result.materials[mesh.material_index].normal_uri.empty())  // that contains a normal map
-                {
-                    spdlog::debug("GLTF file '{}' has no tangents and they need to be generated.", path.string());
-
-                    mesh.tangents.resize(mesh.normals.size());
-
-                    if (!(mesh.normals.size() == mesh.tangents.size() &&
-                        mesh.tangents.size() == mesh.tex_coords.size()))
-                    {
-                        spdlog::error("GLTF file '{}' has no tangents and they failed to generate.", path.string());
-                        return std::unexpected(GLTF_Error::Tangent_Generation_Failed);
-                    }
-
-                    struct Mikkt_Space_User_Data
-                    {
-                        std::vector<std::array<float, 3>>& positions;
-                        std::vector<std::array<float, 3>>& normals;
-                        std::vector<std::array<float, 2>>& tex_coords;
-                        std::vector<std::array<float, 4>>& tangents;
-                        std::vector<uint32_t>& indices;
-                    } mikkt_space_user_data = {
-                        .positions = mesh.positions,
-                        .normals = mesh.normals,
-                        .tex_coords = mesh.tex_coords,
-                        .tangents = mesh.tangents,
-                        .indices = mesh.indices,
-                    };
-
-                    auto get_num_faces = [](
-                        const SMikkTSpaceContext* mikktspace_context) -> int32_t
-                    {
-                        const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-                        return static_cast<int32_t>(user_data.indices.size() / 3);
-                    };
-                    auto get_num_vertices_of_face = [](
-                        const SMikkTSpaceContext* mikktspace_context,
-                        const int face_idx) -> int32_t
-                    {
-                        (void)mikktspace_context;
-                        (void)face_idx;
-                        return 3;
-                    };
-                    auto get_position = [](
-                        const SMikkTSpaceContext* mikktspace_context,
-                        float fv_pos_out[],
-                        const int face_idx,
-                        const int vert_idx) -> void
-                    {
-                        const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-                        const auto& position = user_data.positions[user_data.indices[face_idx * 3 + vert_idx]];
-                        fv_pos_out[0] = position[0];
-                        fv_pos_out[1] = position[1];
-                        fv_pos_out[2] = position[2];
-                    };
-                    auto get_normal = [](
-                        const SMikkTSpaceContext* mikktspace_context,
-                        float fv_norm_out[],
-                        const int face_idx,
-                        const int vert_idx) -> void
-                    {
-                        const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-                        const auto& normal = user_data.normals[user_data.indices[face_idx * 3 + vert_idx]];
-                        fv_norm_out[0] = normal[0];
-                        fv_norm_out[1] = normal[1];
-                        fv_norm_out[2] = normal[2];
-                    };
-                    auto get_tex_coord = [](
-                        const SMikkTSpaceContext* mikktspace_context,
-                        float fv_tex_coord_out[],
-                        const int face_idx,
-                        const int vert_idx) -> void
-                    {
-                        const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-                        const auto& tex_coord = user_data.tex_coords[user_data.indices[face_idx * 3 + vert_idx]];
-                        fv_tex_coord_out[0] = tex_coord[0];
-                        fv_tex_coord_out[1] = tex_coord[1];
-                    };
-                    auto set_tangent_space = [](
-                        const SMikkTSpaceContext* mikktspace_context,
-                        const float fv_tangent[],
-                        const float sign,
-                        const int face_idx,
-                        const int vert_idx) -> void
-                    {
-                        const auto& data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-                        auto& tangent = data.tangents[data.indices[face_idx * 3 + vert_idx]];
-                        tangent[0] = fv_tangent[0];
-                        tangent[1] = fv_tangent[1];
-                        tangent[2] = fv_tangent[2];
-                        tangent[3] = sign;
-                    };
-
-                    SMikkTSpaceInterface mikktspace_interface = {
-                        .m_getNumFaces = get_num_faces,
-                        .m_getNumVerticesOfFace = get_num_vertices_of_face,
-                        .m_getPosition = get_position,
-                        .m_getNormal = get_normal,
-                        .m_getTexCoord = +get_tex_coord,
-                        .m_setTSpaceBasic = set_tangent_space,
-                        .m_setTSpace = nullptr,
-                    };
-                    SMikkTSpaceContext mikktspace_context = {
-                        .m_pInterface = &mikktspace_interface,
-                        .m_pUserData = &mikkt_space_user_data
-                    };
-                    auto has_tangents = genTangSpaceDefault(&mikktspace_context);
-
-                    if (!has_tangents)
-                    {
-                        spdlog::warn("GLTF file '{}' failed to generate mikktspace tangents.", path.string());
-                    }
-                    else
-                    {
-                        spdlog::debug("Generated mikktspace tangents.");
-                    }
-                }
-                else
-                {
-                    spdlog::debug("Mesh requires no tangents or cannot generate them.");
-                }
-
-                for (auto& position : mesh.positions)
-                {
-                    position = { position[0], position[2], position[1] };
-                }
-                for (auto& normal : mesh.normals)
-                {
-                    normal = { normal[0], normal[2], normal[1] };
-                }
-                for (auto& tangent : mesh.tangents)
-                {
-                    tangent = { tangent[0], tangent[2], tangent[1] };
-                }
+            for (auto& tangent : mesh.tangents)
+            {
+                tangent = glm::vec4(glm::normalize(gltf_to_renderer(glm::vec3(tangent))), tangent.w);
             }
         }
 
-        range.second = result.submeshes.size();
-        submesh_ranges[&gltf_mesh] = range;
+        submesh_ranges[&gltf_mesh] = std::make_pair(submesh_range_start, result.submeshes.size());
     }
 
     spdlog::debug("Iterating scenes.");
@@ -511,13 +425,16 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 submesh_range_end = range.second;
             }
 
+            glm::quat rotation = gltf_to_renderer(glm::quat(trs.rotation[3], trs.rotation[0], trs.rotation[1], trs.rotation[2]));
+            glm::vec3 translation = gltf_to_renderer(glm::vec3(trs.translation[0], trs.translation[1], trs.translation[2]));
+
             result.instances.emplace_back( GLTF_Mesh_Instance {
                 .submesh_range_start = submesh_range_start,
                 .submesh_range_end = submesh_range_end,
                 .parent_index = parent_index,
-                .translation = { trs.translation[0], trs.translation[1], trs.translation[2] },
-                .rotation = { trs.rotation[0], trs.rotation[1], trs.rotation[2], trs.rotation[3] },
-                .scale = { trs.scale[0], trs.scale[1], trs.scale[2] },
+                .translation = { translation.x, translation.y, translation.z },
+                .rotation = { rotation.w, rotation.x, rotation.y, rotation.z },
+                .scale = { trs.scale[0], trs.scale[2], trs.scale[1] },
             } );
 
             spdlog::trace("Iterating children of node {}", node_idx);
@@ -772,7 +689,7 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
         mesh_positions.reserve(new_mesh_position_count);
         for (auto& position : submesh.positions)
         {
-            mesh_positions.emplace_back(position);
+            mesh_positions.emplace_back(std::to_array({ position[0], position[1], position[2] }));
         }
 
         mesh_indices.reserve(new_mesh_indices_count);
@@ -787,7 +704,7 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
             auto& attributes = mesh_attributes.emplace_back();
             if (submesh.normals.size() > i)
             {
-                attributes.normal = submesh.normals[i];
+                attributes.normal = { submesh.normals[i][0], submesh.normals[i][1], submesh.normals[i][2] };
             }
             else
             {
@@ -795,7 +712,7 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
             }
             if (submesh.tangents.size() > i)
             {
-                attributes.tangent = submesh.tangents[i];
+                attributes.tangent = { submesh.tangents[i][0], submesh.tangents[i][1], submesh.tangents[i][2], submesh.tangents[i][3] };
             }
             else
             {
@@ -803,7 +720,7 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
             }
             if (submesh.tex_coords.size() > i)
             {
-                attributes.tex_coords = submesh.tex_coords[i];
+                attributes.tex_coords = { submesh.tex_coords[i][0], submesh.tex_coords[i][1] };
             }
             else
             {
@@ -833,7 +750,7 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
 
                 if (submesh.joints.size() > i)
                 {
-                    attributes.joints = submesh.joints[i];
+                    attributes.joints = { submesh.joints[i][0], submesh.joints[i][1], submesh.joints[i][2], submesh.joints[i][3] };
                 }
                 else
                 {
@@ -842,7 +759,7 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
 
                 if (submesh.weights.size() > i)
                 {
-                    attributes.weights = submesh.weights[i];
+                    attributes.weights = { submesh.weights[i][0], submesh.weights[i][1], submesh.weights[i][2], submesh.weights[i][3] };
                 }
                 else
                 {

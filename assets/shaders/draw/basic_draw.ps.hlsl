@@ -1,10 +1,22 @@
 #include "draw/basic_draw.hlsli"
+#include "shared/draw_shared_types.h"
+#include "rhi/bindless.hlsli"
+
+DECLARE_PUSH_CONSTANTS(Immediate_Draw_Push_Constants, pc);
 
 PS_Out main(PS_In ps_in)
 {
-    // PS_Out result = { float4(ps_in.tex_coord.x, ps_in.tex_coord.y, 0.0, 1.0 ) };
-    PS_Out result = { 0.5 + 0.5 * float4(ps_in.normal.x, ps_in.normal.y, ps_in.normal.z, 0.0) };
-    // PS_Out result = { 0.5 + 0.5 * float4(ps_in.tangent.x, ps_in.tangent.y, ps_in.tangent.z, 0.0) };
-    // PS_Out result = { float4(1., 0.5, 0., 1.) };
+    GPU_Material material = rhi::buf_load_arr<GPU_Material>(pc.material_instance_buffer, ps_in.instance_id);
+
+    float4 color;
+    if (material.albedo != ~0 && material.sampler_id != ~0)
+    {
+        color = rhi::tex_sample<float4>(material.albedo, material.sampler_id, ps_in.tex_coord);
+        if (color.a < 0.5) discard;
+    }
+
+    PS_Out result = {
+        color
+    };
     return result;
 }

@@ -120,7 +120,7 @@ struct Mesh_Material_00
 {
     constexpr static auto URI_NO_REFERENCE = ~0u;
 
-    float base_color_factor[4];
+    uint8_t base_color_factor[4];
     float pbr_roughness;
     float pbr_metallic;
     float emissive_color[3];

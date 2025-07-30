@@ -36,7 +36,7 @@ VS_Out main(uint vertex_id : SV_VertexID)
     float3 displacement = float3(x_y_z_xdx.x, x_y_z_xdx.y, x_y_z_xdx.z) + line_length * float3(-slope.x, -slope.y, 0.);
     float4 pos = float4(vertex_pos.x + displacement.x, vertex_pos.y + displacement.y, displacement.z, 1.);
 
-    pos = mul(pos, camera.view_proj);
+    pos = mul(camera.view_proj, pos);
     float4 col = float4(0.5,1.,1.,1.);
     VS_Out result = { pos, col };
     return result;

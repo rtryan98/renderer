@@ -158,7 +158,7 @@ Sampler Render_Resource_Blackboard::get_sampler(const rhi::Sampler_Create_Info& 
         sampler = m_device->create_sampler(create_info).value_or(nullptr);
         m_samplers[create_info] = sampler;
     }
-    return sampler;
+    return m_samplers[create_info];
 }
 
 Buffer Render_Resource_Blackboard::create_buffer(const std::string& name, const rhi::Buffer_Create_Info& create_info)

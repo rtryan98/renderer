@@ -46,12 +46,13 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         },
         .models = m_asset_path + "/cache/"},
         *this))
+    , m_resource_blackboard(std::make_unique<Render_Resource_Blackboard>(m_device.get()))
     , m_static_scene_data(std::make_unique<Static_Scene_Data>(
         *this,
         m_logger,
         *m_asset_repository,
+        *m_resource_blackboard,
         m_device.get()))
-    , m_resource_blackboard(std::make_unique<Render_Resource_Blackboard>(m_device.get()))
     , m_renderer(*this, *m_swapchain, *m_resource_blackboard, Imgui_Renderer_Create_Info{
         .device = m_device.get(),
         .frames_in_flight = FRAME_IN_FLIGHT_COUNT,
@@ -416,7 +417,7 @@ void Application::imgui_process_modals() noexcept
         {
             const auto model_files =  m_asset_repository->get_model_files();
             static std::string selected = "";
-            if (ImGui::BeginListBox("Models"))
+            if (ImGui::BeginListBox("##Models", ImVec2(MODAL_WIDTH - 20.f, MODAL_HEIGHT -90.f)))
             {
                 for (auto& file : model_files)
                 {
@@ -436,7 +437,7 @@ void Application::imgui_process_modals() noexcept
                     .instances = {
                         {
                             .translation = { 0.f, 0.f, 0.f },
-                            .rotation = { 0.f, 0.f, 0.f, 1.f },
+                            .rotation = glm::identity<glm::quat>(),
                             .scale = { 1.f, 1.f, 1.f }
                         }
                     }

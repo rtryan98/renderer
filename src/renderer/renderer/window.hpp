@@ -2,13 +2,11 @@
 
 #include <array>
 #include <memory>
-#include <DirectXMath.h>
+#include <glm/glm.hpp>
 #include "renderer/input_codes.hpp"
 
 namespace ren
 {
-using namespace DirectX;
-
 enum class Mouse_Button : uint8_t;
 
 struct Window_Create_Info
@@ -57,8 +55,8 @@ public:
     bool is_mouse_pressed(Mouse_Button mb) const noexcept;
     bool is_mouse_clicked(Mouse_Button mb) const noexcept;
 
-    const XMFLOAT2 get_mouse_pos() const noexcept;
-    const XMFLOAT2 get_mouse_pos_delta() const noexcept;
+    const glm::vec2 get_mouse_pos() const noexcept;
+    const glm::vec2 get_mouse_pos_delta() const noexcept;
 
 private:
     Window& m_window;
@@ -66,7 +64,7 @@ private:
     std::array<bool, 512> m_last_state = {};
     uint32_t m_current_mouse_state = {};
     uint32_t m_last_mouse_state = {};
-    XMFLOAT2 m_current_mouse_pos = {};
-    XMFLOAT2 m_last_mouse_pos = {};
+    glm::vec2 m_current_mouse_pos = {};
+    glm::vec2 m_last_mouse_pos = {};
 };
 }
