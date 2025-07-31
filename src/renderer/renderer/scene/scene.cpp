@@ -216,7 +216,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
 
 void Static_Scene_Data::process_gui()
 {
-    if (ImGui::Begin("Scene Data"))
+    if (ImGui::Begin("Scene Data", nullptr, ImGuiWindowFlags_NoCollapse))
     {
         uint32_t i = 0;
         for (auto& model_instance : m_model_Instances)
