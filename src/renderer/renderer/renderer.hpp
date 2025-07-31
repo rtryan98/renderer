@@ -25,6 +25,7 @@ public:
     Renderer(Application& app, rhi::Swapchain& swapchain,
         Render_Resource_Blackboard& resource_blackboard,
         const Imgui_Renderer_Create_Info& imgui_renderer_create_info);
+    ~Renderer();
 
     std::vector<Settings_Base*> get_settings() noexcept;
 
@@ -61,7 +62,7 @@ private:
     {
         Image color;
         Image depth_stencil;
-    } m_ocean_rendertargets;
+    } m_ocean_rendertargets = {};
 
     bool m_should_display_overlay;
 };

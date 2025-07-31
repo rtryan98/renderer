@@ -42,8 +42,6 @@ struct Ocean_Resources
         Image ydx_zdx_ydy_zdy_texture;
 
         Buffer initial_spectrum_data;
-        Buffer vertex_buffer;
-        Buffer index_buffer;
     } gpu_resources;
 
     void create_buffers(Render_Resource_Blackboard& resource_blackboard);

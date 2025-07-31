@@ -1,10 +1,11 @@
 #pragma once
 #include <filesystem>
 #include <ankerl/unordered_dense.h>
+#include <plf_colony.h>
+
 #include "renderer/asset/shader_library.hpp"
 #include "renderer/asset/compute_library.hpp"
 #include "renderer/asset/graphics_pipeline_library.hpp"
-#include <rhi/common/array_vector.hpp>
 #include "renderer/logger.hpp"
 #include "renderer/asset/pipeline.hpp"
 #include "renderer/filesystem/mapped_file.hpp"
@@ -76,16 +77,16 @@ private:
     // ankerl is fast but has unstable pointers on insert
     // Because of that the maps are not directly storing the data
     String_Map<Shader_Library*> m_shader_library_ptrs = {};
-    rhi::Array_Vector<Shader_Library, ARRAY_VECTOR_SIZE> m_shader_libraries = {};
+    plf::colony<Shader_Library> m_shader_libraries = {};
 
     String_Map<Compute_Library*> m_compute_library_ptrs = {};
-    rhi::Array_Vector<Compute_Library, ARRAY_VECTOR_SIZE> m_compute_libraries = {};
+    plf::colony<Compute_Library> m_compute_libraries = {};
 
     String_Map<Graphics_Pipeline_Library*> m_pipeline_library_ptrs = {};
-    rhi::Array_Vector<Graphics_Pipeline_Library, ARRAY_VECTOR_SIZE> m_pipeline_libraries = {};
+    plf::colony<Graphics_Pipeline_Library> m_pipeline_libraries = {};
 
     String_Map<Mapped_File*> m_model_ptrs = {};
     String_Map<Mapped_File*> m_texture_ptrs = {};
-    rhi::Array_Vector<Mapped_File, ARRAY_VECTOR_SIZE> m_files = {};
+    plf::colony<Mapped_File> m_files = {};
 };
 }

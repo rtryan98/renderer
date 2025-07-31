@@ -38,7 +38,7 @@ glm::mat3 TRS::to_transposed_adjugate(const glm::mat4& parent) const noexcept
 
 void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
 {
-    auto* model = m_models.acquire();
+    auto& model = *m_models.emplace();
     auto* loadable_model = static_cast<serialization::Model_Header_00*>(
         m_asset_repository.get_model(model_descriptor.name)->data);
     m_logger->info("Loading model '{}'", model_descriptor.name);
@@ -49,23 +49,23 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
             .size = loadable_model->vertex_position_count * sizeof(std::array<float, 3>),
             .heap = rhi::Memory_Heap_Type::GPU
         };
-        model->vertex_positions = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-        m_graphics_device->name_resource(model->vertex_positions, (std::string("gltf:") + model_descriptor.name + ":position").c_str());
+        model.vertex_positions = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+        m_graphics_device->name_resource(model.vertex_positions, (std::string("gltf:") + model_descriptor.name + ":position").c_str());
         buffer_create_info.size = loadable_model->vertex_attribute_count * sizeof(serialization::Vertex_Attributes);
-        model->vertex_attributes = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-        m_graphics_device->name_resource(model->vertex_attributes, (std::string("gltf:") + model_descriptor.name + ":attributes").c_str());
-        model->index_buffer_allocation = m_index_buffer_allocator.allocate(loadable_model->index_count);
+        model.vertex_attributes = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+        m_graphics_device->name_resource(model.vertex_attributes, (std::string("gltf:") + model_descriptor.name + ":attributes").c_str());
+        model.index_buffer_allocation = m_index_buffer_allocator.allocate(loadable_model->index_count);
 
         auto* positions = loadable_model->get_vertex_positions();
         m_app.upload_buffer_data_immediate(
-            model->vertex_positions,
+            model.vertex_positions,
             positions,
             loadable_model->vertex_position_count * sizeof(std::array<float, 3>),
             0);
 
         auto* attributes = loadable_model->get_vertex_attributes();
         m_app.upload_buffer_data_immediate(
-            model->vertex_attributes,
+            model.vertex_attributes,
             attributes,
             loadable_model->vertex_attribute_count * sizeof(serialization::Vertex_Attributes),
             0);
@@ -75,15 +75,15 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
             m_global_index_buffer,
             indices,
             loadable_model->index_count * sizeof(std::uint32_t),
-            model->index_buffer_allocation.offset * sizeof(std::uint32_t));
+            model.index_buffer_allocation.offset * sizeof(std::uint32_t));
     }
 
-    model->materials.resize(loadable_model->material_count);
+    model.materials.resize(loadable_model->material_count);
     for (auto i = 0; i < loadable_model->material_count; ++i)
     {
         const auto& loadable_material = loadable_model->get_materials()[i];
-        model->materials[i] = m_materials.acquire();
-        auto& material = *model->materials[i];
+        model.materials[i] = &*m_materials.emplace();
+        auto& material = *model.materials[i];
 
         auto get_material_texture = [&](uint32_t index) -> rhi::Image* {
             const auto* uris = loadable_model->get_referenced_uris();
@@ -134,28 +134,28 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
         };
     }
 
-    model->submeshes.resize(loadable_model->submesh_count);
+    model.submeshes.resize(loadable_model->submesh_count);
     for (auto i = 0; i < loadable_model->submesh_count; ++i)
     {
         const auto& loadable_submesh = loadable_model->get_submeshes()[i];
-        auto& submesh = model->submeshes[i];
+        auto& submesh = model.submeshes[i];
         submesh.first_index = loadable_submesh.index_range_start;
         submesh.index_count = loadable_submesh.index_range_end - loadable_submesh.index_range_start;
         submesh.first_vertex = loadable_submesh.vertex_position_range_start;
         submesh.aabb_min = {};
         submesh.aabb_max = {};
         submesh.default_material = loadable_submesh.material_index != MESH_PARENT_INDEX_NO_PARENT
-            ? model->materials[loadable_submesh.material_index]
+            ? model.materials[loadable_submesh.material_index]
             : nullptr;
     }
 
-    model->meshes.resize(loadable_model->instance_count);
+    model.meshes.resize(loadable_model->instance_count);
     for (auto i = 0; i < loadable_model->instance_count; ++i)
     {
         const auto& loadable_mesh_instance = loadable_model->get_instances()[i];
-        auto& mesh = model->meshes[i];
+        auto& mesh = model.meshes[i];
         mesh.parent = loadable_mesh_instance.parent_index != MESH_PARENT_INDEX_NO_PARENT
-            ? &model->meshes[loadable_mesh_instance.parent_index]
+            ? &model.meshes[loadable_mesh_instance.parent_index]
             : nullptr;
         mesh.trs = {
             .translation = {
@@ -180,26 +180,26 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
         mesh.submeshes.reserve(end - start);
         for (auto j = start; j < end; ++j)
         {
-            mesh.submeshes.emplace_back(&model->submeshes[j]);
+            mesh.submeshes.emplace_back(&model.submeshes[j]);
         }
     }
 
     for (auto& model_instance_descriptor : model_descriptor.instances)
     {
-        auto* model_instance = m_model_Instances.acquire();
-        model_instance->model = model;
-        model_instance->trs = model_instance_descriptor;
-        model_instance->mesh_instances.resize(model->meshes.size());
-        for (auto i = 0; i < model->meshes.size(); ++i)
+        auto& model_instance = *m_model_Instances.emplace();
+        model_instance.model = &model;
+        model_instance.trs = model_instance_descriptor;
+        model_instance.mesh_instances.resize(model.meshes.size());
+        for (auto i = 0; i < model.meshes.size(); ++i)
         {
-            auto& mesh = model->meshes[i];
-            auto& mesh_instance = model_instance->mesh_instances[i];
+            auto& mesh = model.meshes[i];
+            auto& mesh_instance = model_instance.mesh_instances[i];
             mesh_instance.mesh = &mesh;
             mesh_instance.parent = nullptr;
             if (mesh.parent)
             {
-                const auto index = mesh.parent - &model->meshes[0];
-                mesh_instance.parent = &model_instance->mesh_instances[index];
+                const auto index = mesh.parent - &model.meshes[0];
+                mesh_instance.parent = &model_instance.mesh_instances[index];
             }
             mesh_instance.trs = mesh.trs;
             mesh_instance.submesh_instances.reserve(mesh.submeshes.size());
@@ -211,6 +211,21 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
                 submesh_instance.instance_index = acquire_instance_index();
             }
         }
+    }
+}
+
+void Static_Scene_Data::process_gui()
+{
+    if (ImGui::Begin("Scene Data"))
+    {
+        uint32_t i = 0;
+        for (auto& model_instance : m_model_Instances)
+        {
+            ImGui::PushID(i++);
+            ImGui::InputFloat3("Translation", &model_instance.trs.translation[0]);
+            ImGui::PopID();
+        }
+        ImGui::End();
     }
 }
 

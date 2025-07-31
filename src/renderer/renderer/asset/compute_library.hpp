@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/common/array_vector.hpp>
+#include <plf_colony.h>
 #include <vector>
 #include <string>
 
@@ -22,7 +22,7 @@ struct Compute_Pipeline_Wrapper
 
 struct Compute_Library
 {
-    rhi::Array_Vector<Compute_Pipeline_Wrapper, 16> pipelines;
+    plf::colony<Compute_Pipeline_Wrapper> pipelines;
     std::vector<Compute_Pipeline_Wrapper*> pipeline_ptrs;
 
     void create_pipelines(rhi::Graphics_Device* device, Shader_Library* shader_library);

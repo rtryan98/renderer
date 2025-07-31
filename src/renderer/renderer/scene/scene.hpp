@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/common/array_vector.hpp>
+#include <plf_colony.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <string>
@@ -138,6 +138,8 @@ public:
     [[nodiscard]] auto* get_instance_transform_buffer() const noexcept { return m_global_instance_transform_buffer; }
     [[nodiscard]] auto* get_material_instance_buffer() const noexcept { return m_global_material_instance_buffer; }
 
+    void process_gui();
+
 private:
     uint32_t acquire_instance_index();
 
@@ -153,9 +155,9 @@ private:
     OffsetAllocator::Allocator m_index_buffer_allocator;
 
     std::vector<uint32_t> m_instance_freelist = {};
-    rhi::Array_Vector<Material, SCENE_MEDIUM_ARRAY_VEC_SIZE> m_materials = {};
-    rhi::Array_Vector<Model, SCENE_MEDIUM_ARRAY_VEC_SIZE> m_models = {};
-    rhi::Array_Vector<Model_Instance, SCENE_MEDIUM_ARRAY_VEC_SIZE> m_model_Instances = {};
+    plf::colony<Material> m_materials = {};
+    plf::colony<Model> m_models = {};
+    plf::colony<Model_Instance> m_model_Instances = {};
     ankerl::unordered_dense::map<std::string, rhi::Image*> m_images = {};
     rhi::Buffer* m_global_index_buffer = nullptr;
     rhi::Buffer* m_global_instance_transform_buffer = nullptr;

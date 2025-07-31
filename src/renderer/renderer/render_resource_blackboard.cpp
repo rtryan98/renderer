@@ -164,7 +164,7 @@ Sampler Render_Resource_Blackboard::get_sampler(const rhi::Sampler_Create_Info& 
 Buffer Render_Resource_Blackboard::create_buffer(const std::string& name, const rhi::Buffer_Create_Info& create_info)
 {
     if (has_buffer(name)) return Buffer(*this, &(m_buffer_wrapper_ptrs[name]->buffer), name);
-    const auto buffer = m_buffers.acquire();
+    const auto buffer = &*m_buffers.emplace();
     m_buffer_wrapper_ptrs[name] = buffer;
     buffer->buffer = m_device->create_buffer(create_info).value_or(nullptr);
     m_device->name_resource(buffer->buffer, name.c_str());
@@ -186,15 +186,15 @@ void Render_Resource_Blackboard::destroy_buffer(const std::string& name)
 {
     if (!has_buffer(name))
         return;
-    m_buffers.release(m_buffer_wrapper_ptrs[name]);
     delete_resource(m_buffer_wrapper_ptrs[name]->buffer);
+    m_buffers.erase(m_buffers.get_iterator(m_buffer_wrapper_ptrs[name]));
     m_buffer_wrapper_ptrs.erase(name);
 }
 
 Image Render_Resource_Blackboard::create_image(const std::string& name, const rhi::Image_Create_Info& create_info)
 {
     if (has_image(name)) return Image(*this, &(m_image_wrapper_ptrs[name]->image), name);
-    const auto image = m_images.acquire();
+    const auto image = &*m_images.emplace();
     m_image_wrapper_ptrs[name] = image;
     image->image = m_device->create_image(create_info).value_or(nullptr);
     m_device->name_resource(image->image, name.c_str());
@@ -216,8 +216,8 @@ void Render_Resource_Blackboard::destroy_image(const std::string& name)
 {
     if (!has_image(name))
         return;
-    m_images.release(m_image_wrapper_ptrs[name]);
     delete_resource(m_image_wrapper_ptrs[name]->image);
+    m_images.erase(m_images.get_iterator(m_image_wrapper_ptrs[name]));
     m_image_wrapper_ptrs.erase(name);
 }
 

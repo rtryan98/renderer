@@ -48,6 +48,14 @@ Renderer::Renderer(Application& app, rhi::Swapchain& swapchain,
     m_imgui_renderer.create_fonts_texture();
 }
 
+Renderer::~Renderer()
+{
+    m_resource_blackboard.destroy_image(m_g_buffer.target0);
+    m_resource_blackboard.destroy_image(m_g_buffer.depth_stencil);
+    m_resource_blackboard.destroy_image(m_ocean_rendertargets.color);
+    m_resource_blackboard.destroy_image(m_ocean_rendertargets.depth_stencil);
+}
+
 std::vector<Settings_Base*> Renderer::get_settings() noexcept
 {
     std::vector<Settings_Base*> result;

@@ -382,7 +382,7 @@ void Asset_Repository::compile_shader_library(
     auto shader_library_lookup_name = name + "." + shader_type_string;
     if (!m_shader_library_ptrs.contains(shader_library_lookup_name))
     {
-        m_shader_library_ptrs.insert(std::make_pair(shader_library_lookup_name, m_shader_libraries.acquire()));
+        m_shader_library_ptrs.insert(std::make_pair(shader_library_lookup_name, &*m_shader_libraries.emplace()));
     }
     auto* shader_library = m_shader_library_ptrs[shader_library_lookup_name];
     shader_library->shaders = std::move(named_shaders);
@@ -395,7 +395,7 @@ void Asset_Repository::compile_shader_library(
         m_logger->debug("Creating or updating associated compute library.");
         if (!m_compute_library_ptrs.contains(name))
         {
-            m_compute_library_ptrs.insert(std::make_pair(name, m_compute_libraries.acquire()));
+            m_compute_library_ptrs.insert(std::make_pair(name, &*m_compute_libraries.emplace()));
         }
         auto* compute_library = m_compute_library_ptrs[name];
         shader_library->referenced_compute_library = compute_library;
@@ -673,7 +673,7 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
     auto name = pipeline_json["name"].get<std::string>();
     if (!m_pipeline_library_ptrs.contains(name))
     {
-        m_pipeline_library_ptrs[name] = m_pipeline_libraries.acquire();
+        m_pipeline_library_ptrs[name] = &*m_pipeline_libraries.emplace();
     }
 
     auto& pipeline_library = *m_pipeline_library_ptrs[name];
@@ -798,7 +798,7 @@ void Asset_Repository::register_texture(const std::filesystem::path& path)
     const auto texture_identifier = path.filename().string();
     if (!m_texture_ptrs.contains(texture_identifier))
     {
-        m_texture_ptrs[texture_identifier] = m_files.acquire();
+        m_texture_ptrs[texture_identifier] = &*m_files.emplace();
     }
     auto& texture = *m_texture_ptrs.at(texture_identifier);
     texture = mapped_file;
@@ -838,7 +838,7 @@ void Asset_Repository::register_model(const std::filesystem::path& path)
     const auto model_identifier = path.filename().string();
     if (!m_model_ptrs.contains(model_identifier))
     {
-        m_model_ptrs[model_identifier] = m_files.acquire();
+        m_model_ptrs[model_identifier] = &*m_files.emplace();
     }
     auto& model = *m_model_ptrs.at(model_identifier);
     model = mapped_file;

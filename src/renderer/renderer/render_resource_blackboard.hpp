@@ -2,7 +2,7 @@
 
 #include <rhi/resource.hpp>
 #include <ankerl/unordered_dense.h>
-#include <rhi/common/array_vector.hpp>
+#include <plf_colony.h>
 
 namespace rhi
 {
@@ -101,8 +101,6 @@ private:
     friend class Buffer;
     friend class Image;
 
-    constexpr static auto ARRAY_VEC_SIZE = 128;
-
     struct Buffer_Wrapper { rhi::Buffer* buffer; };
     struct Image_Wrapper { rhi::Image* image; };
     struct Sampler_Hash
@@ -118,9 +116,9 @@ private:
     ankerl::unordered_dense::map<rhi::Sampler_Create_Info, Sampler, Sampler_Hash> m_samplers;
 
     ankerl::unordered_dense::map<std::string, Buffer_Wrapper*> m_buffer_wrapper_ptrs;
-    rhi::Array_Vector<Buffer_Wrapper, ARRAY_VEC_SIZE> m_buffers;
+    plf::colony<Buffer_Wrapper> m_buffers;
     ankerl::unordered_dense::map<std::string, Image_Wrapper*> m_image_wrapper_ptrs;
-    rhi::Array_Vector<Image_Wrapper, ARRAY_VEC_SIZE> m_images;
+    plf::colony<Image_Wrapper> m_images;
 
     struct Deleted_Resource
     {
