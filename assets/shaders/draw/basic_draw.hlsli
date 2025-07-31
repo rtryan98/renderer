@@ -7,7 +7,7 @@ struct VS_Out
     float3 normal : NORMAL;
     float4 tangent : TANGENT;
     float2 tex_coord : TEXCOORD;
-    nointerpolation uint instance_id : INSTANCE;
+    nointerpolation uint material_index : INSTANCE;
 };
 
 typedef VS_Out PS_In;

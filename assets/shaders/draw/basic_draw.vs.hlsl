@@ -18,7 +18,10 @@ VS_Out main(uint vertex_id : SV_VertexID, uint vertex_offset : SV_StartVertexLoc
     uint vertex_index = vertex_id + vertex_offset;
 
     GPU_Camera_Data camera = rhi::uni::buf_load<GPU_Camera_Data>(pc.camera_buffer);
-    GPU_Instance instance_transform = rhi::uni::buf_load_arr<GPU_Instance>(pc.instance_transform_buffer, instance_index);
+    GPU_Instance_Indices instance_indices =
+        rhi::uni::buf_load_arr<GPU_Instance_Indices>(pc.instance_indices_buffer, instance_index);
+    GPU_Instance_Transform_Data instance_transform =
+        rhi::uni::buf_load_arr<GPU_Instance_Transform_Data>(pc.instance_transform_buffer, instance_indices.transform_index);
 
     float4 vertex_pos = float4(rhi::uni::buf_load_arr<float3>(pc.position_buffer, vertex_index), 1.0);
     vertex_pos = mul(camera.view_proj, mul(instance_transform.mesh_to_world, vertex_pos));
@@ -30,7 +33,7 @@ VS_Out main(uint vertex_id : SV_VertexID, uint vertex_offset : SV_StartVertexLoc
         vertex_attributes.normal,
         vertex_attributes.tangent,
         vertex_attributes.tex_coord,
-        instance_index
+        instance_indices.material_index
     };
     return result;
 }

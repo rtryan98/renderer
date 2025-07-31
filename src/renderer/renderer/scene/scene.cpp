@@ -4,6 +4,7 @@
 #include <ranges>
 #include <shared/serialized_asset_formats.hpp>
 
+#include "glm/gtc/packing.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "renderer/application.hpp"
 #include "renderer/asset/asset_formats.hpp"
@@ -82,7 +83,8 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
     for (auto i = 0; i < loadable_model->material_count; ++i)
     {
         const auto& loadable_material = loadable_model->get_materials()[i];
-        model.materials[i] = &*m_materials.emplace();
+        auto material_index = acquire_material_index();
+        model.materials[i] = &m_materials[material_index];
         auto& material = *model.materials[i];
 
         auto get_material_texture = [&](uint32_t index) -> rhi::Image* {
@@ -112,6 +114,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
         };
 
         material = {
+            .material_index = material_index,
             .base_color_factor = {
                 loadable_material.base_color_factor[0],
                 loadable_material.base_color_factor[1],
@@ -132,6 +135,31 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
             .emissive = get_material_texture(loadable_material.emissive_uri_index),
             .sampler = m_render_resource_blackboard.get_sampler(default_sampler_create_info)
         };
+
+        auto get_image_index = [&](rhi::Image* image)
+        {
+            if (!image) return ~0u;
+            return image->image_view->bindless_index;
+        };
+
+        GPU_Material gpu_material = {
+            .base_color_factor = glm::packUint4x8(material.base_color_factor),
+            .pbr_roughness = material.pbr_roughness,
+            .pbr_metallic = material.pbr_metallic,
+            .emissive_color = material.emissive_color,
+            .emissive_strength = material.emissive_strength,
+            .albedo = get_image_index(material.albedo),
+            .normal = get_image_index(material.normal),
+            .metallic_roughness = get_image_index(material.metallic_roughness),
+            .emissive = get_image_index(material.emissive),
+            .sampler_id = material.sampler->bindless_index
+        };
+
+        m_app.upload_buffer_data_immediate(
+            m_material_buffer,
+            &gpu_material,
+            sizeof(GPU_Material),
+            material.material_index * sizeof(GPU_Material));
     }
 
     model.submeshes.resize(loadable_model->submesh_count);
@@ -201,6 +229,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
                 const auto index = mesh.parent - &model.meshes[0];
                 mesh_instance.parent = &model_instance.mesh_instances[index];
             }
+            mesh_instance.transform_index = acquire_transform_index();
             mesh_instance.trs = mesh.trs;
             mesh_instance.submesh_instances.reserve(mesh.submeshes.size());
             for (auto* submesh : mesh.submeshes)
@@ -211,21 +240,40 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
                 submesh_instance.instance_index = acquire_instance_index();
             }
         }
-    }
-}
-
-void Static_Scene_Data::process_gui()
-{
-    if (ImGui::Begin("Scene Data", nullptr, ImGuiWindowFlags_NoCollapse))
-    {
-        uint32_t i = 0;
-        for (auto& model_instance : m_model_Instances)
+        for (auto& mesh_instance : model_instance.mesh_instances)
         {
-            ImGui::PushID(i++);
-            ImGui::InputFloat3("Translation", &model_instance.trs.translation[0]);
-            ImGui::PopID();
+            if (mesh_instance.parent)
+                mesh_instance.mesh_to_world = mesh_instance.trs.to_transform(mesh_instance.parent->mesh_to_world);
+            else
+                mesh_instance.mesh_to_world = mesh_instance.trs.to_mat();
         }
-        ImGui::End();
+        for (const auto& mesh_instance : model_instance.mesh_instances)
+        {
+            GPU_Instance_Transform_Data instance_transform_data = {
+                .mesh_to_world = mesh_instance.mesh_to_world,
+                .normal_to_world = mesh_instance.trs.to_transposed_adjugate(
+                    mesh_instance.parent != nullptr
+                    ? mesh_instance.parent->mesh_to_world
+                    : glm::identity<glm::mat4>())
+            };
+            m_app.upload_buffer_data_immediate(
+                m_transform_buffer,
+                &instance_transform_data,
+                sizeof(GPU_Instance_Transform_Data),
+                mesh_instance.transform_index * sizeof(GPU_Instance_Transform_Data));
+            for (const auto& submesh_instance : mesh_instance.submesh_instances)
+            {
+                GPU_Instance_Indices instance_indices = {
+                    .transform_index = mesh_instance.transform_index,
+                    .material_index = submesh_instance.material->material_index
+                };
+                m_app.upload_buffer_data_immediate(
+                    m_instance_buffer,
+                    &instance_indices,
+                    sizeof(instance_indices),
+                    submesh_instance.instance_index * sizeof(GPU_Instance_Indices));
+            }
+        }
     }
 }
 
@@ -233,6 +281,20 @@ uint32_t Static_Scene_Data::acquire_instance_index()
 {
     const auto val = m_instance_freelist.back();
     m_instance_freelist.pop_back();
+    return val;
+}
+
+uint32_t Static_Scene_Data::acquire_material_index()
+{
+    const auto val = m_material_freelist.back();
+    m_material_freelist.pop_back();
+    return val;
+}
+
+uint32_t Static_Scene_Data::acquire_transform_index()
+{
+    const auto val = m_transform_freelist.back();
+    m_transform_freelist.pop_back();
     return val;
 }
 
@@ -285,6 +347,13 @@ Static_Scene_Data::Static_Scene_Data(Application& app, std::shared_ptr<Logger> l
     m_instance_freelist.resize(MAX_INSTANCES);
     std::iota(m_instance_freelist.rbegin(), m_instance_freelist.rend(), 0);
 
+    m_material_freelist.resize(MAX_INSTANCES);
+    std::iota(m_material_freelist.rbegin(), m_material_freelist.rend(), 0);
+    m_materials.resize(MAX_MATERIALS);
+
+    m_transform_freelist.resize(MAX_INSTANCES);
+    std::iota(m_transform_freelist.rbegin(), m_transform_freelist.rend(), 0);
+
     rhi::Buffer_Create_Info buffer_create_info = {
         .size = INDEX_BUFFER_SIZE,
         .heap = rhi::Memory_Heap_Type::GPU
@@ -292,19 +361,23 @@ Static_Scene_Data::Static_Scene_Data(Application& app, std::shared_ptr<Logger> l
     m_global_index_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
     m_graphics_device->name_resource(m_global_index_buffer, "scene:global_index_buffer");
     buffer_create_info.size = INSTANCE_TRANSFORM_BUFFER_SIZE;
-    m_global_instance_transform_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-    m_graphics_device->name_resource(m_global_instance_transform_buffer, "scene:global_instance_transform_buffer");
+    m_transform_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+    m_graphics_device->name_resource(m_transform_buffer, "scene:instance_transform_buffer");
     buffer_create_info.size = MATERIAL_INSTANCE_BUFFER_SIZE;
-    m_global_material_instance_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
-    m_graphics_device->name_resource(m_global_material_instance_buffer, "scene:global_material_instance_buffer");
+    m_material_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+    m_graphics_device->name_resource(m_material_buffer, "scene:material_instance_buffer");
+    buffer_create_info.size = INSTANCE_INDICES_BUFFER_SIZE;
+    m_instance_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+    m_graphics_device->name_resource(m_instance_buffer, "scene:instance_indices_buffer");
 }
 
 Static_Scene_Data::~Static_Scene_Data()
 {
     m_graphics_device->wait_idle();
     m_graphics_device->destroy_buffer(m_global_index_buffer);
-    m_graphics_device->destroy_buffer(m_global_instance_transform_buffer);
-    m_graphics_device->destroy_buffer(m_global_material_instance_buffer);
+    m_graphics_device->destroy_buffer(m_transform_buffer);
+    m_graphics_device->destroy_buffer(m_material_buffer);
+    m_graphics_device->destroy_buffer(m_instance_buffer);
     for (const auto& model : m_models)
     {
         m_graphics_device->destroy_buffer(model.vertex_positions);

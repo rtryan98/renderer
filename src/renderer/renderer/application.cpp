@@ -382,8 +382,6 @@ void Application::process_gui() noexcept
     }
     if (m_imgui_data.windows.demo)
         ImGui::ShowDemoWindow(&m_imgui_data.windows.demo);
-    if (m_imgui_data.windows.scene_info)
-        m_static_scene_data->process_gui();
 
     imgui_process_modals();
 
@@ -400,7 +398,6 @@ void Application::imgui_close_all_windows() noexcept
     m_imgui_data.windows.demo = false;
     m_imgui_data.windows.renderer_settings = false;
     m_imgui_data.windows.tool_cbt_vis = false;
-    m_imgui_data.windows.scene_info = false;
 }
 
 void Application::imgui_process_modals() noexcept
@@ -567,7 +564,6 @@ void Application::imgui_menubar() noexcept
         if (ImGui::BeginMenu("Window"))
         {
             imgui_menu_toggle_window("Renderer Settings", m_imgui_data.windows.renderer_settings);
-            imgui_menu_toggle_window("Scene Info", m_imgui_data.windows.scene_info);
             if (ImGui::MenuItem("Close all Windows"))
             {
                 imgui_close_all_windows();

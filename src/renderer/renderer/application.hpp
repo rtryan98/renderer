@@ -26,7 +26,6 @@ struct ImGui_Data
         bool demo = false;
         bool renderer_settings = false;
         bool tool_cbt_vis = false;
-        bool scene_info = false;
     } windows;
     struct
     {

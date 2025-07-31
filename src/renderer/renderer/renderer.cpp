@@ -357,64 +357,19 @@ void Renderer::render_gbuffer_pass(Static_Scene_Data& scene, rhi::Command_List* 
         model_instance.model_to_world = model_instance.trs.to_mat();
         for (auto& mesh_instance : model_instance.mesh_instances)
         {
-            // TODO: this is really bad, slow, and only for testing.
-            // Upload only deltas later on instead and disperse via compute shader.
-
-            glm::mat4 parent_matrix = model_instance.model_to_world;
-            if (mesh_instance.parent != nullptr)
-            {
-                parent_matrix = mesh_instance.parent->mesh_to_world;
-            }
-            mesh_instance.mesh_to_world = mesh_instance.trs.to_transform(parent_matrix);
-            glm::mat3 normal_matrix = mesh_instance.trs.to_transposed_adjugate(parent_matrix);
-
-            GPU_Instance gpu_instance = {
-                .mesh_to_world = mesh_instance.mesh_to_world,
-                .normal_to_world = normal_matrix
-            };
-
             for (auto& submesh_instance : mesh_instance.submesh_instances)
             {
                 auto* const submesh = submesh_instance.submesh;
-
-                m_app.upload_buffer_data_immediate(
-                    scene.get_instance_transform_buffer(),
-                    &gpu_instance,
-                    sizeof(GPU_Instance),
-                    submesh_instance.instance_index * sizeof(GPU_Instance));
-
-                auto get_image_index = [&](rhi::Image* image)
-                {
-                    if (!image) return ~0u;
-                    return image->image_view->bindless_index;
-                };
-
-                GPU_Material gpu_material = {
-                    .base_color_factor = std::bit_cast<uint32_t>(submesh_instance.material->base_color_factor),
-                    .pbr_roughness = submesh_instance.material->pbr_roughness,
-                    .pbr_metallic = submesh_instance.material->pbr_metallic,
-                    .emissive_color = submesh_instance.material->emissive_color,
-                    .emissive_strength = submesh_instance.material->emissive_strength,
-                    .albedo = get_image_index(submesh_instance.material->albedo),
-                    .normal = get_image_index(submesh_instance.material->normal),
-                    .metallic_roughness = get_image_index(submesh_instance.material->metallic_roughness),
-                    .emissive = get_image_index(submesh_instance.material->emissive),
-                    .sampler_id = submesh_instance.material->sampler->bindless_index
-                };
-
-                m_app.upload_buffer_data_immediate(
-                    scene.get_material_instance_buffer(),
-                    &gpu_material,
-                    sizeof(GPU_Material),
-                    submesh_instance.instance_index * sizeof(GPU_Material));
 
                 cmd->set_push_constants<Immediate_Draw_Push_Constants>({
                     .position_buffer = model->vertex_positions->buffer_view->bindless_index,
                     .attribute_buffer = model->vertex_attributes->buffer_view->bindless_index,
                     .camera_buffer = m_camera_buffer,
-                    .instance_transform_buffer = scene.get_instance_transform_buffer()->buffer_view->bindless_index,
-                    .material_instance_buffer = scene.get_material_instance_buffer()->buffer_view->bindless_index,
+                    .instance_indices_buffer = scene.get_instance_buffer()->buffer_view->bindless_index,
+                    .instance_transform_buffer = scene.get_transform_buffer()->buffer_view->bindless_index,
+                    .material_instance_buffer = scene.get_material_buffer()->buffer_view->bindless_index,
                 }, rhi::Pipeline_Bind_Point::Graphics);
+
                 cmd->draw_indexed(
                     submesh->index_count,
                     1,
