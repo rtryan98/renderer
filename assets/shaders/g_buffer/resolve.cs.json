@@ -1,0 +1,5 @@
+{
+    "name": "g_buffer_resolve",
+    "shader_type": "cs",
+    "entry_point": "main"
+}

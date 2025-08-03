@@ -2,12 +2,10 @@
 
 #include "renderer/logger.hpp"
 #include "renderer/window.hpp"
-#include "renderer/cbt/cbt_cpu.hpp"
-#include "renderer/imgui/renderer_settings.hpp"
-#include "renderer/ocean/ocean_renderer.hpp"
 #include "renderer/renderer.hpp"
 #include "renderer/asset/asset_repository.hpp"
 #include "renderer/render_resource_blackboard.hpp"
+#include "renderer/gpu_transfer.hpp"
 
 #include <rhi/graphics_device.hpp>
 #include <rhi/swapchain.hpp>
@@ -17,15 +15,12 @@
 
 namespace ren
 {
-constexpr static std::size_t FRAME_IN_FLIGHT_COUNT = 2;
-
 struct ImGui_Data
 {
     struct
     {
         bool demo = false;
         bool renderer_settings = false;
-        bool tool_cbt_vis = false;
     } windows;
     struct
     {
@@ -82,7 +77,6 @@ private:
 
     void setup_frame(Frame& frame) noexcept;
     void render_frame(Frame& frame, double t, double dt) noexcept;
-    rhi::Command_List* handle_immediate_uploads(Frame& frame) noexcept;
     void process_gui() noexcept;
     void update(double t, double dt) noexcept;
 
@@ -99,10 +93,8 @@ private:
     std::unique_ptr<Input_State> m_input_state;
     std::unique_ptr<rhi::Graphics_Device> m_device;
     std::unique_ptr<rhi::Swapchain> m_swapchain;
-    std::array<Frame, FRAME_IN_FLIGHT_COUNT> m_frames;
-    std::array<std::vector<rhi::Buffer*>, FRAME_IN_FLIGHT_COUNT> m_staging_buffers;
-    std::array<std::vector<Buffer_Staging_Info>, FRAME_IN_FLIGHT_COUNT> m_buffer_staging_infos;
-    std::array<std::vector<Image_Staging_Info>, FRAME_IN_FLIGHT_COUNT> m_image_staging_infos;
+    GPU_Transfer_Context m_gpu_transfer_context;
+    std::array<Frame, REN_MAX_FRAMES_IN_FLIGHT> m_frames;
     uint64_t m_frame_counter;
     std::unique_ptr<Asset_Repository> m_asset_repository;
     std::unique_ptr<Render_Resource_Blackboard> m_resource_blackboard;
@@ -110,7 +102,5 @@ private:
     Renderer m_renderer;
     bool m_is_running;
     ImGui_Data m_imgui_data = {};
-    std::unique_ptr<CBT_CPU_Vis> m_cbt_cpu_vis;
-    Renderer_Settings m_renderer_settings;
 };
 }

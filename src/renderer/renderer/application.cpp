@@ -3,7 +3,8 @@
 #include <chrono>
 #include <filesystem>
 #include <imgui.h>
-#include "renderer/imgui/imgui_util.hpp"
+
+#include "imgui/imgui_util.hpp"
 
 namespace ren
 {
@@ -26,12 +27,11 @@ Application::Application(const Application_Create_Info& create_info) noexcept
     , m_swapchain(m_device->create_swapchain({
         .hwnd = m_window->get_native_handle(),
         .preferred_format = rhi::Image_Format::R8G8B8A8_UNORM,
-        .image_count = FRAME_IN_FLIGHT_COUNT + 1,
+        .image_count = REN_MAX_FRAMES_IN_FLIGHT + 1,
         .present_mode = rhi::Present_Mode::Immediate
         }))
+    , m_gpu_transfer_context(m_device.get())
     , m_frames()
-    , m_staging_buffers()
-    , m_buffer_staging_infos()
     , m_frame_counter(0)
     , m_asset_repository(std::make_unique<Asset_Repository>(
         m_logger,
@@ -41,8 +41,7 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         .pipelines = m_asset_path + "/pipelines/",
         .shader_include_paths = {
             "../",
-            "../../src/shared/",
-            //"../../thirdparty/rhi/src/shaders/"
+            "../../src/shared/"
         },
         .models = m_asset_path + "/cache/"},
         *this))
@@ -53,13 +52,15 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         *m_asset_repository,
         *m_resource_blackboard,
         m_device.get()))
-    , m_renderer(*this, *m_swapchain, *m_resource_blackboard, Imgui_Renderer_Create_Info{
-        .device = m_device.get(),
-        .frames_in_flight = FRAME_IN_FLIGHT_COUNT,
-        .swapchain_image_format = m_swapchain->get_image_format()})
+    , m_renderer(
+        m_gpu_transfer_context,
+        *m_swapchain,
+        *m_asset_repository,
+        *m_resource_blackboard,
+        Imgui_Renderer_Create_Info{
+            .device = m_device.get(),
+            .swapchain_image_format = m_swapchain->get_image_format()})
     , m_is_running(true)
-    , m_cbt_cpu_vis(nullptr)
-    , m_renderer_settings()
 {
     for (auto& frame : m_frames)
     {
@@ -75,12 +76,6 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         frame.compute_command_pool = m_device->create_command_pool({ .queue_type = rhi::Queue_Type::Compute });
         frame.copy_command_pool = m_device->create_command_pool({ .queue_type = rhi::Queue_Type::Copy });
     }
-
-    auto renderer_settings = m_renderer.get_settings();
-    for (auto settings : renderer_settings)
-    {
-        m_renderer_settings.add_settings(settings);
-    }
     imgui_setup_style();
 
     m_logger->info("Finished initializing.");
@@ -93,13 +88,6 @@ Application::~Application() noexcept
     for (auto& frame : m_frames)
     {
         m_device->destroy_fence(frame.frame_fence);
-    }
-    for (auto& staging_buffer_vec : m_staging_buffers)
-    {
-        for (auto staging_buffer : staging_buffer_vec)
-        {
-            m_device->destroy_buffer(staging_buffer);
-        }
     }
 }
 
@@ -120,7 +108,7 @@ void Application::run()
             .count();
         total_time += delta_time;
 
-        auto& frame = m_frames[m_frame_counter % FRAME_IN_FLIGHT_COUNT];
+        auto& frame = m_frames[m_frame_counter % REN_MAX_FRAMES_IN_FLIGHT];
 
         setup_frame(frame);
         process_gui();
@@ -141,53 +129,12 @@ void Application::run()
 
 void Application::upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, uint64_t size, uint64_t offset) noexcept
 {
-    auto& staging_buffers = m_staging_buffers[m_frame_counter % FRAME_IN_FLIGHT_COUNT];
-    rhi::Buffer_Create_Info buffer_info = {
-        .size = size,
-        .heap = rhi::Memory_Heap_Type::CPU_Upload
-    };
-    auto staging_buffer = m_device->create_buffer(buffer_info).value_or(nullptr);
-    memcpy(staging_buffer->data, data, size);
-
-    staging_buffers.push_back(staging_buffer);
-    m_buffer_staging_infos[m_frame_counter % FRAME_IN_FLIGHT_COUNT].push_back({
-        .src = staging_buffer,
-        .dst = buffer,
-        .offset = offset,
-        .size = size });
+    m_gpu_transfer_context.enqueue_immediate_upload(buffer, data, size, offset);
 }
 
 void Application::upload_image_data_immediate_full(rhi::Image* image, void** data) noexcept
 {
-    const auto byte_size = rhi::get_image_format_info(image->format).bytes;
-    std::size_t size = 0;
-    for (auto i = 0; i < image->mip_levels; ++i)
-    {
-        size += byte_size * (image->width / (1 << i)) * (image->height / (1 << i));
-    }
-
-    auto& staging_buffers = m_staging_buffers[m_frame_counter % FRAME_IN_FLIGHT_COUNT];
-    rhi::Buffer_Create_Info buffer_info = {
-        .size = std::max(4ull, size),
-        .heap = rhi::Memory_Heap_Type::CPU_Upload
-    };
-    auto staging_buffer = m_device->create_buffer(buffer_info).value_or(nullptr);
-
-    std::size_t offset = 0;
-    for (auto i = 0; i < image->mip_levels; ++i)
-    {
-        std::size_t current_size = byte_size * (image->width / (1 << i)) * (image->height / (1 << i));
-        if (i > 0)
-        {
-            offset += byte_size * (image->width / (1 << (i - 1))) * (image->height / (1 << (i - 1)));
-        }
-        memcpy(&static_cast<char*>(staging_buffer->data)[offset], data[i], current_size);
-    }
-
-    staging_buffers.push_back(staging_buffer);
-    m_image_staging_infos[m_frame_counter % FRAME_IN_FLIGHT_COUNT].push_back({
-        .src = staging_buffer,
-        .dst = image });
+    m_gpu_transfer_context.enqueue_immediate_upload(image, data);
 }
 
 std::string Application::init_asset_path() const
@@ -218,17 +165,7 @@ void Application::setup_frame(Frame& frame) noexcept
     }
     m_swapchain->acquire_next_image();
 
-    if (m_frame_counter > FRAME_IN_FLIGHT_COUNT)
-    {
-        auto last_frame_in_flight = (m_frame_counter - FRAME_IN_FLIGHT_COUNT) % FRAME_IN_FLIGHT_COUNT;
-        m_buffer_staging_infos[last_frame_in_flight].clear();
-        m_image_staging_infos[last_frame_in_flight].clear();
-        for (auto staging_buffer : m_staging_buffers[last_frame_in_flight])
-        {
-            m_device->destroy_buffer(staging_buffer);
-        }
-        m_staging_buffers[last_frame_in_flight].clear();
-    }
+    m_gpu_transfer_context.garbage_collect();
 
     m_renderer.setup_frame();
 }
@@ -236,10 +173,12 @@ void Application::setup_frame(Frame& frame) noexcept
 void Application::render_frame(Frame& frame, double t, double dt) noexcept
 {
     auto graphics_cmd = frame.graphics_command_pool->acquire_command_list();
+    auto upload_cmd = frame.graphics_command_pool->acquire_command_list();
 
     m_renderer.render(*m_static_scene_data, graphics_cmd, t, dt);
+    m_gpu_transfer_context.process_immediate_uploads_on_graphics_queue(upload_cmd);
 
-    auto cmds = std::to_array({ handle_immediate_uploads(frame), graphics_cmd });
+    auto cmds = std::to_array({ upload_cmd, graphics_cmd });
 
     frame.fence_value += 1;
     rhi::Submit_Fence_Info frame_fence_signal_info = {
@@ -257,128 +196,20 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
     m_swapchain->present();
 }
 
-rhi::Command_List* Application::handle_immediate_uploads(Frame& frame) noexcept
-{
-    const auto upload_cmd = frame.graphics_command_pool->acquire_command_list();
-    const auto frame_idx = m_frame_counter % FRAME_IN_FLIGHT_COUNT;
-    std::vector<rhi::Image_Barrier_Info> image_barriers_before;
-    std::vector<rhi::Image_Barrier_Info> image_barriers_after;
-    image_barriers_before.reserve(m_image_staging_infos[frame_idx].size());
-    image_barriers_after.reserve(m_image_staging_infos[frame_idx].size());
-    for (const auto& image_staging_info : m_image_staging_infos[frame_idx])
-    {
-        image_barriers_before.emplace_back( rhi::Image_Barrier_Info {
-            .stage_before = rhi::Barrier_Pipeline_Stage::None,
-            .stage_after = rhi::Barrier_Pipeline_Stage::Copy,
-            .access_before = rhi::Barrier_Access::None,
-            .access_after = rhi::Barrier_Access::Transfer_Write,
-            .layout_before = rhi::Barrier_Image_Layout::Undefined,
-            .layout_after = rhi::Barrier_Image_Layout::Copy_Dst,
-            .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
-            .image = image_staging_info.dst,
-            .subresource_range = {
-                .first_mip_level = 0,
-                .mip_count = image_staging_info.dst->mip_levels,
-                .first_array_index = 0,
-                .array_size = image_staging_info.dst->array_size,
-                .first_plane = 0,
-                .plane_count = 1
-            },
-            .discard = true
-        });
-        image_barriers_after.emplace_back( rhi::Image_Barrier_Info {
-            .stage_before = rhi::Barrier_Pipeline_Stage::Copy,
-            .stage_after = rhi::Barrier_Pipeline_Stage::All_Commands,
-            .access_before = rhi::Barrier_Access::Transfer_Write,
-            .access_after = rhi::Barrier_Access::Shader_Read,
-            .layout_before = rhi::Barrier_Image_Layout::Copy_Dst,
-            .layout_after = rhi::Barrier_Image_Layout::Shader_Read_Only,
-            .queue_type_ownership_transfer_mode = rhi::Queue_Type_Ownership_Transfer_Mode::None,
-            .image = image_staging_info.dst,
-            .subresource_range = {
-                .first_mip_level = 0,
-                .mip_count = image_staging_info.dst->mip_levels,
-                .first_array_index = 0,
-                .array_size = image_staging_info.dst->array_size,
-                .first_plane = 0,
-                .plane_count = 1
-            },
-            .discard = false
-        });
-    }
-    if (image_barriers_before.size() > 0)
-    {
-        upload_cmd->barrier({
-            .image_barriers = image_barriers_before
-            });
-    }
-
-    // TODO: this is temporary and will be reworked when uploads are moved to the copy queue
-    for (const auto& image_staging_info : m_image_staging_infos[frame_idx])
-    {
-        std::size_t offset = 0;
-        for (auto i = 0; i < image_staging_info.dst->mip_levels; ++i)
-        {
-            const auto byte_size = rhi::get_image_format_info(image_staging_info.dst->format).bytes;
-            const auto width = image_staging_info.dst->width / (1 << i);
-            const auto height = image_staging_info.dst->height / (1 << i);
-            if (i > 0)
-            {
-                offset += byte_size * (image_staging_info.dst->width / (1 << (i - 1))) * (image_staging_info.dst->height / (1 << (i - 1)));
-            }
-            upload_cmd->copy_buffer_to_image(
-                image_staging_info.src,
-                offset,
-                image_staging_info.dst,
-                {},
-                {
-                .x = width,
-                .y = height,
-                .z = 1
-                },
-                i,
-                0);
-        }
-    }
-
-    for (const auto& buffer_staging_info : m_buffer_staging_infos[frame_idx])
-    {
-        upload_cmd->copy_buffer(
-            buffer_staging_info.src,
-            0,
-            buffer_staging_info.dst,
-            buffer_staging_info.offset,
-            buffer_staging_info.size);
-    }
-    rhi::Memory_Barrier_Info mem_barrier = {
-        .stage_before = rhi::Barrier_Pipeline_Stage::Copy,
-        .stage_after = rhi::Barrier_Pipeline_Stage::All_Commands,
-        .access_before = rhi::Barrier_Access::Transfer_Write,
-        .access_after = rhi::Barrier_Access::Shader_Read
-    };
-    rhi::Barrier_Info barrier = {
-        .image_barriers = image_barriers_after,
-        .memory_barriers = { &mem_barrier, 1 },
-    };
-    upload_cmd->barrier(barrier);
-    return upload_cmd;
-}
-
 void Application::process_gui() noexcept
 {
     ImGui::NewFrame();
 
-    m_renderer.overlay_gui();
-
     imgui_menubar();
 
     if (m_imgui_data.windows.renderer_settings)
-        m_renderer_settings.process_gui(&m_imgui_data.windows.renderer_settings);
-    if (m_imgui_data.windows.tool_cbt_vis)
     {
-        // no need to allocate cpu-sided vis if it's not used
-        if (!m_cbt_cpu_vis) m_cbt_cpu_vis = std::make_unique<CBT_CPU_Vis>();
-        m_cbt_cpu_vis->imgui_window(m_imgui_data.windows.tool_cbt_vis);
+        imutil::push_minimum_window_size();
+        if (ImGui::Begin("Renderer Settings", &m_imgui_data.windows.renderer_settings))
+        {
+            m_renderer.process_gui();
+        }
+        ImGui::End();
     }
     if (m_imgui_data.windows.demo)
         ImGui::ShowDemoWindow(&m_imgui_data.windows.demo);
@@ -397,7 +228,6 @@ void Application::imgui_close_all_windows() noexcept
 {
     m_imgui_data.windows.demo = false;
     m_imgui_data.windows.renderer_settings = false;
-    m_imgui_data.windows.tool_cbt_vis = false;
 }
 
 void Application::imgui_process_modals() noexcept
@@ -535,8 +365,7 @@ void Application::imgui_setup_style() noexcept
     style.TabRounding = 4;
 
     style.ScaleAllSizes(m_window->get_dpi_scale());
-    ImGui::GetIO().FontGlobalScale = m_window->get_dpi_scale();
-    Settings_Base::set_pad_scale(m_window->get_dpi_scale());
+    style.FontScaleDpi = m_window->get_dpi_scale();
 }
 
 void imgui_menu_toggle_window(const char* name, bool& window_open)
@@ -568,11 +397,6 @@ void Application::imgui_menubar() noexcept
             {
                 imgui_close_all_windows();
             }
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Tools"))
-        {
-            imgui_menu_toggle_window("CBT and LEB Visualization", m_imgui_data.windows.tool_cbt_vis);
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Debug"))

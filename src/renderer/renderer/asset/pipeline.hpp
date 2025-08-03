@@ -21,6 +21,10 @@ public:
 
     Compute_Pipeline& set_variant(std::string_view name);
 
+    uint32_t get_group_size_x() const noexcept;
+    uint32_t get_group_size_y() const noexcept;
+    uint32_t get_group_size_z() const noexcept;
+
 private:
     Compute_Library* m_compute_library;
     Compute_Pipeline_Wrapper* m_active_pipeline;

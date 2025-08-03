@@ -336,7 +336,7 @@ void Asset_Repository::compile_shader_library(
             permutation_name = name;
             permutation_name.append(postfix);
 
-            m_logger->info("Created shader variant: '{}'", permutation_name);
+            m_logger->debug("Created shader variant: '{}'", permutation_name);
         }
     }
 
@@ -388,7 +388,7 @@ void Asset_Repository::compile_shader_library(
     shader_library->shaders = std::move(named_shaders);
     shader_library->hlsl_path = hlsl_path;
     shader_library->json_path = json_path;
-    m_logger->info("Successfully created shader library '{}'", shader_library_lookup_name);
+    m_logger->debug("Successfully created shader library '{}'", shader_library_lookup_name);
 
     if (shader_type == rhi::dxc::Shader_Type::Compute)
     {
@@ -400,7 +400,7 @@ void Asset_Repository::compile_shader_library(
         auto* compute_library = m_compute_library_ptrs[name];
         shader_library->referenced_compute_library = compute_library;
         compute_library->create_pipelines(m_graphics_device, shader_library);
-        m_logger->info("Successfully created compute library '{}'", name);
+        m_logger->debug("Successfully created compute library '{}'", name);
     }
 }
 
@@ -707,7 +707,7 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
     pipeline_library.color_attachment_count = color_attachment_count;
     pipeline_library.depth_stencil_format = depth_stencil_format;
 
-    m_logger->info("Created graphics pipeline library '{}'", name);
+    m_logger->debug("Created graphics pipeline library '{}'", name);
 }
 
 void Asset_Repository::create_shader_and_compute_libraries()

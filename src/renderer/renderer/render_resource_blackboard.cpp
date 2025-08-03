@@ -1,7 +1,7 @@
 #include "renderer/render_resource_blackboard.hpp"
 
 #include <rhi/graphics_device.hpp>
-#include "renderer/application.hpp"
+#include <rhi/swapchain.hpp>
 
 namespace ren
 {
@@ -66,6 +66,12 @@ Image::Image(Render_Resource_Blackboard& blackboard, rhi::Image** image, const s
     , m_name(name)
 {}
 
+Image::Image(rhi::Swapchain& swapchain)
+    : m_blackboard(nullptr)
+    , m_image(&swapchain.get_current_image_view()->image)
+    , m_name("swapchain_image")
+{}
+
 rhi::Image_Create_Info Image::get_create_info() const
 {
     if (!m_image)
@@ -84,7 +90,7 @@ rhi::Image_Create_Info Image::get_create_info() const
 
 void Image::recreate(const rhi::Image_Create_Info& create_info)
 {
-    if (!m_image) return;
+    if (!m_image || !m_blackboard) return;
 
     m_blackboard->delete_resource(*m_image);
     auto device = m_blackboard->m_device;
@@ -133,7 +139,7 @@ Sampler::operator rhi::Sampler*() const
 Render_Resource_Blackboard::Render_Resource_Blackboard(rhi::Graphics_Device* device)
     : m_device(device)
     , m_deletion_queue()
-    , m_current_garbage_frame(FRAME_IN_FLIGHT_COUNT)
+    , m_current_garbage_frame(REN_MAX_FRAMES_IN_FLIGHT)
 {}
 
 Render_Resource_Blackboard::~Render_Resource_Blackboard()
@@ -243,7 +249,7 @@ void Render_Resource_Blackboard::garbage_collect(const uint64_t frame)
         }
     }
     std::swap(m_deletion_queue, survivors);
-    m_current_garbage_frame = frame + FRAME_IN_FLIGHT_COUNT;
+    m_current_garbage_frame = frame + REN_MAX_FRAMES_IN_FLIGHT;
 }
 
 void Render_Resource_Blackboard::delete_resource(rhi::Buffer* buffer)

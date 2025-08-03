@@ -7,6 +7,7 @@
 namespace rhi
 {
 class Graphics_Device;
+class Swapchain;
 }
 
 namespace ren
@@ -40,6 +41,7 @@ class Image
 public:
     Image() = default;
     Image(Render_Resource_Blackboard& blackboard, rhi::Image** image, const std::string& name);
+    Image(rhi::Swapchain& swapchain);
 
     rhi::Image_Create_Info get_create_info() const;
     void recreate(const rhi::Image_Create_Info& create_info);

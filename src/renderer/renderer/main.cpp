@@ -60,6 +60,8 @@ int32_t main(uint32_t argc, const char* argv[])
     auto imgui_ctx = ren::imutil::Context_Wrapper();
     auto& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleFonts;
+    io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleViewports;
 
     auto application = ren::Application(app_create_info);
     application.run();

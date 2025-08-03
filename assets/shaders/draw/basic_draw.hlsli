@@ -14,7 +14,9 @@ typedef VS_Out PS_In;
 
 struct PS_Out
 {
-    float4 color : SV_Target;
+    float4 color : SV_Target0;
+    float4 normal : SV_Target1;
+    float2 metallic_roughness : SV_Target2;
 };
 
 #endif

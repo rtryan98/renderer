@@ -15,7 +15,7 @@ void main(uint3 id : SV_DispatchThreadID)
     float2 spectrum_minus_k = ren::cconjugate(rhi::uni::tex_load_arr<float4>(pc.initial_spectrum_tex, uint2((pc.texture_size - id.x) % pc.texture_size, (pc.texture_size - id.y) % pc.texture_size), id.z).xy);
     float omega_k = rhi::uni::tex_load_arr<float>(pc.angular_frequency_tex, id.xy, id.z);
 
-    float2 arg = ren::cpolar(1., pc.time * omega_k);
+    float2 arg = ren::cpolar(1.f, pc.time * omega_k);
     float2 h = ren::cadd(ren::cmul(spectrum, arg), ren::cmul(spectrum_minus_k, ren::cconjugate(arg)));
     float2 ih = ren::cmuli(h);
 

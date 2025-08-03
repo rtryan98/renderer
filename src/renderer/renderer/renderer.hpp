@@ -1,9 +1,11 @@
 #pragma once
 
 #include "renderer/imgui/imgui_renderer.hpp"
-#include "renderer/ocean/ocean_renderer.hpp"
 #include "renderer/scene/camera.hpp"
 #include "renderer/render_resource_blackboard.hpp"
+
+#include "renderer/techniques/g_buffer.hpp"
+#include "renderer/techniques/ocean.hpp"
 
 namespace rhi
 {
@@ -13,7 +15,8 @@ class Swapchain;
 
 namespace ren
 {
-class Application;
+class Asset_Repository;
+class GPU_Transfer_Context;
 class Input_State;
 struct Render_Attachment;
 class Render_Resource_Blackboard;
@@ -22,48 +25,38 @@ class Static_Scene_Data;
 class Renderer
 {
 public:
-    Renderer(Application& app, rhi::Swapchain& swapchain,
+    Renderer(GPU_Transfer_Context& gpu_transfer_context,
+        rhi::Swapchain& swapchain,
+        Asset_Repository& asset_repository,
         Render_Resource_Blackboard& resource_blackboard,
         const Imgui_Renderer_Create_Info& imgui_renderer_create_info);
     ~Renderer();
 
-    std::vector<Settings_Base*> get_settings() noexcept;
-
+    void process_gui();
     void update(const Input_State& input_state, double t, double dt) noexcept;
-    void overlay_gui();
     void setup_frame();
-    void render(Static_Scene_Data& scene, rhi::Command_List* cmd, double t, double dt) noexcept;
+    void render(const Static_Scene_Data& scene, rhi::Command_List* cmd, double t, double dt) noexcept;
     void on_resize(uint32_t width, uint32_t height) noexcept;
 
 private:
-    void render_gbuffer_pass(Static_Scene_Data& scene, rhi::Command_List* cmd);
-    void render_ocean_pass(rhi::Command_List* cmd);
-    void render_swapchain_pass(rhi::Command_List* cmd);
-
-    void init_rendertargets();
+    void render_swapchain_pass(rhi::Command_List* cmd, Resource_State_Tracker& tracker);
 
 private:
-    Application& m_app;
+    GPU_Transfer_Context& m_gpu_transfer_context;
     rhi::Swapchain& m_swapchain;
+    Asset_Repository& m_asset_repository;
     Render_Resource_Blackboard& m_resource_blackboard;
 
     Fly_Camera m_fly_cam;
     Buffer m_camera_buffer;
     Imgui_Renderer m_imgui_renderer;
-    Ocean_Renderer m_ocean_renderer;
 
     float m_render_scale = 1.f;
-    struct
-    {
-        Image target0;
-        Image depth_stencil;
-    } m_g_buffer = {};
-    struct
-    {
-        Image color;
-        Image depth_stencil;
-    } m_ocean_rendertargets = {};
+    Image m_swapchain_image = {};
+    Image m_shaded_geometry_render_target = {};
 
-    bool m_should_display_overlay;
+    techniques::G_Buffer m_g_buffer;
+    techniques::Ocean m_ocean;
+
 };
 }

@@ -135,8 +135,8 @@ public:
     void add_model(const Model_Descriptor& model_descriptor);
 
     // TODO: those should be const but rhi::Array_Vector currently has no const iterator
-    [[nodiscard]] auto& get_models() { return m_models; }
-    [[nodiscard]] auto& get_instances() { return m_model_Instances; }
+    [[nodiscard]] auto& get_models() const noexcept { return m_models; }
+    [[nodiscard]] auto& get_instances() const noexcept { return m_model_Instances; }
     [[nodiscard]] auto* get_index_buffer() const noexcept { return m_global_index_buffer; }
     [[nodiscard]] auto* get_transform_buffer() const noexcept { return m_transform_buffer; }
     [[nodiscard]] auto* get_material_buffer() const noexcept { return m_material_buffer; }
@@ -147,7 +147,9 @@ private:
     uint32_t acquire_material_index();
     uint32_t acquire_transform_index();
 
-    rhi::Image* get_or_create_image(const std::string& uri);
+    rhi::Image* get_or_create_image(const std::string& uri, rhi::Image* replacement);
+
+    void create_default_images();
 
 private:
     Application& m_app;
@@ -172,5 +174,10 @@ private:
     rhi::Buffer* m_transform_buffer = nullptr;
     rhi::Buffer* m_material_buffer = nullptr;
     rhi::Buffer* m_instance_buffer = nullptr;
+
+    rhi::Image* m_default_albedo_tex = nullptr;
+    rhi::Image* m_default_normal_tex = nullptr;
+    rhi::Image* m_default_metallic_roughness_tex = nullptr;
+    rhi::Image* m_default_emissive_tex = nullptr;
 };
 }

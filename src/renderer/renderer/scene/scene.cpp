@@ -87,13 +87,13 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
         model.materials[i] = &m_materials[material_index];
         auto& material = *model.materials[i];
 
-        auto get_material_texture = [&](uint32_t index) -> rhi::Image* {
+        auto get_material_texture = [&](uint32_t index, rhi::Image* replacement) -> rhi::Image* {
             const auto* uris = loadable_model->get_referenced_uris();
             if (index == ~0u)
             {
                 return nullptr;
             }
-            return get_or_create_image(uris[index].value);
+            return get_or_create_image(uris[index].value, replacement);
         };
 
         rhi::Sampler_Create_Info default_sampler_create_info = {
@@ -129,14 +129,14 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
                 loadable_material.emissive_color[2]
             },
             .emissive_strength = loadable_material.emissive_strength,
-            .albedo = get_material_texture(loadable_material.albedo_uri_index),
-            .normal = get_material_texture(loadable_material.normal_uri_index),
-            .metallic_roughness = get_material_texture(loadable_material.metallic_roughness_uri_index),
-            .emissive = get_material_texture(loadable_material.emissive_uri_index),
+            .albedo = get_material_texture(loadable_material.albedo_uri_index, m_default_albedo_tex),
+            .normal = get_material_texture(loadable_material.normal_uri_index, m_default_normal_tex),
+            .metallic_roughness = get_material_texture(loadable_material.metallic_roughness_uri_index, m_default_metallic_roughness_tex),
+            .emissive = get_material_texture(loadable_material.emissive_uri_index, m_default_emissive_tex),
             .sampler = m_render_resource_blackboard.get_sampler(default_sampler_create_info)
         };
 
-        auto get_image_index = [&](rhi::Image* image)
+        auto get_image_index = [&](const rhi::Image* image)
         {
             if (!image) return ~0u;
             return image->image_view->bindless_index;
@@ -298,7 +298,7 @@ uint32_t Static_Scene_Data::acquire_transform_index()
     return val;
 }
 
-rhi::Image* Static_Scene_Data::get_or_create_image(const std::string& uri)
+rhi::Image* Static_Scene_Data::get_or_create_image(const std::string& uri, rhi::Image* replacement)
 {
     if (m_images.contains(uri))
     {
@@ -307,7 +307,7 @@ rhi::Image* Static_Scene_Data::get_or_create_image(const std::string& uri)
 
     const auto texture_file = m_asset_repository.get_texture_safe(uri);
     if (!texture_file)
-        return nullptr;
+        return replacement;
 
     m_logger->info("Loading texture {}", uri);
     auto loadable_image = static_cast<serialization::Image_Data_00*>(texture_file->data);
@@ -322,6 +322,7 @@ rhi::Image* Static_Scene_Data::get_or_create_image(const std::string& uri)
         .primary_view_type = rhi::Image_View_Type::Texture_2D
     };
     auto image = m_graphics_device->create_image(texture_create_info).value_or(nullptr);
+    m_graphics_device->name_resource(image, (std::string("gltf:") + loadable_image->name).c_str());
     std::array<void*, 14> mip_data;
     for (auto mip = 0; mip < loadable_image->mip_count; ++mip)
     {
@@ -331,6 +332,60 @@ rhi::Image* Static_Scene_Data::get_or_create_image(const std::string& uri)
     m_images[uri] = image;
 
     return m_images[uri];
+}
+
+void Static_Scene_Data::create_default_images()
+{
+    rhi::Image_Create_Info default_texture_create_info = {
+        .format = rhi::Image_Format::R8G8B8A8_SRGB,
+        .width = 2,
+        .height = 2,
+        .depth = 1,
+        .array_size = 1,
+        .mip_levels = 1,
+        .usage = rhi::Image_Usage::Sampled,
+        .primary_view_type = rhi::Image_View_Type::Texture_2D
+    };
+
+    m_default_albedo_tex = m_graphics_device->create_image(default_texture_create_info).value_or(nullptr);
+    m_graphics_device->name_resource(m_default_albedo_tex, "scene:default_albedo_texture");
+    m_default_emissive_tex = m_graphics_device->create_image(default_texture_create_info).value_or(nullptr);
+    m_graphics_device->name_resource(m_default_emissive_tex, "scene:default_emissive_texture");
+
+    default_texture_create_info.format = rhi::Image_Format::R8G8B8A8_UNORM;
+    m_default_normal_tex = m_graphics_device->create_image(default_texture_create_info).value_or(nullptr);
+    m_graphics_device->name_resource(m_default_normal_tex, "scene:default_normal_texture");
+    m_default_metallic_roughness_tex = m_graphics_device->create_image(default_texture_create_info).value_or(nullptr);
+    m_graphics_device->name_resource(m_default_metallic_roughness_tex, "scene:default_metallic_roughness_texture");
+
+    std::array<uint8_t, 16> default_missing_texture_data = {
+        255, 0, 127, 255,
+          0, 0,   0, 255,
+        255, 0, 127, 255,
+          0, 0,   0, 255,
+    };
+
+    std::array<uint8_t, 16> default_normal_data = {
+        127, 127, 127, 127,
+        127, 127, 127, 127,
+        127, 127, 127, 127,
+        127, 127, 127, 127,
+    };
+
+    std::array<uint8_t, 16> default_empty_attributes_data = {
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+    };
+
+    void* data = default_missing_texture_data.data();
+    m_app.upload_image_data_immediate_full(m_default_albedo_tex, &data);
+    data = default_normal_data.data();
+    m_app.upload_image_data_immediate_full(m_default_normal_tex, &data);
+    data = default_empty_attributes_data.data();
+    m_app.upload_image_data_immediate_full(m_default_metallic_roughness_tex, &data);
+    m_app.upload_image_data_immediate_full(m_default_emissive_tex, &data);
 }
 
 Static_Scene_Data::Static_Scene_Data(Application& app, std::shared_ptr<Logger> logger,
@@ -369,6 +424,8 @@ Static_Scene_Data::Static_Scene_Data(Application& app, std::shared_ptr<Logger> l
     buffer_create_info.size = INSTANCE_INDICES_BUFFER_SIZE;
     m_instance_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
     m_graphics_device->name_resource(m_instance_buffer, "scene:instance_indices_buffer");
+
+    create_default_images();
 }
 
 Static_Scene_Data::~Static_Scene_Data()
@@ -378,6 +435,10 @@ Static_Scene_Data::~Static_Scene_Data()
     m_graphics_device->destroy_buffer(m_transform_buffer);
     m_graphics_device->destroy_buffer(m_material_buffer);
     m_graphics_device->destroy_buffer(m_instance_buffer);
+    m_graphics_device->destroy_image(m_default_albedo_tex);
+    m_graphics_device->destroy_image(m_default_normal_tex);
+    m_graphics_device->destroy_image(m_default_metallic_roughness_tex);
+    m_graphics_device->destroy_image(m_default_emissive_tex);
     for (const auto& model : m_models)
     {
         m_graphics_device->destroy_buffer(model.vertex_positions);

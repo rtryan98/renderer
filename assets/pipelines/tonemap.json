@@ -1,0 +1,16 @@
+{
+    "name": "tonemap",
+    "vs": {
+        "name": "fullscreen_triangle.vs"
+    },
+    "ps": {
+        "name": "tonemap.ps"
+    },
+    "color_attachments": [
+        {
+            "format": "R8G8B8A8_UNORM"
+        }
+    ],
+    "depth_stencil": {
+    }
+}

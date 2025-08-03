@@ -10,7 +10,6 @@ class Asset_Repository;
 struct Imgui_Renderer_Create_Info
 {
     rhi::Graphics_Device* device;
-    uint32_t frames_in_flight;
     rhi::Image_Format swapchain_image_format;
 };
 
@@ -42,7 +41,6 @@ private:
     std::vector<rhi::Buffer*> m_index_buffers;
     std::vector<rhi::Image*> m_images;
     rhi::Sampler* m_sampler;
-    uint32_t m_frames_in_flight;
     uint32_t m_frame_index;
 };
 }

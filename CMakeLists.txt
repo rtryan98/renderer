@@ -84,6 +84,7 @@ set_target_properties(
 )
 target_compile_definitions(
     renderer PUBLIC
+    REN_MAX_FRAMES_IN_FLIGHT=2
     GLM_FORCE_DEPTH_ZERO_TO_ONE
     GLM_FORCE_SWIZZLE
 )

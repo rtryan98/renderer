@@ -25,7 +25,6 @@ Imgui_Renderer::Imgui_Renderer(const Imgui_Renderer_Create_Info& create_info, As
     , m_index_buffers()
     , m_images()
     , m_sampler(nullptr)
-    , m_frames_in_flight(create_info.frames_in_flight)
     , m_frame_index(0u)
 {
     auto& io = ImGui::GetIO();
@@ -34,8 +33,8 @@ Imgui_Renderer::Imgui_Renderer(const Imgui_Renderer_Create_Info& create_info, As
     io.BackendRendererName = "imgui_impl_rhi";
     io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
-    m_vertex_buffers.resize(create_info.frames_in_flight);
-    m_index_buffers.resize(create_info.frames_in_flight);
+    m_vertex_buffers.resize(REN_MAX_FRAMES_IN_FLIGHT);
+    m_index_buffers.resize(REN_MAX_FRAMES_IN_FLIGHT);
 
     rhi::Sampler_Create_Info sampler_create_info = {
         .filter_min = rhi::Sampler_Filter::Linear,
@@ -78,7 +77,7 @@ Imgui_Renderer::~Imgui_Renderer() noexcept
 
 void Imgui_Renderer::next_frame() noexcept
 {
-    m_frame_index = (m_frame_index + 1) % m_frames_in_flight;
+    m_frame_index = (m_frame_index + 1) % REN_MAX_FRAMES_IN_FLIGHT;
 }
 
 void Imgui_Renderer::render(rhi::Command_List* cmd) noexcept

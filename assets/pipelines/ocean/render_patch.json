@@ -8,7 +8,7 @@
     },
     "color_attachments": [
         {
-            "format": "B10G11R11_UFLOAT_PACK32"
+            "format": "R16G16B16A16_SFLOAT"
         }
     ],
     "depth_stencil": {

@@ -3,44 +3,51 @@
 
 namespace ren
 {
-float2 cadd(float2 a, float2 b)
+template<typename T>
+vector<T, 2> cadd(vector<T, 2> a, vector<T, 2> b)
 {
     return a + b;
 }
 
-float2 csub(float2 a, float2 b)
+template<typename T>
+vector<T, 2> csub(vector<T, 2> a, vector<T, 2> b)
 {
     return a - b;
 }
 
-float2 cmul(float2 a, float2 b)
+template<typename T>
+vector<T, 2> cmul(vector<T, 2> a, vector<T, 2> b)
 {
-    return float2(a.x * b.x - a.y * b.y, a.y * b.x + a.x * b.y);
+    return vector<T, 2>(a.x * b.x - a.y * b.y, a.y * b.x + a.x * b.y);
 }
 
-float2 cdiv(float2 a, float2 b)
+template<typename T>
+vector<T, 2> cdiv(vector<T, 2> a, vector<T, 2> b)
 {
     float r = a.x * b.x + a.y * b.y;
     float i = a.y * b.x - a.x * b.y;
     float d = b.x * b.x + b.y * b.y;
-    return float2((r/d),(i/d));
+    return vector<T, 2>((r/d),(i/d));
 }
 
-float2 cconjugate(float2 a)
+template<typename T>
+vector<T, 2> cconjugate(vector<T, 2> a)
 {
-    return float2(a.x, -a.y);
+    return vector<T, 2>(a.x, -a.y);
 }
 
-float2 cpolar(float r, float phi)
+template<typename T>
+vector<T, 2> cpolar(T r, T phi)
 {
-    float2 result;
+    vector<T, 2> result;
     sincos(phi, result.y, result.x);
     return r * result;
 }
 
-float2 cmuli(float2 a)
+template<typename T>
+vector<T, 2> cmuli(vector<T, 2> a)
 {
-    return float2(-a.y, a.x);
+    return vector<T, 2>(-a.y, a.x);
 }
 }
 

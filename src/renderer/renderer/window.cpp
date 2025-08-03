@@ -5,7 +5,7 @@
 
 namespace ren
 {
-constexpr static auto SDL_WINDOW_CREATE_FLAGS = SDL_WINDOW_RESIZABLE;
+constexpr static auto SDL_WINDOW_CREATE_FLAGS = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
 
 class Window_SDL3 : public Window
 {
