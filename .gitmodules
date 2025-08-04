@@ -41,3 +41,6 @@
 [submodule "thirdparty/sdl"]
 	path = thirdparty/sdl
 	url = https://github.com/libsdl-org/SDL
+[submodule "thirdparty/RobotoMono"]
+	path = thirdparty/RobotoMono
+	url = https://github.com/googlefonts/RobotoMono

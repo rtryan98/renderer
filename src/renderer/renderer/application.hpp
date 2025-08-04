@@ -46,9 +46,6 @@ public:
     [[nodiscard]] Window& get_window() const { return *m_window; }
     [[nodiscard]] Asset_Repository& get_asset_repository() const { return *m_asset_repository; }
 
-    void upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, uint64_t size, uint64_t offset) noexcept;
-    void upload_image_data_immediate_full(rhi::Image* image, void** data) noexcept;
-
 private:
     struct Frame
     {
@@ -73,8 +70,6 @@ private:
         rhi::Image* dst;
     };
 
-    std::string init_asset_path() const;
-
     void setup_frame(Frame& frame) noexcept;
     void render_frame(Frame& frame, double t, double dt) noexcept;
     void process_gui() noexcept;
@@ -88,7 +83,6 @@ private:
 
 private:
     std::shared_ptr<Logger> m_logger;
-    std::string m_asset_path;
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Input_State> m_input_state;
     std::unique_ptr<rhi::Graphics_Device> m_device;

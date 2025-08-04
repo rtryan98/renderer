@@ -9,6 +9,13 @@
 
 namespace asset_baker
 {
+enum class GLTF_Alpha_Mode : uint8_t
+{
+    Opaque,
+    Mask,
+    Blend
+};
+
 enum class GLTF_Error
 {
     No_Error = 0,
@@ -58,6 +65,8 @@ struct GLTF_Material
     std::string normal_uri;
     std::string metallic_roughness_uri;
     std::string emissive_uri;
+    GLTF_Alpha_Mode alpha_mode;
+    bool double_sided;
 };
 
 struct GLTF_Texture_Load_Request

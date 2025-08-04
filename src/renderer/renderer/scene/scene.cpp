@@ -1,13 +1,17 @@
 #include "renderer/scene/scene.hpp"
 
+#include "renderer/gpu_transfer.hpp"
+#include "renderer/asset/asset_formats.hpp"
+#include "renderer/asset/asset_repository.hpp"
+
 #include <numeric>
 #include <ranges>
 #include <shared/serialized_asset_formats.hpp>
+#include <rhi/graphics_device.hpp>
+#include <glm/gtc/packing.hpp>
+#include <glm/gtc/quaternion.hpp>
 
-#include "glm/gtc/packing.hpp"
-#include "glm/gtc/quaternion.hpp"
-#include "renderer/application.hpp"
-#include "renderer/asset/asset_formats.hpp"
+#include "renderer/render_resource_blackboard.hpp"
 
 namespace ren
 {
@@ -58,21 +62,21 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
         model.index_buffer_allocation = m_index_buffer_allocator.allocate(loadable_model->index_count);
 
         auto* positions = loadable_model->get_vertex_positions();
-        m_app.upload_buffer_data_immediate(
+        m_gpu_transfer_context.enqueue_immediate_upload(
             model.vertex_positions,
             positions,
             loadable_model->vertex_position_count * sizeof(std::array<float, 3>),
             0);
 
         auto* attributes = loadable_model->get_vertex_attributes();
-        m_app.upload_buffer_data_immediate(
+        m_gpu_transfer_context.enqueue_immediate_upload(
             model.vertex_attributes,
             attributes,
             loadable_model->vertex_attribute_count * sizeof(serialization::Vertex_Attributes),
             0);
 
         auto* indices = loadable_model->get_indices();
-        m_app.upload_buffer_data_immediate(
+        m_gpu_transfer_context.enqueue_immediate_upload(
             m_global_index_buffer,
             indices,
             loadable_model->index_count * sizeof(std::uint32_t),
@@ -133,7 +137,9 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
             .normal = get_material_texture(loadable_material.normal_uri_index, m_default_normal_tex),
             .metallic_roughness = get_material_texture(loadable_material.metallic_roughness_uri_index, m_default_metallic_roughness_tex),
             .emissive = get_material_texture(loadable_material.emissive_uri_index, m_default_emissive_tex),
-            .sampler = m_render_resource_blackboard.get_sampler(default_sampler_create_info)
+            .sampler = m_render_resource_blackboard.get_sampler(default_sampler_create_info),
+            .alpha_mode = static_cast<Material_Alpha_Mode>(loadable_material.alpha_mode),
+            .double_sided = static_cast<bool>(loadable_material.double_sided),
         };
 
         auto get_image_index = [&](const rhi::Image* image)
@@ -155,7 +161,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
             .sampler_id = material.sampler->bindless_index
         };
 
-        m_app.upload_buffer_data_immediate(
+        m_gpu_transfer_context.enqueue_immediate_upload(
             m_material_buffer,
             &gpu_material,
             sizeof(GPU_Material),
@@ -256,7 +262,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
                     ? mesh_instance.parent->mesh_to_world
                     : glm::identity<glm::mat4>())
             };
-            m_app.upload_buffer_data_immediate(
+            m_gpu_transfer_context.enqueue_immediate_upload(
                 m_transform_buffer,
                 &instance_transform_data,
                 sizeof(GPU_Instance_Transform_Data),
@@ -267,7 +273,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
                     .transform_index = mesh_instance.transform_index,
                     .material_index = submesh_instance.material->material_index
                 };
-                m_app.upload_buffer_data_immediate(
+                m_gpu_transfer_context.enqueue_immediate_upload(
                     m_instance_buffer,
                     &instance_indices,
                     sizeof(instance_indices),
@@ -328,7 +334,7 @@ rhi::Image* Static_Scene_Data::get_or_create_image(const std::string& uri, rhi::
     {
         mip_data[mip] = loadable_image->get_mip_data(mip);
     }
-    m_app.upload_image_data_immediate_full(image, mip_data.data());
+    m_gpu_transfer_context.enqueue_immediate_upload(image, mip_data.data());
     m_images[uri] = image;
 
     return m_images[uri];
@@ -380,23 +386,25 @@ void Static_Scene_Data::create_default_images()
     };
 
     void* data = default_missing_texture_data.data();
-    m_app.upload_image_data_immediate_full(m_default_albedo_tex, &data);
+    m_gpu_transfer_context.enqueue_immediate_upload(m_default_albedo_tex, &data);
     data = default_normal_data.data();
-    m_app.upload_image_data_immediate_full(m_default_normal_tex, &data);
+    m_gpu_transfer_context.enqueue_immediate_upload(m_default_normal_tex, &data);
     data = default_empty_attributes_data.data();
-    m_app.upload_image_data_immediate_full(m_default_metallic_roughness_tex, &data);
-    m_app.upload_image_data_immediate_full(m_default_emissive_tex, &data);
+    m_gpu_transfer_context.enqueue_immediate_upload(m_default_metallic_roughness_tex, &data);
+    m_gpu_transfer_context.enqueue_immediate_upload(m_default_emissive_tex, &data);
 }
 
-Static_Scene_Data::Static_Scene_Data(Application& app, std::shared_ptr<Logger> logger,
-                                     Asset_Repository& asset_repository,
-                                     Render_Resource_Blackboard& render_resource_blackboard,
-                                     rhi::Graphics_Device* graphics_device)
-    : m_app(app)
+Static_Scene_Data::Static_Scene_Data(
+    rhi::Graphics_Device* graphics_device,
+    std::shared_ptr<Logger> logger,
+    GPU_Transfer_Context& gpu_transfer_context,
+    Asset_Repository& asset_repository,
+    Render_Resource_Blackboard& render_resource_blackboard)
+    : m_graphics_device(graphics_device)
     , m_logger(std::move(logger))
+    , m_gpu_transfer_context(gpu_transfer_context)
     , m_asset_repository(asset_repository)
     , m_render_resource_blackboard(render_resource_blackboard)
-    , m_graphics_device(graphics_device)
     , m_index_buffer_allocator(MAX_INDICES)
 {
     m_instance_freelist.resize(MAX_INSTANCES);

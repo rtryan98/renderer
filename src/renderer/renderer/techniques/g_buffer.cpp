@@ -160,6 +160,9 @@ void G_Buffer::render_scene_cpu(
             {
                 const auto* submesh = submesh_instance.submesh;
 
+                if (submesh_instance.material->alpha_mode == Material_Alpha_Mode::Blend)
+                    continue;
+
                 cmd->set_push_constants<Immediate_Draw_Push_Constants>({
                     .position_buffer = model->vertex_positions->buffer_view->bindless_index,
                     .attribute_buffer = model->vertex_attributes->buffer_view->bindless_index,

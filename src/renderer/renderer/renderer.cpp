@@ -1,11 +1,13 @@
 #include "renderer/renderer.hpp"
 
-#include "renderer/application.hpp"
 #include "renderer/scene/scene.hpp"
 #include "renderer/resource_state_tracker.hpp"
 #include "shared/camera_shared_types.h"
 #include "renderer/gpu_transfer.hpp"
-#include "shared/tonemap_shared_types.h"
+#include "renderer/asset/asset_repository.hpp"
+
+#include <rhi/swapchain.hpp>
+#include <shared/tonemap_shared_types.h>
 
 #undef near
 #undef far

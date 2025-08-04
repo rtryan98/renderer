@@ -6,6 +6,7 @@
 #include <fstream>
 #include <shared/serialized_asset_formats.hpp>
 #include <TaskScheduler.h>
+#include <ankerl/unordered_dense.h>
 
 namespace asset_baker
 {
@@ -14,6 +15,7 @@ struct Asset_Bake_Context
 {
     std::filesystem::path input_directory;
     std::filesystem::path output_directory;
+    ankerl::unordered_dense::set<std::string> processed_hashes;
     // bool use_cache;
     enki::TaskScheduler task_scheduler;
 };
@@ -47,6 +49,11 @@ void process_gltf(Asset_Bake_Context& context, const std::filesystem::path& inpu
         tasks.reserve(gltf.value().texture_load_requests.size());
         for (auto& request : gltf.value().texture_load_requests)
         {
+            if (context.processed_hashes.contains(request.hash_identifier))
+            {
+                continue;
+            }
+            context.processed_hashes.insert(request.hash_identifier);
             auto& task = tasks.emplace_back(std::make_unique<enki::TaskSet>(
                 1,
                 [&](enki::TaskSetPartition range, uint32_t thread_idx)

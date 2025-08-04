@@ -10,7 +10,6 @@ namespace ren
 {
 Application::Application(const Application_Create_Info& create_info) noexcept
     : m_logger(std::make_shared<Logger>())
-    , m_asset_path(init_asset_path())
     , m_window(Window::create({
         .width = create_info.width,
         .height = create_info.height,
@@ -37,21 +36,21 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         m_logger,
         m_device.get(),
         Asset_Repository_Paths {
-        .shaders = m_asset_path + "/shaders/",
-        .pipelines = m_asset_path + "/pipelines/",
+        .shaders = "../assets/shaders/",
+        .pipelines = "../assets/pipelines/",
         .shader_include_paths = {
             "../",
             "../../src/shared/"
         },
-        .models = m_asset_path + "/cache/"},
+        .models = "../assets/cache/"},
         *this))
     , m_resource_blackboard(std::make_unique<Render_Resource_Blackboard>(m_device.get()))
     , m_static_scene_data(std::make_unique<Static_Scene_Data>(
-        *this,
+        m_device.get(),
         m_logger,
+        m_gpu_transfer_context,
         *m_asset_repository,
-        *m_resource_blackboard,
-        m_device.get()))
+        *m_resource_blackboard))
     , m_renderer(
         m_gpu_transfer_context,
         *m_swapchain,
@@ -125,30 +124,6 @@ void Application::run()
 
         m_frame_counter += 1;
     }
-}
-
-void Application::upload_buffer_data_immediate(rhi::Buffer* buffer, void* data, uint64_t size, uint64_t offset) noexcept
-{
-    m_gpu_transfer_context.enqueue_immediate_upload(buffer, data, size, offset);
-}
-
-void Application::upload_image_data_immediate_full(rhi::Image* image, void** data) noexcept
-{
-    m_gpu_transfer_context.enqueue_immediate_upload(image, data);
-}
-
-std::string Application::init_asset_path() const
-{
-    auto dir = std::filesystem::path();
-    for (uint32_t back_search = 0; back_search < 5; ++back_search)
-    {
-        if (auto path_marker = dir / "assets" / "cache"; std::filesystem::exists(path_marker))
-            break;
-        dir = dir / "..";
-    }
-    auto prefix = (dir / "assets").string();
-    m_logger->info("Asset path is '{}'.", prefix);
-    return prefix;
 }
 
 void Application::setup_frame(Frame& frame) noexcept
@@ -365,7 +340,7 @@ void Application::imgui_setup_style() noexcept
     style.TabRounding = 4;
 
     style.ScaleAllSizes(m_window->get_dpi_scale());
-    style.FontScaleDpi = m_window->get_dpi_scale();
+    // style.FontScaleDpi = m_window->get_dpi_scale();
 }
 
 void imgui_menu_toggle_window(const char* name, bool& window_open)

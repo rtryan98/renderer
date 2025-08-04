@@ -203,6 +203,8 @@ void Imgui_Renderer::render(rhi::Command_List* cmd) noexcept
 void Imgui_Renderer::create_fonts_texture() noexcept
 {
     auto& io = ImGui::GetIO();
+    io.Fonts->ClearFonts();
+    io.Fonts->AddFontFromFileTTF("../assets/fonts/RobotoMono-Regular.ttf", 24.0f);
     uint8_t* pixels = nullptr;
     int32_t width = 0, height = 0;
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);

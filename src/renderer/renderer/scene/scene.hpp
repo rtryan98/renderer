@@ -19,8 +19,15 @@ class Graphics_Device;
 
 namespace ren
 {
-class Application;
 class Asset_Repository;
+class GPU_Transfer_Context;
+
+enum class Material_Alpha_Mode
+{
+    Opaque,
+    Mask,
+    Blend
+};
 
 struct Material
 {
@@ -35,6 +42,8 @@ struct Material
     rhi::Image* metallic_roughness;
     rhi::Image* emissive;
     rhi::Sampler* sampler;
+    Material_Alpha_Mode alpha_mode;
+    bool double_sided;
 };
 
 struct TRS
@@ -121,10 +130,12 @@ public:
     constexpr static auto MATERIAL_INSTANCE_BUFFER_SIZE = sizeof(GPU_Material) * MAX_MATERIALS;
     constexpr static auto INSTANCE_INDICES_BUFFER_SIZE = sizeof(GPU_Instance_Indices) * MAX_INSTANCES;
 
-    Static_Scene_Data(Application& app, std::shared_ptr<Logger> logger,
+    Static_Scene_Data(
+        rhi::Graphics_Device* graphics_device,
+        std::shared_ptr<Logger> logger,
+        GPU_Transfer_Context& gpu_transfer_context,
         Asset_Repository& asset_repository,
-        Render_Resource_Blackboard& render_resource_blackboard,
-        rhi::Graphics_Device* graphics_device);
+        Render_Resource_Blackboard& render_resource_blackboard);
     ~Static_Scene_Data();
 
     Static_Scene_Data(const Static_Scene_Data&) = delete;
@@ -152,11 +163,11 @@ private:
     void create_default_images();
 
 private:
-    Application& m_app;
+    rhi::Graphics_Device* m_graphics_device;
     std::shared_ptr<Logger> m_logger;
+    GPU_Transfer_Context& m_gpu_transfer_context;
     Asset_Repository& m_asset_repository;
     Render_Resource_Blackboard& m_render_resource_blackboard;
-    rhi::Graphics_Device* m_graphics_device;
 
     OffsetAllocator::Allocator m_index_buffer_allocator;
 

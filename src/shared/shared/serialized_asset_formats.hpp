@@ -116,7 +116,14 @@ struct URI_Reference_00
     char value[NAME_FIELD_SIZE];
 };
 
-struct Mesh_Material_00
+enum class Material_Alpha_Mode : uint32_t
+{
+    Opaque,
+    Mask,
+    Blend
+};
+
+struct Material_00
 {
     constexpr static auto URI_NO_REFERENCE = ~0u;
 
@@ -129,6 +136,8 @@ struct Mesh_Material_00
     uint32_t normal_uri_index;
     uint32_t metallic_roughness_uri_index;
     uint32_t emissive_uri_index;
+    Material_Alpha_Mode alpha_mode;
+    uint32_t double_sided;
 };
 
 struct Submesh_Data_Ranges_00
@@ -174,7 +183,7 @@ struct Model_Header_00
     Model_Header header;
     char name[NAME_FIELD_SIZE];
     uint32_t referenced_uri_count;          // URI_Reference_00
-    uint32_t material_count;                // Mesh_Material_00
+    uint32_t material_count;                // Material_00
     uint32_t submesh_count;                 // Submesh_Data_Ranges_00
     uint32_t instance_count;                // Mesh_Instance_00
     uint32_t vertex_position_count;         // std::array<float, 3>
@@ -203,17 +212,17 @@ struct Model_Header_00
             + referenced_uri_count * sizeof(URI_Reference_00);
     }
 
-    Mesh_Material_00* get_materials()
+    Material_00* get_materials()
     {
         auto ptr = reinterpret_cast<char*>(this);
         ptr += get_materials_offset();
-        return reinterpret_cast<Mesh_Material_00*>(ptr);
+        return reinterpret_cast<Material_00*>(ptr);
     }
 
     std::size_t get_submeshes_offset() const
     {
         return get_materials_offset()
-            + material_count * sizeof(Mesh_Material_00);
+            + material_count * sizeof(Material_00);
     }
 
     Submesh_Data_Ranges_00* get_submeshes()
@@ -292,7 +301,7 @@ struct Model_Header_00
     {
         auto size = sizeof(Model_Header_00);
         size += (referenced_uri_count * sizeof(URI_Reference_00));
-        size += (material_count * sizeof(Mesh_Material_00));
+        size += (material_count * sizeof(Material_00));
         size += (submesh_count * sizeof(Submesh_Data_Ranges_00));
         size += (instance_count * sizeof(Mesh_Instance_00));
         size += (vertex_position_count * 12); //sizeof(float[3]));

@@ -39,6 +39,7 @@ add_custom_command(
     COMMAND $<TARGET_FILE:asset_baker> -i thirdparty/gltf-sample-assets/Models/ -o ${CMAKE_BINARY_DIR}/assets/cache
     COMMAND $<TARGET_FILE:asset_baker> -i ${CMAKE_BINARY_DIR}/download/intel_sponza -o ${CMAKE_BINARY_DIR}/assets/cache
     COMMAND $<TARGET_FILE:asset_baker> -i ${CMAKE_BINARY_DIR}/download/intel_sponza_curtains -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> -i ${CMAKE_BINARY_DIR}/download/intel_sponza_ivy -o ${CMAKE_BINARY_DIR}/assets/cache
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
 )
 # Asset baker is not supporting unicode right now.
@@ -56,6 +57,11 @@ core_download_and_extract_zip(
     https://cdrdv2.intel.com/v1/dl/getContent/726650
     ${CMAKE_BINARY_DIR}/download
     intel_sponza_curtains
+)
+core_download_and_extract_zip(
+    https://cdrdv2.intel.com/v1/dl/getContent/726656
+    ${CMAKE_BINARY_DIR}/download
+    intel_sponza_ivy
 )
 
 add_executable(renderer)

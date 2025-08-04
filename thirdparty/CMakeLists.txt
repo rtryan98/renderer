@@ -67,3 +67,8 @@ set_target_properties(
 
 add_subdirectory(glm)
 add_subdirectory(sdl)
+
+file(
+    COPY RobotoMono/fonts/ttf/RobotoMono-Regular.ttf
+    DESTINATION ${CMAKE_SOURCE_DIR}/assets/fonts/
+)

@@ -342,7 +342,8 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
                 material.emissiveTexture,
                 false,
                 rhi::Image_Format::R8G8B8A8_SRGB),
-
+            .alpha_mode = std::bit_cast<GLTF_Alpha_Mode>(material.alphaMode),
+            .double_sided = material.doubleSided
         });
     }
 
@@ -612,7 +613,7 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
     serialized_model.referenced_uri_count = static_cast<uint32_t>(uri_references.size());
 
     // materials
-    std::vector<serialization::Mesh_Material_00> materials;
+    std::vector<serialization::Material_00> materials;
     materials.reserve(gltf_model.materials.size());
     for (const auto& material : gltf_model.materials)
     {
@@ -620,10 +621,10 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
         {
             if (mapped_uris.contains(value))
                 return mapped_uris.at(value);
-            return serialization::Mesh_Material_00::URI_NO_REFERENCE;
+            return serialization::Material_00::URI_NO_REFERENCE;
         };
 
-        materials.emplace_back( serialization::Mesh_Material_00 {
+        materials.emplace_back( serialization::Material_00 {
             .base_color_factor = {
                 material.base_color_factor[0], material.base_color_factor[1],
                 material.base_color_factor[2], material.base_color_factor[3]
@@ -638,7 +639,9 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
             .albedo_uri_index = get_uri(material.albedo_uri),
             .normal_uri_index = get_uri(material.normal_uri),
             .metallic_roughness_uri_index = get_uri(material.metallic_roughness_uri),
-            .emissive_uri_index = get_uri(material.emissive_uri)
+            .emissive_uri_index = get_uri(material.emissive_uri),
+            .alpha_mode = static_cast<serialization::Material_Alpha_Mode>(material.alpha_mode),
+            .double_sided = material.double_sided,
         });
     }
     serialized_model.material_count = static_cast<uint32_t>(materials.size());
@@ -802,8 +805,8 @@ std::vector<char> serialize_gltf_model(const std::string& name, GLTF_Model& gltf
 
     data = &(result.data()[serialized_model.get_materials_offset()]);
     spdlog::trace("Copying materials. Offset: {}, Size: {}",
-        serialized_model.get_materials_offset(), materials.size() * sizeof(serialization::Mesh_Material_00));
-    memcpy(data, materials.data(), materials.size() * sizeof(serialization::Mesh_Material_00));
+        serialized_model.get_materials_offset(), materials.size() * sizeof(serialization::Material_00));
+    memcpy(data, materials.data(), materials.size() * sizeof(serialization::Material_00));
 
     data = &(result.data()[serialized_model.get_submeshes_offset()]);
     spdlog::trace("Copying submesh data ranges. Offset: {}, Size: {}",

@@ -1,5 +1,6 @@
 #include "rhi/bindless.hlsli"
 #include "shared/tonemap_shared_types.h"
+#include "common/color/transfer_functions.hlsli"
 
 DECLARE_PUSH_CONSTANTS(Tonemap_Push_Constants, pc);
 
@@ -14,8 +15,8 @@ struct PS_Out {
 
 PS_Out main(PS_In ps_in)
 {
-    float4 source_color = rhi::uni::tex_sample<float4>(pc.source_texture, pc.texture_sampler, ps_in.uv);
-
-    PS_Out result = { source_color };
+    float4 color = rhi::uni::tex_sample<float4>(pc.source_texture, pc.texture_sampler, ps_in.uv);
+    color.xyz = ren::color::transfer_functions::IEOTF_sRGB(color.xyz);
+    PS_Out result = { color };
     return result;
 }
