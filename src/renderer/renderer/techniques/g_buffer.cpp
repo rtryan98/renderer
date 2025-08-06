@@ -189,6 +189,7 @@ void G_Buffer::render_scene_cpu(
 void G_Buffer::resolve(
     rhi::Command_List* cmd,
     Resource_State_Tracker& tracker,
+    const Buffer& camera,
     const Image& resolve_target)
 {
     cmd->begin_debug_region("g_buffer:resolve", 1.f, .5f, 1.f);
@@ -231,6 +232,7 @@ void G_Buffer::resolve(
             .depth = m_depth_buffer,
             .resolve_target = resolve_target,
             .texture_sampler = m_resolve_sampler,
+            .camera_buffer = camera,
             .width = target_width,
             .height = target_height
         }, rhi::Pipeline_Bind_Point::Compute);

@@ -2,6 +2,7 @@
 
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
+#include "glm/gtc/matrix_inverse.hpp"
 #include "renderer/window.hpp"
 
 namespace ren
@@ -15,20 +16,23 @@ void Fly_Camera::update()
     });
     right = glm::normalize(glm::cross(WORLD_UP, forward));
     up = glm::normalize(glm::cross(forward, right));
-    camera_data.proj = glm::infinitePerspectiveRH(glm::radians(fov_y), aspect, near_plane);
-    camera_data.proj = glm::perspectiveRH(glm::radians(fov_y), aspect, near_plane, 1000.f);
-    camera_data.view = glm::lookAtRH(
+    // camera_data.camera_to_clip = glm::infinitePerspectiveRH(glm::radians(fov_y), aspect, near_plane);
+    camera_data.camera_to_clip = glm::perspectiveRH(glm::radians(fov_y), aspect, near_plane, far_plane);
+    camera_data.world_to_camera = glm::lookAtRH(
         position,
         position + forward,
         up);
-    camera_data.view_proj = camera_data.proj * camera_data.view;
-    camera_data.position = { position.x, position.y, position.z, 0.0f };
+    camera_data.world_to_clip = camera_data.camera_to_clip * camera_data.world_to_camera;
+    camera_data.position = { position.x, position.y, position.z, 1.0f };
+    camera_data.clip_to_camera = glm::inverse(camera_data.camera_to_clip);
+    camera_data.camera_to_world = glm::inverse(camera_data.world_to_camera);
+    camera_data.clip_to_world = glm::inverse(camera_data.world_to_clip);
 }
 
-void Fly_Camera::process_inputs(const Input_State& input_state, float dt)
+void Fly_Camera::process_inputs(const Input_State& input_state, const float dt)
 {
     update_rotation(input_state);
-    update_position(input_state, float(dt));
+    update_position(input_state, dt);
 }
 
 void Fly_Camera::update_rotation(const Input_State& input_state)

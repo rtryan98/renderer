@@ -9,9 +9,12 @@ class Input_State;
 
 struct Camera_Data
 {
-    glm::mat4 proj;
-    glm::mat4 view;
-    glm::mat4 view_proj;
+    glm::mat4 camera_to_clip;
+    glm::mat4 world_to_camera;
+    glm::mat4 world_to_clip;
+    glm::mat4 clip_to_camera;
+    glm::mat4 camera_to_world;
+    glm::mat4 clip_to_world;
     glm::vec4 position;
 };
 
@@ -37,6 +40,7 @@ public:
     float fov_y;
     float aspect;
     float near_plane;
+    float far_plane;
     float sensitivity;
     float movement_speed;
     float pitch;

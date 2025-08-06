@@ -78,6 +78,8 @@ void Ocean::simulate(
     Resource_State_Tracker& tracker,
     const float dt)
 {
+    if (!m_options.enabled) return;
+
     if (m_options.update_time)
         m_simulation_data.total_time += dt;
 
@@ -264,6 +266,8 @@ void Ocean::opaque_forward_pass(
         const Image& shaded_scene_render_target,
         const Image& shaded_scene_depth_render_target)
 {
+    if (!m_options.enabled) return;
+
     cmd->begin_debug_region("ocean:render:opaque_pass", 0.25f, 0.0f, 1.0f);
 
     tracker.use_resource(
@@ -470,6 +474,7 @@ void Ocean::process_gui()
         ImGui::SeparatorText("Debug");
         {
             ImGui::Checkbox("Update Time", &m_options.update_time);
+            ImGui::Checkbox("Enabled##Ocean", &m_options.enabled);
         }
     }
 }
@@ -563,7 +568,7 @@ void Ocean::process_gui_simulation_settings()
     ImGui::SeparatorText("Simulation Settings");
 
     imutil::push_negative_padding();
-    ImGui::SliderFloat("Gravity", &m_simulation_data.full_spectrum_parameters.gravity, .001f, 100.f);
+    ImGui::SliderFloat("Gravity", &m_simulation_data.full_spectrum_parameters.gravity, .001f, 30.f);
     imutil::help_marker(OCEAN_HELP_TEXT_GRAVITY);
 
     auto length_scales = std::to_array({
@@ -665,12 +670,12 @@ void Ocean::process_gui_simulation_settings()
 
         auto wind_speed_str = std::string("Wind Speed##") + std::to_string(spectrum_count);
         imutil::push_negative_padding();
-        ImGui::SliderFloat(wind_speed_str.c_str(), &spectrum.wind_speed, .001f, 100.f);
+        ImGui::SliderFloat(wind_speed_str.c_str(), &spectrum.wind_speed, .001f, 60.f);
         imutil::help_marker(OCEAN_HELP_TEXT_WIND_SPEED);
 
         auto fetch_str = std::string("Fetch##") + std::to_string(spectrum_count);
         imutil::push_negative_padding();
-        ImGui::SliderFloat(fetch_str.c_str(), &spectrum.fetch, 1.0f, 50.f);
+        ImGui::SliderFloat(fetch_str.c_str(), &spectrum.fetch, 1.0f, 125.f);
         imutil::help_marker(OCEAN_HELP_TEXT_FETCH);
 
         auto phillips_alpha_str = std::string("Phillips Coefficient Alpha##") + std::to_string(spectrum_count);

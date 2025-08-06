@@ -92,14 +92,15 @@ glm::u8vec4 pack_4x8u(float a, float b, float c, float d)
 
 void generate_tangents_for_submesh(GLTF_Submesh& submesh, const std::vector<GLTF_Material>& materials)
 {
+    // Generate tangents with non-zero length but zero-sign.
+    submesh.tangents.resize(submesh.normals.size(), glm::vec4(1.0f, 0.0f, 0.0f, 0.0f));
+
     if (submesh.tangents.size() == 0 &&                         // Mesh has no tangents
         submesh.normals.size() > 0 &&                           // and it has normals
         submesh.tex_coords.size() > 0 &&                        // and texture coordinates
         submesh.material_index != NO_INDEX &&                   // and a material
         !materials[submesh.material_index].normal_uri.empty())  // that contains a normal map
     {
-        submesh.tangents.resize(submesh.normals.size());
-
         if (!(submesh.normals.size() == submesh.tangents.size() &&
             submesh.tangents.size() == submesh.tex_coords.size()))
         {

@@ -54,7 +54,7 @@ struct TRS
 
     [[nodiscard]] glm::mat4 to_mat() const noexcept;
     [[nodiscard]] glm::mat4 to_transform(const glm::mat4& parent = glm::identity<glm::mat4>()) const noexcept;
-    [[nodiscard]] glm::mat3 to_transposed_adjugate(const glm::mat4& parent = glm::identity<glm::mat4>()) const noexcept;
+    [[nodiscard]] glm::mat3 adjugate(const glm::mat4& parent = glm::identity<glm::mat4>()) const noexcept;
 };
 
 struct Submesh

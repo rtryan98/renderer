@@ -10,6 +10,7 @@ struct G_Buffer_Resolve_Push_Constants
     SHADER_HANDLE_TYPE depth;
     SHADER_HANDLE_TYPE resolve_target;
     SHADER_HANDLE_TYPE texture_sampler;
+    SHADER_HANDLE_TYPE camera_buffer;
     uint width;
     uint height;
 };

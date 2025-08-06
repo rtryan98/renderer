@@ -28,16 +28,13 @@ glm::mat4 TRS::to_transform(const glm::mat4& parent) const noexcept
     return parent * to_mat();
 }
 
-glm::mat3 TRS::to_transposed_adjugate(const glm::mat4& parent) const noexcept
+glm::mat3 TRS::adjugate(const glm::mat4& parent) const noexcept
 {
-    const glm::mat3 intermediate = to_transform(parent);
-    glm::vec3 r0 = glm::cross(intermediate[1], intermediate[2]);
-    glm::vec3 r1 = glm::cross(intermediate[2], intermediate[0]);
-    glm::vec3 r2 = glm::cross(intermediate[0], intermediate[1]);
-    return { // already transposed
-        r0.x, r1.x, r2.x,
-        r0.y, r1.y, r2.y,
-        r0.z, r1.z, r2.z,
+    const glm::mat3 m = to_transform(parent);
+    return {
+        glm::cross(m[1], m[2]),
+        glm::cross(m[2], m[0]),
+        glm::cross(m[0], m[1])
     };
 }
 
@@ -257,7 +254,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
         {
             GPU_Instance_Transform_Data instance_transform_data = {
                 .mesh_to_world = mesh_instance.mesh_to_world,
-                .normal_to_world = mesh_instance.trs.to_transposed_adjugate(
+                .normal_to_world = mesh_instance.trs.adjugate(
                     mesh_instance.parent != nullptr
                     ? mesh_instance.parent->mesh_to_world
                     : glm::identity<glm::mat4>())
@@ -372,10 +369,10 @@ void Static_Scene_Data::create_default_images()
     };
 
     std::array<uint8_t, 16> default_normal_data = {
-        127, 127, 127, 127,
-        127, 127, 127, 127,
-        127, 127, 127, 127,
-        127, 127, 127, 127,
+        0, 0, 255, 0,
+        0, 0, 255, 0,
+        0, 0, 255, 0,
+        0, 0, 255, 0,
     };
 
     std::array<uint8_t, 16> default_empty_attributes_data = {

@@ -34,6 +34,7 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         .fov_y = 75.f,
         .aspect = calculate_aspect_ratio(m_swapchain),
         .near_plane = .01f,
+        .far_plane = 500.f,
         .sensitivity = .25f,
         .movement_speed = 10.f,
         .pitch = 0.f,
@@ -45,7 +46,6 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         .heap = rhi::Memory_Heap_Type::GPU
         }))
     , m_imgui_renderer(imgui_renderer_create_info, m_asset_repository)
-    // , m_ocean_renderer(m_resource_blackboard, m_asset_repository)
     , m_g_buffer(
         m_asset_repository,
         m_resource_blackboard,
@@ -105,10 +105,15 @@ void Renderer::setup_frame()
     m_swapchain_image = Image(m_swapchain);
 
     GPU_Camera_Data camera_data = {
-        .view = m_fly_cam.camera_data.view,
-        .proj = m_fly_cam.camera_data.proj,
-        .view_proj = m_fly_cam.camera_data.view_proj,
-        .position = m_fly_cam.camera_data.position
+        .world_to_camera = m_fly_cam.camera_data.world_to_camera,
+        .camera_to_clip = m_fly_cam.camera_data.camera_to_clip,
+        .world_to_clip = m_fly_cam.camera_data.world_to_clip,
+        .clip_to_camera = m_fly_cam.camera_data.clip_to_camera,
+        .camera_to_world = m_fly_cam.camera_data.camera_to_world,
+        .clip_to_world = m_fly_cam.camera_data.clip_to_world,
+        .position = m_fly_cam.camera_data.position,
+        .near_plane = m_fly_cam.near_plane,
+        .far_plane = m_fly_cam.far_plane,
     };
     m_gpu_transfer_context.enqueue_immediate_upload(m_camera_buffer, camera_data);
 }
@@ -133,6 +138,7 @@ void Renderer::render(
     m_g_buffer.resolve(
         cmd,
         tracker,
+        m_camera_buffer,
         m_shaded_geometry_render_target);
     m_ocean.opaque_forward_pass(
         cmd,

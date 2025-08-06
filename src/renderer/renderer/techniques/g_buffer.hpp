@@ -40,6 +40,7 @@ public:
     void resolve(
         rhi::Command_List* cmd,
         Resource_State_Tracker& tracker,
+        const Buffer& camera,
         const Image& resolve_target);
 
 private:
