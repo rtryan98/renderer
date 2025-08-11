@@ -23,7 +23,7 @@ template<typename T>
 T IEOTF_sRGB(T C_l)
 {
     T lower = C_l * 12.92;
-    T upper = 1.055 * pow(C_l, rcp(2.4));
+    T upper = 1.055 * pow(C_l, rcp(2.4)) - 0.055;
     return select(C_l <= 0.0031308, lower, upper);
 }
 
