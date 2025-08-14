@@ -121,6 +121,12 @@ std::vector<std::string> Asset_Repository::get_model_files() const
     return result;
 }
 
+void Asset_Repository::recompile_shaders()
+{
+    create_shader_and_compute_libraries();
+    create_graphics_pipeline_libraries();
+}
+
 rhi::dxc::Shader_Type shader_type_from_string(std::string_view type)
 {
     if (type == "vs")

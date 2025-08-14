@@ -11,9 +11,4 @@ struct VS_Out
 
 typedef VS_Out PS_In;
 
-struct PS_Out
-{
-    float4 color : SV_Target0;
-};
-
 #endif

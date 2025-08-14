@@ -9,14 +9,9 @@ struct PS_In {
     float2 uv : TEXCOORD0;
 };
 
-struct PS_Out {
-    float4 color : SV_Target;
-};
-
-PS_Out main(PS_In ps_in)
+float4 main(PS_In ps_in) : SV_Target
 {
     float4 color = rhi::uni::tex_sample<float4>(pc.source_texture, pc.texture_sampler, ps_in.uv);
     color.xyz = ren::color::transfer_functions::IEOTF_sRGB(color.xyz);
-    PS_Out result = { color };
-    return result;
+    return color;
 }

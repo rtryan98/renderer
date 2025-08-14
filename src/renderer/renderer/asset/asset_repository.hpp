@@ -43,6 +43,8 @@ public:
     [[nodiscard]] Mapped_File* get_texture_safe(const std::string_view& name) const;
     [[nodiscard]] std::vector<std::string> get_model_files() const;
 
+    void recompile_shaders();
+
 private:
     void compile_shader_library(
         std::string_view hlsl_path,

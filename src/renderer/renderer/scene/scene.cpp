@@ -15,11 +15,28 @@
 
 namespace ren
 {
+constexpr static auto DEFAULT_SAMPLER_CREATE_INFO = rhi::Sampler_Create_Info {
+    .filter_min = rhi::Sampler_Filter::Linear,
+    .filter_mag = rhi::Sampler_Filter::Linear,
+    .filter_mip = rhi::Sampler_Filter::Linear,
+    .address_mode_u = rhi::Image_Sample_Address_Mode::Wrap,
+    .address_mode_v = rhi::Image_Sample_Address_Mode::Wrap,
+    .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
+    .mip_lod_bias = 0.f,
+    .max_anisotropy = 16,
+    .comparison_func = rhi::Comparison_Func::None,
+    .reduction = rhi::Sampler_Reduction_Type::Standard,
+    .border_color = {},
+    .min_lod = 0.f,
+    .max_lod = 1000.f,
+    .anisotropy_enable = true
+};
+
 glm::mat4 TRS::to_mat() const noexcept
 {
-    auto s = glm::scale(glm::identity<glm::mat4>(), scale);
-    auto r = glm::mat4_cast(rotation);
-    auto t = glm::translate(glm::identity<glm::mat4>(), translation);
+    const auto s = glm::scale(glm::identity<glm::mat4>(), scale);
+    const auto r = glm::mat4_cast(rotation);
+    const auto t = glm::translate(glm::identity<glm::mat4>(), translation);
     return t * r * s;
 }
 
@@ -92,26 +109,9 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
             const auto* uris = loadable_model->get_referenced_uris();
             if (index == ~0u)
             {
-                return nullptr;
+                return replacement;
             }
             return get_or_create_image(uris[index].value, replacement);
-        };
-
-        rhi::Sampler_Create_Info default_sampler_create_info = {
-            .filter_min = rhi::Sampler_Filter::Linear,
-            .filter_mag = rhi::Sampler_Filter::Linear,
-            .filter_mip = rhi::Sampler_Filter::Linear,
-            .address_mode_u = rhi::Image_Sample_Address_Mode::Wrap,
-            .address_mode_v = rhi::Image_Sample_Address_Mode::Wrap,
-            .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
-            .mip_lod_bias = 0.f,
-            .max_anisotropy = 16,
-            .comparison_func = rhi::Comparison_Func::None,
-            .reduction = rhi::Sampler_Reduction_Type::Standard,
-            .border_color = {},
-            .min_lod = 0.f,
-            .max_lod = 1000.f,
-            .anisotropy_enable = true
         };
 
         material = {
@@ -134,7 +134,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
             .normal = get_material_texture(loadable_material.normal_uri_index, m_default_normal_tex),
             .metallic_roughness = get_material_texture(loadable_material.metallic_roughness_uri_index, m_default_metallic_roughness_tex),
             .emissive = get_material_texture(loadable_material.emissive_uri_index, m_default_emissive_tex),
-            .sampler = m_render_resource_blackboard.get_sampler(default_sampler_create_info),
+            .sampler = m_render_resource_blackboard.get_sampler(DEFAULT_SAMPLER_CREATE_INFO),
             .alpha_mode = static_cast<Material_Alpha_Mode>(loadable_material.alpha_mode),
             .double_sided = static_cast<bool>(loadable_material.double_sided),
         };
@@ -175,9 +175,9 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
         submesh.first_vertex = loadable_submesh.vertex_position_range_start;
         submesh.aabb_min = {};
         submesh.aabb_max = {};
-        submesh.default_material = loadable_submesh.material_index != MESH_PARENT_INDEX_NO_PARENT
+        submesh.material = loadable_submesh.material_index != MESH_PARENT_INDEX_NO_PARENT
             ? model.materials[loadable_submesh.material_index]
-            : nullptr;
+            : &m_default_material;
     }
 
     model.meshes.resize(loadable_model->instance_count);
@@ -239,7 +239,7 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
             {
                 auto& submesh_instance = mesh_instance.submesh_instances.emplace_back();
                 submesh_instance.submesh = submesh;
-                submesh_instance.material = submesh->default_material;
+                submesh_instance.material = submesh->material;
                 submesh_instance.instance_index = acquire_instance_index();
             }
         }
@@ -326,7 +326,7 @@ rhi::Image* Static_Scene_Data::get_or_create_image(const std::string& uri, rhi::
     };
     auto image = m_graphics_device->create_image(texture_create_info).value_or(nullptr);
     m_graphics_device->name_resource(image, (std::string("gltf:") + loadable_image->name).c_str());
-    std::array<void*, 14> mip_data;
+    std::array<void*, 14> mip_data{};
     for (auto mip = 0; mip < loadable_image->mip_count; ++mip)
     {
         mip_data[mip] = loadable_image->get_mip_data(mip);
@@ -362,17 +362,17 @@ void Static_Scene_Data::create_default_images()
     m_graphics_device->name_resource(m_default_metallic_roughness_tex, "scene:default_metallic_roughness_texture");
 
     std::array<uint8_t, 16> default_missing_texture_data = {
-        255, 0, 127, 255,
-          0, 0,   0, 255,
-        255, 0, 127, 255,
-          0, 0,   0, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
     };
 
     std::array<uint8_t, 16> default_normal_data = {
-        0, 0, 255, 0,
-        0, 0, 255, 0,
-        0, 0, 255, 0,
-        0, 0, 255, 0,
+        127, 127, 255, 0,
+        127, 127, 255, 0,
+        127, 127, 255, 0,
+        127, 127, 255, 0,
     };
 
     std::array<uint8_t, 16> default_empty_attributes_data = {
@@ -431,6 +431,22 @@ Static_Scene_Data::Static_Scene_Data(
     m_graphics_device->name_resource(m_instance_buffer, "scene:instance_indices_buffer");
 
     create_default_images();
+
+    m_default_material = {
+        .material_index = acquire_material_index(),
+        .base_color_factor = glm::u8vec4(255, 255, 255, 255),
+        .pbr_roughness = 1.0f,
+        .pbr_metallic = 0.0f,
+        .emissive_color = glm::vec3(0.0f, 0.0f, 0.0f),
+        .emissive_strength = 0.0f,
+        .albedo = m_default_albedo_tex,
+        .normal = m_default_normal_tex,
+        .metallic_roughness = m_default_metallic_roughness_tex,
+        .emissive = m_default_emissive_tex,
+        .sampler = m_render_resource_blackboard.get_sampler(DEFAULT_SAMPLER_CREATE_INFO),
+        .alpha_mode = Material_Alpha_Mode::Opaque,
+        .double_sided = false
+    };
 }
 
 Static_Scene_Data::~Static_Scene_Data()

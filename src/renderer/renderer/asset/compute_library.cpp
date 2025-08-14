@@ -25,8 +25,8 @@ void Compute_Library::destroy_pipelines(rhi::Graphics_Device* device)
     for (auto& wrapper : pipelines)
     {
         device->destroy_pipeline(wrapper.pipeline);
-        pipelines.erase(pipelines.get_iterator(&wrapper));
     }
+    pipelines.clear();
     pipeline_ptrs.clear();
 }
 }

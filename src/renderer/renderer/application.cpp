@@ -21,7 +21,7 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         .graphics_api = rhi::Graphics_API::D3D12,
         .enable_validation = create_info.enable_validation,
         .enable_gpu_validation = create_info.enable_gpu_validation,
-        .enable_locking = false
+        .enable_locking = true
         }))
     , m_swapchain(m_device->create_swapchain({
         .hwnd = m_window->get_native_handle(),
@@ -139,6 +139,13 @@ void Application::setup_frame(Frame& frame) noexcept
         m_renderer.on_resize(width, height);
     }
     m_swapchain->acquire_next_image();
+
+    if (m_input_state->is_key_clicked(SDL_SCANCODE_F5))
+    {
+        m_logger->info("Recompiling shaders and recreating pipelines.");
+        m_device->wait_idle();
+        m_asset_repository->recompile_shaders();
+    }
 
     m_gpu_transfer_context.garbage_collect();
 

@@ -64,7 +64,7 @@ struct Submesh
     uint32_t first_vertex;
     glm::vec3 aabb_min;
     glm::vec3 aabb_max;
-    Material* default_material;
+    Material* material;
 };
 
 struct Submesh_Instance
@@ -190,5 +190,6 @@ private:
     rhi::Image* m_default_normal_tex = nullptr;
     rhi::Image* m_default_metallic_roughness_tex = nullptr;
     rhi::Image* m_default_emissive_tex = nullptr;
+    Material m_default_material = {};
 };
 }
