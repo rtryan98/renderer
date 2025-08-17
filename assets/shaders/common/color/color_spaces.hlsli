@@ -80,10 +80,10 @@ static const float3x3 MAT_XYZ_AP1 = {
      0.011722, -0.008284,  0.988395
 };
 
-static const float3x3 MAT_Rec709_Rec2020 = mul(MAT_XYZ_Rec2020, MAT_XYZ_Rec709);
-static const float3x3 MAT_Rec709_P3D65   = mul(MAT_XYZ_P3D65  , MAT_XYZ_Rec709);
-static const float3x3 MAT_Rec709_AP0     = mul(MAT_XYZ_AP0    , MAT_XYZ_Rec709);
-static const float3x3 MAT_Rec709_AP1     = mul(MAT_XYZ_AP1    , MAT_XYZ_Rec709);
+static const float3x3 MAT_Rec709_Rec2020 = mul(MAT_XYZ_Rec2020, MAT_Rec709_XYZ);
+static const float3x3 MAT_Rec709_P3D65   = mul(MAT_XYZ_P3D65  , MAT_Rec709_XYZ);
+static const float3x3 MAT_Rec709_AP0     = mul(MAT_XYZ_AP0    , MAT_Rec709_XYZ);
+static const float3x3 MAT_Rec709_AP1     = mul(MAT_XYZ_AP1    , MAT_Rec709_XYZ);
 
 static const float3x3 MAT_Rec2020_Rec709 = mul(MAT_XYZ_Rec709, MAT_Rec2020_XYZ);
 static const float3x3 MAT_Rec2020_P3D65  = mul(MAT_XYZ_P3D65 , MAT_Rec2020_XYZ);
@@ -110,27 +110,27 @@ static const float3x3 MAT_AP1_AP0        = mul(MAT_XYZ_AP0    , MAT_AP1_XYZ);
 
 float3 XYZ_Rec709(float3 XYZ)
 {
-    return mul(XYZ, MAT_XYZ_Rec709);
+    return mul(MAT_XYZ_Rec709, XYZ);
 }
 
 float3 XYZ_Rec2020(float3 XYZ)
 {
-    return mul(XYZ, MAT_XYZ_Rec2020);
+    return mul(MAT_XYZ_Rec2020, XYZ);
 }
 
 float3 XYZ_P3D65(float3 XYZ)
 {
-    return mul(XYZ, MAT_XYZ_P3D65);
+    return mul(MAT_XYZ_P3D65, XYZ);
 }
 
 float3 XYZ_AP0(float3 XYZ)
 {
-    return mul(XYZ, MAT_XYZ_AP0);
+    return mul(MAT_XYZ_AP0, XYZ);
 }
 
 float3 XYZ_AP1(float3 XYZ)
 {
-    return mul(XYZ, MAT_AP0_AP1);
+    return mul(MAT_AP0_AP1, XYZ);
 }
 
 
@@ -138,27 +138,27 @@ float3 XYZ_AP1(float3 XYZ)
 
 float3 Rec709_XYZ(float3 Rec709)
 {
-    return mul(Rec709, MAT_Rec709_XYZ);
+    return mul(MAT_Rec709_XYZ, Rec709);
 }
 
 float3 Rec709_Rec2020(float3 Rec709)
 {
-    return mul(Rec709, MAT_Rec709_Rec2020);
+    return mul(MAT_Rec709_Rec2020, Rec709);
 }
 
 float3 Rec709_P3D65(float3 Rec709)
 {
-    return mul(Rec709, MAT_Rec709_P3D65);
+    return mul(MAT_Rec709_P3D65, Rec709);
 }
 
 float3 Rec709_AP0(float3 Rec709)
 {
-    return mul(Rec709, MAT_Rec709_AP0);
+    return mul(MAT_Rec709_AP0, Rec709);
 }
 
 float3 Rec709_AP1(float3 Rec709)
 {
-    return mul(Rec709, MAT_Rec709_AP1);
+    return mul(MAT_Rec709_AP1, Rec709);
 }
 
 
@@ -166,52 +166,64 @@ float3 Rec709_AP1(float3 Rec709)
 
 float3 Rec2020_XYZ(float3 Rec2020)
 {
-    return mul(Rec2020, MAT_Rec2020_XYZ);
+    return mul(MAT_Rec2020_XYZ, Rec2020);
 }
 
 float3 Rec2020_Rec709(float3 Rec2020)
 {
-    return mul(Rec2020, MAT_Rec2020_Rec709);
+    return mul(MAT_Rec2020_Rec709, Rec2020);
 }
 
 float3 Rec2020_P3D65(float3 Rec2020)
 {
-    return mul(Rec2020, MAT_Rec2020_P3D65);
+    return mul(MAT_Rec2020_P3D65, Rec2020);
 }
 
 float3 Rec2020_AP0(float3 Rec2020)
 {
-    return mul(Rec2020, MAT_Rec2020_AP0);
+    return mul(MAT_Rec2020_AP0, Rec2020);
 }
 
 float3 Rec2020_AP1(float3 Rec2020)
 {
-    return mul(Rec2020, MAT_Rec2020_AP1);
+    return mul(MAT_Rec2020_AP1, Rec2020);
 }
 
 float3 Rec2020_ICtCp(float3 Rec2020)
 {
     // As described in Dolby's ICtCp whitepaper.
-    static const float3 L_ = rcp(4096.) * float3(1688.0, 2146.0, 262.0);
-    static const float3 M_ = rcp(4096.) * float3(683.0, 2951.0, 462.0);
-    static const float3 S_ = rcp(4096.) * float3(99.0, 309.0, 3688.0);
-    float3 LMS = ren::color::transfer_functions::IEOTF_PQ(float3(dot(L_, Rec2020), dot(M_, Rec2020), dot(S_, Rec2020)));
-    static const float3 I_ = float3(0.5, 0.5, 0.0);
-    static const float3 CT_ = rcp(4096.) * float3(6610.0, -13613.0, 7003.0);
-    static const float3 CP_ = rcp(4096.) * float3(17933.0, -17390.0, -543.0);
-    return float3(dot(I_, LMS), dot(CT_, LMS), dot(CP_, LMS));
+    static const float3x3 Rec2020_LMS = rcp(4096.) * float3x3(
+        1688.0, 2146.0,  262.0,
+         683.0, 2951.0,  462.0,
+          99.0,  309.0, 3688.0
+    );
+    float3 LMS = ren::color::transfer_functions::IEOTF_PQ(mul(Rec2020_LMS, Rec2020));
+    static const float3x3 LMS_ICtCp = rcp(4096.) * float3x3(
+         2048.0,   2048.0,    0.0,
+         6610.0, -13613.0, 7003.0,
+        17933.0, -17390.0, -543.0
+    );
+    return mul(LMS_ICtCp, LMS);
 }
 
 float3 Rec2020_Jzazbz(float3 Rec2020)
 {
-    static const float3 L_ = float3(0.530004, 0.3557, 0.086090);
-    static const float3 M_ = float3(0.289388, 0.525395, 0.157481);
-    static const float3 S_ = float3(0.091098, 0.147588, 0.734234);
-    float3 LMS = ren::color::transfer_functions::IEOTF_PQ(float3(dot(L_, Rec2020), dot(M_, Rec2020), dot(S_, Rec2020)), 1.7);
-    float Iz = 0.5 * LMS.x * LMS.y;
-    static const float3 A_ = float3(3.524, -4.066708, 0.542708);
-    static const float3 B_ = float3(0.199076, 1.096799, -1.295875);
-    return float3((0.44 * Iz) / (1.0 - 0.56 * Iz) - 1.6295499532821566e-11, dot(A_, LMS.y), dot(B_, LMS.z));
+    static const float3x3 Rec2020_LMS = float3x3(
+        0.530004, 0.355700, 0.086090,
+        0.289388, 0.525395, 0.157481,
+        0.091098, 0.147588, 0.734234
+    );
+    float3 LMS = ren::color::transfer_functions::IEOTF_PQ(mul(Rec2020_LMS, Rec2020), 1.7);
+    float Iz = 0.5 * (LMS.x + LMS.y);
+    float Jz = (0.44 * Iz) / (1.0 - 0.56 * Iz) - 1.6295499532821566e-11;
+    static const float3x3 LMS_Jzazbz = float3x3(
+        0.0, 0.0, 0.0,
+        3.524, -4.066708, 0.542708,
+        0.199076, 1.096799, -1.295875
+    );
+    float3 Jzazbz = mul(LMS_Jzazbz, LMS);
+    Jzazbz.x = Jz;
+    return Jzazbz;
 }
 
 
@@ -219,27 +231,27 @@ float3 Rec2020_Jzazbz(float3 Rec2020)
 
 float3 P3D65_XYZ(float3 P3D65)
 {
-    return mul(P3D65, MAT_P3D65_XYZ);
+    return mul(MAT_P3D65_XYZ, P3D65);
 }
 
 float3 P3D65_Rec709(float3 P3D65)
 {
-    return mul(P3D65, MAT_P3D65_Rec709);
+    return mul(MAT_P3D65_Rec709, P3D65);
 }
 
 float3 P3D65_Rec2020(float3 P3D65)
 {
-    return mul(P3D65, MAT_P3D65_Rec2020);
+    return mul(MAT_P3D65_Rec2020, P3D65);
 }
 
 float3 P3D65_AP0(float3 P3D65)
 {
-    return mul(P3D65, MAT_P3D65_AP0);
+    return mul(MAT_P3D65_AP0, P3D65);
 }
 
 float3 P3D65_AP1(float3 P3D65)
 {
-    return mul(P3D65, MAT_P3D65_AP1);
+    return mul(MAT_P3D65_AP1, P3D65);
 }
 
 
@@ -247,27 +259,27 @@ float3 P3D65_AP1(float3 P3D65)
 
 float3 AP0_XYZ(float3 AP0)
 {
-    return mul(AP0, MAT_AP0_XYZ);
+    return mul(MAT_AP0_XYZ, AP0);
 }
 
 float3 AP0_Rec709(float3 AP0)
 {
-    return mul(AP0, MAT_AP0_Rec709);
+    return mul(MAT_AP0_Rec709, AP0);
 }
 
 float3 AP0_Rec2020(float3 AP0)
 {
-    return mul(AP0, MAT_AP0_Rec2020);
+    return mul(MAT_AP0_Rec2020, AP0);
 }
 
 float3 AP0_P3D65(float3 AP0)
 {
-    return mul(AP0, MAT_AP0_P3D65);
+    return mul(MAT_AP0_P3D65, AP0);
 }
 
 float3 AP0_AP1(float3 AP0)
 {
-    return mul(AP0, MAT_AP0_AP1);
+    return mul(MAT_AP0_AP1, AP0);
 }
 
 
@@ -275,27 +287,27 @@ float3 AP0_AP1(float3 AP0)
 
 float3 AP1_XYZ(float3 AP1)
 {
-    return mul(AP1, MAT_AP1_XYZ);
+    return mul(MAT_AP1_XYZ, AP1);
 }
 
 float3 AP1_Rec709(float3 AP1)
 {
-    return mul(AP1, MAT_AP1_Rec709);
+    return mul(MAT_AP1_Rec709, AP1);
 }
 
 float3 AP1_Rec2020(float3 AP1)
 {
-    return mul(AP1, MAT_AP1_Rec2020);
+    return mul(MAT_AP1_Rec2020, AP1);
 }
 
 float3 AP1_P3D65(float3 AP1)
 {
-    return mul(AP1, MAT_AP1_P3D65);
+    return mul(MAT_AP1_P3D65, AP1);
 }
 
 float3 AP1_AP0(float3 AP1)
 {
-    return mul(AP1, MAT_AP1_AP0);
+    return mul(MAT_AP1_AP0, AP1);
 }
 
 
@@ -303,14 +315,18 @@ float3 AP1_AP0(float3 AP1)
 
 float3 ICtCp_Rec2020(float3 ICtCp)
 {
-    static const float3 I_ = float3(1.0, 0.00860904, 0.11103);
-    static const float3 CT_ = float3(1.0, -0.00860904, -0.11103);
-    static const float3 CP_ = float3(1.0, 0.560031, -0.320627);
-    float3 LMS = ren::color::transfer_functions::EOTF_PQ(float3(dot(I_, ICtCp), dot(CT_, ICtCp), dot(CP_, ICtCp)));
-    static const float3 L_ = float3(3.43661, -2.50645, 0.0698454);
-    static const float3 M_ = float3(-0.079133, 1.9836, -0.192271);
-    static const float3 S_ = float3(-0.0259499, -0.0989137, 1.12486);
-    return max(float3(dot(L_, LMS), dot(M_, LMS), dot(S_, LMS)), 0.0);
+    static const float3x3 ICtCp_LMS = float3x3(
+        1.0,  0.00860904,  0.111030,
+        1.0, -0.00860904, -0.111030,
+        1.0,  0.56003100, -0.320627
+    );
+    float3 LMS = ren::color::transfer_functions::EOTF_PQ(mul(ICtCp_LMS, ICtCp));
+    static const float3x3 LMS_Rec2020 = float3x3(
+         3.4366100, -2.5064500,  0.0698454,
+        -0.0791330,  1.9836000, -0.1922710,
+        -0.0259499, -0.0989137,  1.1248600
+    );
+    return max(mul(LMS_Rec2020, LMS), 0.0);
 }
 
 
@@ -320,14 +336,18 @@ float3 Jzazbz_Rec2020(float3 Jzazbz)
 {
     float Jz = Jzazbz.x + 1.6295499532821566e-11;
     Jzazbz.x = Jz / (0.44 + 0.56 * Jz);
-    static const float3 Jz_ = float3(1.0, 1.386050432715393e-1, 5.804731615611869e-2);
-    static const float3 az_ = float3(1.0, -1.386050432715393e-1, -5.804731615611869e-2);
-    static const float3 bz_ = float3(1.0, -9.601924202631895e-2, -8.118918960560390e-1);
-    float3 LMS = ren::color::transfer_functions::EOTF_PQ(float3(dot(Jz_, Jzazbz), dot(az_, Jzazbz), dot(bz_, Jzazbz)), 1.7);
-    static const float3 L_ = float3(2.990669, -2.049742, 0.088977);
-    static const float3 M_ = float3(-1.634525, 3.145627, -0.483037);
-    static const float3 S_ = float3(-0.042505, -0.377983, 1.448019);
-    return float3(dot(L_, LMS), dot(M_, LMS), dot(S_, LMS));
+    static const float3x3 Jzazbz_LMS = float3x3(
+        1.0,  1.386050432715393e-1,  5.804731615611869e-2,
+        1.0, -1.386050432715393e-1, -5.804731615611869e-2,
+        1.0, -9.601924202631895e-2, -8.118918960560390e-1
+    );
+    float3 LMS = ren::color::transfer_functions::EOTF_PQ(mul(Jzazbz_LMS, Jzazbz), 1.7);
+    static const float3x3 LMS_Rec2020 = float3x3(
+         2.990669, -2.049742,  0.088977,
+        -1.634525,  3.145627, -0.483037,
+        -0.042505, -0.377983,  1.448019
+    );
+    return mul(LMS_Rec2020, LMS);
 }
 
 } // namespace spaces

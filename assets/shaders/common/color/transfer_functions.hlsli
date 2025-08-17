@@ -61,6 +61,7 @@ static const float PQ_c1 = PQ_c3 - PQ_c2 + 1.;
 template<typename T>
 T EOTF_PQ(T E_Rec2020, float exponential_scale_factor = 1.0)
 {
+    E_Rec2020 = saturate(E_Rec2020);
     T E1m2 = pow(E_Rec2020, rcp(PQ_m2 * exponential_scale_factor));
     return 10000.0 * pow(max(E1m2 - PQ_c1, 0.0) / (PQ_c2 - PQ_c3 * E1m2), rcp(PQ_m1));
 }
@@ -68,6 +69,7 @@ T EOTF_PQ(T E_Rec2020, float exponential_scale_factor = 1.0)
 template<typename T>
 T IEOTF_PQ(T F_D_Rec2020, float exponential_scale_factor = 1.0)
 {
+    F_D_Rec2020 = clamp(F_D_Rec2020, 0.0, 10000.0);
     T Ym1 = pow(F_D_Rec2020 / 10000.0, PQ_m1);
     return pow((PQ_c1 + PQ_c2 * Ym1) / (1.0 + PQ_c3 * Ym1), PQ_m2 * exponential_scale_factor);
 }
@@ -75,6 +77,7 @@ T IEOTF_PQ(T F_D_Rec2020, float exponential_scale_factor = 1.0)
 template<typename T, typename U>
 T EOTF_PQ_scaled(T E_Rec2020, U max_nits, float exponential_scale_factor = 1.0)
 {
+    E_Rec2020 = saturate(E_Rec2020);
     T E1m2 = pow(E_Rec2020, rcp(PQ_m2 * exponential_scale_factor));
     return (10000.0 / max_nits) * pow(max(E1m2 - PQ_c1, 0.0) / (PQ_c2 - PQ_c3 * E1m2), rcp(PQ_m1));
 }
@@ -82,6 +85,7 @@ T EOTF_PQ_scaled(T E_Rec2020, U max_nits, float exponential_scale_factor = 1.0)
 template<typename T, typename U>
 T IEOTF_PQ_scaled(T F_D_Rec2020, U max_nits, float exponential_scale_factor = 1.0)
 {
+    F_D_Rec2020 = clamp(F_D_Rec2020, 0.0, 10000.0);
     T Ym1 = pow(F_D_Rec2020 * max_nits / 10000.0, PQ_m1);
     return pow((PQ_c1 + PQ_c2 * Ym1) / (1.0 + PQ_c3 * Ym1), PQ_m2 * exponential_scale_factor);
 }

@@ -5,6 +5,7 @@
 #include "constants.hlsli"
 #include "ocean/ocean_render_utils.hlsli"
 #include "common/pbr/pbr.hlsli"
+#include "common/color/color_spaces.hlsli"
 
 DECLARE_PUSH_CONSTANTS(Ocean_Render_Patch_Push_Constants, pc);
 
@@ -61,9 +62,9 @@ float4 main(PS_In ps_in) : SV_Target
     float y_dy = ydx_zdx_ydy_zdy[2];
     float z_dy = ydx_zdx_ydy_zdy[3];
 
-
+    float3 diffuse_color = float3(0.02352941176, 0.25882352941, 0.45098039215);
     Surface surface;
-    surface.albedo = float3(0.02352941176, 0.25882352941, 0.45098039215);
+    surface.albedo = ren::color::spaces::Rec709_Rec2020(diffuse_color);
     surface.normal = calculate_normals(calculate_slope(z_dx, z_dy, x_dx, y_dy));
     surface.metallic = 0.0;
     surface.roughness = 0.25;

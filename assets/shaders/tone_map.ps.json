@@ -1,5 +1,5 @@
 {
-    "name": "tonemap",
+    "name": "tone_map",
     "shader_type": "ps",
     "entry_point": "main"
 }

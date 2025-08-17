@@ -6,6 +6,7 @@
 
 #include "renderer/techniques/g_buffer.hpp"
 #include "renderer/techniques/ocean.hpp"
+#include "renderer/techniques/tone_map.hpp"
 
 namespace rhi
 {
@@ -57,6 +58,6 @@ private:
 
     techniques::G_Buffer m_g_buffer;
     techniques::Ocean m_ocean;
-
+    techniques::Tone_Map m_tone_map;
 };
 }

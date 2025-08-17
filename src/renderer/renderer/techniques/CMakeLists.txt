@@ -4,4 +4,6 @@ target_sources(
     g_buffer.hpp
     ocean.cpp
     ocean.hpp
+    tone_map.cpp
+    tone_map.hpp
 )

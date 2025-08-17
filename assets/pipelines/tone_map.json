@@ -1,10 +1,10 @@
 {
-    "name": "tonemap",
+    "name": "tone_map",
     "vs": {
         "name": "fullscreen_triangle.vs"
     },
     "ps": {
-        "name": "tonemap.ps"
+        "name": "tone_map.ps"
     },
     "color_attachments": [
         {

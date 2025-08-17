@@ -7,7 +7,6 @@
 #include "renderer/asset/asset_repository.hpp"
 
 #include <rhi/swapchain.hpp>
-#include <shared/tonemap_shared_types.h>
 
 #undef near
 #undef far
@@ -57,6 +56,12 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         m_resource_blackboard,
         m_swapchain.get_width(),
         m_swapchain.get_height())
+    , m_tone_map(
+        m_asset_repository,
+        m_gpu_transfer_context,
+        m_resource_blackboard,
+        false,
+        techniques::Tone_Map::SDR_PAPER_WHITE)
 {
     m_imgui_renderer.create_fonts_texture();
 
@@ -146,6 +151,11 @@ void Renderer::render(
         m_camera_buffer,
         m_shaded_geometry_render_target,
         m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
+    m_tone_map.blit_apply(
+        cmd,
+        tracker,
+        m_shaded_geometry_render_target,
+        m_swapchain_image);
     render_swapchain_pass(cmd, tracker);
 }
 
@@ -163,26 +173,11 @@ void Renderer::on_resize(uint32_t width, uint32_t height) noexcept
 
 void Renderer::render_swapchain_pass(rhi::Command_List* cmd, Resource_State_Tracker& tracker)
 {
-    cmd->begin_debug_region("swapchain_pass", 0.5f, 0.25f, 0.25f);
-    tracker.use_resource(
-        m_swapchain_image,
-        rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
-        rhi::Barrier_Access::Color_Attachment_Write,
-        rhi::Barrier_Image_Layout::Color_Attachment,
-        true);
-    tracker.use_resource(
-        m_shaded_geometry_render_target,
-        rhi::Barrier_Pipeline_Stage::Pixel_Shader,
-        rhi::Barrier_Access::Shader_Sampled_Read,
-        rhi::Barrier_Image_Layout::Shader_Read_Only);
-    tracker.flush_barriers(cmd);
+    cmd->begin_debug_region("imgui", .5f, 1.f, .0f);
     rhi::Render_Pass_Color_Attachment_Info swapchain_attachment_info = {
         .attachment = m_swapchain_image,
-        .load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
-        .store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
-        .clear_value = {
-            .color = { 0.0f, 0.0f, 0.0f, 1.0f }
-        }
+        .load_op = rhi::Render_Pass_Attachment_Load_Op::Load,
+        .store_op = rhi::Render_Pass_Attachment_Store_Op::Store
     };
     const rhi::Render_Pass_Begin_Info render_pass_info = {
         .color_attachments = { &swapchain_attachment_info, 1 },
@@ -193,33 +188,9 @@ void Renderer::render_swapchain_pass(rhi::Command_List* cmd, Resource_State_Trac
     cmd->set_viewport(0.f, 0.f, static_cast<float>(m_swapchain.get_width()), static_cast<float>(m_swapchain.get_height()), 0.f, 1.f);
     cmd->set_scissor(0, 0, m_swapchain.get_width(), m_swapchain.get_height());
 
-    cmd->begin_debug_region("swapchain_pass:tonemap", .75f, 0.f, .25f);
-    cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("tonemap"));
-    cmd->set_push_constants<Tonemap_Push_Constants>({
-            .source_texture = m_shaded_geometry_render_target,
-            .texture_sampler = m_resource_blackboard.get_sampler({
-                .filter_min = rhi::Sampler_Filter::Nearest,
-                .filter_mag = rhi::Sampler_Filter::Nearest,
-                .filter_mip = rhi::Sampler_Filter::Nearest,
-                .address_mode_u = rhi::Image_Sample_Address_Mode::Clamp,
-                .address_mode_v = rhi::Image_Sample_Address_Mode::Clamp,
-                .address_mode_w = rhi::Image_Sample_Address_Mode::Clamp,
-                .mip_lod_bias = 0.f,
-                .max_anisotropy = 0,
-                .comparison_func = rhi::Comparison_Func::None,
-                .reduction = rhi::Sampler_Reduction_Type::Standard,
-                .border_color = {},
-                .min_lod = .0f,
-                .max_lod = .0f,
-                .anisotropy_enable = false})
-        }, rhi::Pipeline_Bind_Point::Graphics);
-    cmd->draw(3, 1, 0, 0);
-    cmd->end_debug_region();
-
-    cmd->begin_debug_region("swapchain_pass:imgui", .5f, 1.f, .0f);
     m_imgui_renderer.render(cmd);
-    cmd->end_debug_region(); // imgui
     cmd->end_render_pass();
+    cmd->end_debug_region(); // imgui
 
     tracker.use_resource(
         m_swapchain_image,
@@ -227,6 +198,5 @@ void Renderer::render_swapchain_pass(rhi::Command_List* cmd, Resource_State_Trac
         rhi::Barrier_Access::None,
         rhi::Barrier_Image_Layout::Present);
     tracker.flush_barriers(cmd);
-    cmd->end_debug_region(); // swapchain_pass
 }
 }
