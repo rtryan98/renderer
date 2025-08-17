@@ -23,9 +23,9 @@ Windows 10 and older Visual Studio versions are not tested and may not work. Bui
 
 ## Features
 ### Graphics Techniques
-- Inverse Fast-Fourier-Transform (FFT$^{-1}$) based ocean surface simulation:
+- Inverse Fast-Fourier-Transform (IFFT) based ocean surface simulation:
     - Utilizes oceanographic spectra presented in C. Horvath's [*'Empirical directional wave spectra for computer graphics'*](https://dl.acm.org/doi/10.1145/2791261.2791267).
-    - The synthesized spectra are packed together to halve the amount of FFT$^{-1}$s required and thus double the performance of the simulation.
+    - The synthesized spectra are packed together to halve the amount of IFFTs required and thus double the performance of the simulation.
 - Physically based rendering:
     - Implemented microfacet BRDFs:
         - Cook-Torrance.
@@ -36,7 +36,7 @@ Windows 10 and older Visual Studio versions are not tested and may not work. Bui
 - Parallelized asset baking into runtime format.
 - Pipeline and shader runtime precompilation and hot reloading (F5).
 - Simple resource barrier tracking for single-queue use.
-- (WIP) Wide color gamut (WCG) and High dynamic range (HDR) display support (via PQ EOTF$^{-1}$).
+- (WIP) Wide color gamut (WCG) and High dynamic range (HDR) display support (via PQ inverse EOTF).
 
 ## Legal
 This project is licensed under the MIT license.
