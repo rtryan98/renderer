@@ -14,7 +14,8 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         .width = create_info.width,
         .height = create_info.height,
         .title = "Renderer",
-        .dpi_aware_size = false
+        .dpi_aware_size = false,
+        .borderless = true
         }))
     , m_input_state(std::make_unique<Input_State>(*m_window))
     , m_device(rhi::Graphics_Device::create({
@@ -25,7 +26,8 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         }))
     , m_swapchain(m_device->create_swapchain({
         .hwnd = m_window->get_native_handle(),
-        .preferred_format = rhi::Image_Format::R8G8B8A8_UNORM,
+        .preferred_format = rhi::Image_Format::R8G8B8A8_UNORM, // SDR
+        // .preferred_format = rhi::Image_Format::A2R10G10B10_UNORM_PACK32, // HDR
         .image_count = REN_MAX_FRAMES_IN_FLIGHT + 1,
         .present_mode = rhi::Present_Mode::Immediate
         }))

@@ -72,7 +72,7 @@ void main(uint3 id : SV_DispatchThreadID)
     surface.roughness = metallic_roughness.y;
 
     Directional_Light light;
-    light.color = 1.0;
+    light.color = 2.5;
     light.direction = normalize(float3(0.8, 0.0, 1.0));
 
     float3 direct_light = evaluate_light(light, V, surface);

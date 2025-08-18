@@ -15,7 +15,7 @@ public:
             create_info.title,
             static_cast<int32_t>(create_info.width),
             static_cast<int32_t>(create_info.height),
-            SDL_WINDOW_CREATE_FLAGS))
+            create_info.borderless ? SDL_WINDOW_BORDERLESS : SDL_WINDOW_CREATE_FLAGS))
         , m_data {
             .width = create_info.width,
             .height = create_info.height,

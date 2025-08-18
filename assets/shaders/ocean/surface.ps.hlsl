@@ -62,18 +62,29 @@ float4 main(PS_In ps_in) : SV_Target
     float y_dy = ydx_zdx_ydy_zdy[2];
     float z_dy = ydx_zdx_ydy_zdy[3];
 
+    float jacobian = calculate_det_jacobian(x_dx, y_dx, y_dx, y_dy);
+
     float3 diffuse_color = float3(0.02352941176, 0.25882352941, 0.45098039215);
     Surface surface;
     surface.albedo = ren::color::spaces::Rec709_Rec2020(diffuse_color);
     surface.normal = calculate_normals(calculate_slope(z_dx, z_dy, x_dx, y_dy));
-    surface.metallic = 0.0;
-    surface.roughness = 0.25;
+    surface.metallic = 0.0625;
+    surface.roughness = 0.1;
+    if (jacobian < 0.66)
+    {
+        surface.albedo = float3(0.7, 0.7, 0.7);
+        surface.roughness = 1.0;
+        surface.metallic = 0.0;
+    }
 
-    float3 V = normalize(ps_in.position_camera - ps_in.position_ws).xyz;
-    if (dot(V, surface.normal) < 0.0) surface.normal *= -1.;
+    float3 V = normalize(float3(ps_in.position_camera.xyz - ps_in.position_ws.xyz));
 
     Directional_Light light;
-    light.color = 1.0;
+    light.color = 2.5;
     light.direction = normalize(float3(0.8, 0.8, 1.0));
-    return float4(evaluate_light(light, V, surface), 1.0);
+
+    float3 direct = evaluate_light(light, V, surface);
+    float3 ambient = surface.albedo * 0.1;
+
+    return float4(direct + ambient, 1.0);
 }

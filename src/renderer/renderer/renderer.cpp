@@ -60,8 +60,8 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         m_asset_repository,
         m_gpu_transfer_context,
         m_resource_blackboard,
-        false,
-        techniques::Tone_Map::SDR_PAPER_WHITE)
+        m_swapchain.get_image_format() == rhi::Image_Format::A2R10G10B10_UNORM_PACK32,
+        1405.0f)
 {
     m_imgui_renderer.create_fonts_texture();
 

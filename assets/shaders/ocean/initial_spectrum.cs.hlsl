@@ -107,12 +107,14 @@ float calculate_spectrum(float2 dispersion_and_derivative, float delta_k, float 
 
 float calculate_min_wavenumber(float length_scale)
 {
-    return sqrt(2.) * ren::TWO_PI / length_scale;
+    static const float USER_MIN_SCALE = 1.0;
+    return sqrt(2.) * ren::PI / length_scale;
 }
 
 float calculate_max_wavenumber(float length_scale, float texture_size)
 {
-    return ren::PI * texture_size / length_scale;
+    static const float USER_MAX_SCALE = 5.0;
+    return USER_MAX_SCALE * ren::PI * texture_size / length_scale;
 }
 
 [numthreads(32, 32, 1)]

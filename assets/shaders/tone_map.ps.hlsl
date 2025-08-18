@@ -45,9 +45,9 @@ float4 main(PS_In ps_in) : SV_Target
     float4 color = max(rhi::uni::tex_sample<float4>(pc.source_texture, pc.texture_sampler, ps_in.uv), 0.0);
     color.xyz = apply_gt7_tone_map(color.xyz, tone_map_parameters);
 
-    if (tone_map_parameters.is_hdr)
+    if (tone_map_parameters.is_hdr > 0)
     {
-        color.xyz = ren::color::transfer_functions::IEOTF_PQ(color.xyz);
+        color.xyz = ren::color::transfer_functions::IEOTF_PQ(color.xyz * tone_map_parameters.reference_luminance);
     }
     else
     {

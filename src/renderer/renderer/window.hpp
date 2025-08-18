@@ -15,6 +15,7 @@ struct Window_Create_Info
     uint32_t height;
     const char* title;
     bool dpi_aware_size;
+    bool borderless;
 };
 
 struct Window_Data

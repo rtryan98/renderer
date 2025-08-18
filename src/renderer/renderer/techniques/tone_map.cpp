@@ -55,7 +55,8 @@ Tone_Map::Tone_Map(Asset_Repository& asset_repository,
         .blend_ratio = m_blend_ratio,
         .fade_start = m_fade_start,
         .fade_end = m_fade_end,
-        .is_hdr = m_is_hdr
+        .is_hdr = m_is_hdr,
+        .reference_luminance = IMAGE_REFERENCE_LUMINANCE
     };
     m_gpu_transfer_context.enqueue_immediate_upload(m_tone_map_parameters_buffer, tone_map_data);
 }

@@ -29,8 +29,9 @@ struct GT7_Tone_Mapping_Data
     float fade_start;
     float fade_end;
 
-    // EOTF
+    // EOTF and display
     uint is_hdr;
+    float reference_luminance;
 };
 
 #endif
