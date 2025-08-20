@@ -71,8 +71,6 @@ private:
     class Shader_Compiler;
     std::unique_ptr<Shader_Compiler> m_shader_compiler;
 
-    constexpr static auto ARRAY_VECTOR_SIZE = 128u;
-
     template<typename T>
     using String_Map = ankerl::unordered_dense::map<std::string, T>;
 

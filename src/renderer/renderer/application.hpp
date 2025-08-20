@@ -9,7 +9,6 @@
 
 #include <rhi/graphics_device.hpp>
 #include <rhi/swapchain.hpp>
-#include <rhi/resource.hpp>
 
 #include "scene/scene.hpp"
 
@@ -43,8 +42,6 @@ public:
     ~Application() noexcept;
 
     void run();
-    [[nodiscard]] Window& get_window() const { return *m_window; }
-    [[nodiscard]] Asset_Repository& get_asset_repository() const { return *m_asset_repository; }
 
 private:
     struct Frame
@@ -54,20 +51,6 @@ private:
         std::unique_ptr<rhi::Command_Pool> graphics_command_pool;
         std::unique_ptr<rhi::Command_Pool> compute_command_pool;
         std::unique_ptr<rhi::Command_Pool> copy_command_pool;
-    };
-
-    struct Buffer_Staging_Info
-    {
-        rhi::Buffer* src;
-        rhi::Buffer* dst;
-        uint64_t offset;
-        uint64_t size;
-    };
-
-    struct Image_Staging_Info
-    {
-        rhi::Buffer* src;
-        rhi::Image* dst;
     };
 
     void setup_frame(Frame& frame) noexcept;
