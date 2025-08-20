@@ -1,10 +1,10 @@
 #pragma once
 
-#include "renderer/imgui/imgui_renderer.hpp"
 #include "renderer/scene/camera.hpp"
 #include "renderer/render_resource_blackboard.hpp"
 
 #include "renderer/techniques/g_buffer.hpp"
+#include "renderer/techniques/imgui.hpp"
 #include "renderer/techniques/ocean.hpp"
 #include "renderer/techniques/tone_map.hpp"
 
@@ -29,8 +29,7 @@ public:
     Renderer(GPU_Transfer_Context& gpu_transfer_context,
         rhi::Swapchain& swapchain,
         Asset_Repository& asset_repository,
-        Render_Resource_Blackboard& resource_blackboard,
-        const Imgui_Renderer_Create_Info& imgui_renderer_create_info);
+        Render_Resource_Blackboard& resource_blackboard);
     ~Renderer();
 
     void process_gui();
@@ -40,9 +39,6 @@ public:
     void on_resize(uint32_t width, uint32_t height) noexcept;
 
 private:
-    void render_swapchain_pass(rhi::Command_List* cmd, Resource_State_Tracker& tracker);
-
-private:
     GPU_Transfer_Context& m_gpu_transfer_context;
     rhi::Swapchain& m_swapchain;
     Asset_Repository& m_asset_repository;
@@ -50,13 +46,13 @@ private:
 
     Fly_Camera m_fly_cam;
     Buffer m_camera_buffer;
-    Imgui_Renderer m_imgui_renderer;
 
     float m_render_scale = 1.f;
     Image m_swapchain_image = {};
     Image m_shaded_geometry_render_target = {};
 
     techniques::G_Buffer m_g_buffer;
+    techniques::Imgui m_imgui;
     techniques::Ocean m_ocean;
     techniques::Tone_Map m_tone_map;
 };

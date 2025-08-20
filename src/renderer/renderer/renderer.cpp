@@ -7,6 +7,7 @@
 #include "renderer/asset/asset_repository.hpp"
 
 #include <rhi/swapchain.hpp>
+#include <imgui.h>
 
 #undef near
 #undef far
@@ -23,8 +24,7 @@ float calculate_aspect_ratio(const rhi::Swapchain& swapchain)
 Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
     rhi::Swapchain& swapchain,
     Asset_Repository& asset_repository,
-    Render_Resource_Blackboard& resource_blackboard,
-    const Imgui_Renderer_Create_Info& imgui_renderer_create_info)
+    Render_Resource_Blackboard& resource_blackboard)
     : m_gpu_transfer_context(gpu_transfer_context)
     , m_swapchain(swapchain)
     , m_asset_repository(asset_repository)
@@ -44,12 +44,15 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         .size = sizeof(GPU_Camera_Data),
         .heap = rhi::Memory_Heap_Type::GPU
         }))
-    , m_imgui_renderer(imgui_renderer_create_info, m_asset_repository)
     , m_g_buffer(
         m_asset_repository,
         m_resource_blackboard,
         m_swapchain.get_width(),
         m_swapchain.get_height())
+    , m_imgui(
+        m_asset_repository,
+        m_gpu_transfer_context,
+        m_resource_blackboard)
     , m_ocean(
         m_asset_repository,
         m_gpu_transfer_context,
@@ -63,8 +66,6 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         m_swapchain.get_image_format() == rhi::Image_Format::A2R10G10B10_UNORM_PACK32,
         1405.0f)
 {
-    m_imgui_renderer.create_fonts_texture();
-
     const rhi::Image_Create_Info render_target_create_info = {
         .format = rhi::Image_Format::R16G16B16A16_SFLOAT,
         .width = m_swapchain.get_width(),
@@ -106,7 +107,6 @@ void Renderer::update(const Input_State& input_state, double t, double dt) noexc
 
 void Renderer::setup_frame()
 {
-    m_imgui_renderer.next_frame();
     m_swapchain_image = Image(m_swapchain);
 
     GPU_Camera_Data camera_data = {
@@ -156,7 +156,13 @@ void Renderer::render(
         tracker,
         m_shaded_geometry_render_target,
         m_swapchain_image);
-    render_swapchain_pass(cmd, tracker);
+    m_imgui.render(cmd, m_swapchain_image);
+    tracker.use_resource(
+        m_swapchain_image,
+        rhi::Barrier_Pipeline_Stage::None,
+        rhi::Barrier_Access::None,
+        rhi::Barrier_Image_Layout::Present);
+    tracker.flush_barriers(cmd);
 }
 
 void Renderer::on_resize(uint32_t width, uint32_t height) noexcept
@@ -169,34 +175,5 @@ void Renderer::on_resize(uint32_t width, uint32_t height) noexcept
         image.recreate(create_info);
     };
     // TODO: resize techniques
-}
-
-void Renderer::render_swapchain_pass(rhi::Command_List* cmd, Resource_State_Tracker& tracker)
-{
-    cmd->begin_debug_region("imgui", .5f, 1.f, .0f);
-    rhi::Render_Pass_Color_Attachment_Info swapchain_attachment_info = {
-        .attachment = m_swapchain_image,
-        .load_op = rhi::Render_Pass_Attachment_Load_Op::Load,
-        .store_op = rhi::Render_Pass_Attachment_Store_Op::Store
-    };
-    const rhi::Render_Pass_Begin_Info render_pass_info = {
-        .color_attachments = { &swapchain_attachment_info, 1 },
-        .depth_stencil_attachment = {}
-    };
-
-    cmd->begin_render_pass(render_pass_info);
-    cmd->set_viewport(0.f, 0.f, static_cast<float>(m_swapchain.get_width()), static_cast<float>(m_swapchain.get_height()), 0.f, 1.f);
-    cmd->set_scissor(0, 0, m_swapchain.get_width(), m_swapchain.get_height());
-
-    m_imgui_renderer.render(cmd);
-    cmd->end_render_pass();
-    cmd->end_debug_region(); // imgui
-
-    tracker.use_resource(
-        m_swapchain_image,
-        rhi::Barrier_Pipeline_Stage::None,
-        rhi::Barrier_Access::None,
-        rhi::Barrier_Image_Layout::Present);
-    tracker.flush_barriers(cmd);
 }
 }

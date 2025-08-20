@@ -4,6 +4,8 @@
 #include "renderer/imgui/imgui_util.hpp"
 #include "renderer/application.hpp"
 
+#include <imgui.h>
+
 int32_t main(uint32_t argc, const char* argv[])
 {
     constexpr static uint32_t WINDOW_DEFAULT_WIDTH = 2560;

@@ -57,10 +57,7 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         m_gpu_transfer_context,
         *m_swapchain,
         *m_asset_repository,
-        *m_resource_blackboard,
-        Imgui_Renderer_Create_Info{
-            .device = m_device.get(),
-            .swapchain_image_format = m_swapchain->get_image_format()})
+        *m_resource_blackboard)
     , m_is_running(true)
 {
     for (auto& frame : m_frames)
