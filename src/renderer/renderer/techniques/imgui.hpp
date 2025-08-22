@@ -46,6 +46,7 @@ private:
 
 private:
     void setup_render_state(rhi::Command_List* cmd) const;
+    void setup_style();
 };
 }
 }

@@ -60,8 +60,6 @@ private:
 
     void imgui_close_all_windows() noexcept;
     void imgui_process_modals() noexcept;
-
-    void imgui_setup_style() noexcept;
     void imgui_menubar() noexcept;
 
 private:
