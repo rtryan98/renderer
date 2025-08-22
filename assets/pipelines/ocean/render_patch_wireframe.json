@@ -1,0 +1,23 @@
+{
+    "name": "ocean_render_patch_wireframe",
+    "vs": {
+        "name": "surface_patch_render_ocean.vs"
+    },
+    "ps": {
+        "name": "surface_render_ocean.ps"
+    },
+    "color_attachments": [
+        {
+            "format": "R16G16B16A16_SFLOAT"
+        }
+    ],
+    "depth_stencil": {
+        "format": "D32_SFLOAT",
+        "depth_enable": true,
+        "depth_write_enable": true,
+        "comparison_func": "Less"
+    },
+    "rasterizer_state": {
+        "wireframe": true
+    }
+}

@@ -72,6 +72,7 @@ private:
         bool use_fp16_maths = false;
         bool update_time = true;
         bool enabled = true;
+        bool wireframe = false;
         uint32_t texture_size = 256;
         uint32_t cascade_count = 4;
 

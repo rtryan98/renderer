@@ -320,7 +320,10 @@ void Ocean::opaque_forward_pass(
     cmd->set_scissor(0, 0, width, height);
 
     constexpr static auto SIZE = 2048;
-    cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch"));
+    if (m_options.wireframe)
+        cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch_wireframe"));
+    else
+        cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch"));
     cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
         .length_scales = m_simulation_data.full_spectrum_parameters.length_scales,
         .tex_sampler = m_displacement_sampler,
@@ -333,24 +336,6 @@ void Ocean::opaque_forward_pass(
     cmd->draw(6 * SIZE * SIZE,1,0,0);
     cmd->end_render_pass();
     cmd->end_debug_region(); // ocean:render:opaque_forward_pass
-}
-
-glm::vec4 calculate_default_length_scales()
-{
-    auto calculate_length_scale = [](const uint32_t factor) {
-        auto length_scale = 1024.f;
-        for (auto i = 0; i < factor; ++i)
-        {
-            length_scale = length_scale * (1.f - 1.f / 1.681033988f);
-        }
-        return length_scale;
-    };
-    return {
-        calculate_length_scale(0),
-        calculate_length_scale(2),
-        calculate_length_scale(4),
-        calculate_length_scale(6)
-    };
 }
 
 rhi::Image_Create_Info Ocean::Options::generate_create_info(bool four_components) const noexcept
@@ -391,7 +376,7 @@ Ocean::Simulation_Data::Full_Spectrum_Parameters::Full_Spectrum_Parameters()
               .generalized_a = 1.0f,
               .generalized_b = 1.0f,
               .contribution = 1.0f,
-              .wind_direction = 0.f
+              .wind_direction = 110.f
           },
           {
               .wind_speed = 10.5f,
@@ -404,7 +389,7 @@ Ocean::Simulation_Data::Full_Spectrum_Parameters::Full_Spectrum_Parameters()
           }}
       )
     , active_cascades(glm::uvec4(1,1,1,1))
-    , length_scales(calculate_default_length_scales())
+    , length_scales({ 753.53f, 237.43f, 79.12f, 14.33f })
     , oceanographic_spectrum(static_cast<uint32_t>(Ocean_Spectrum::TMA))
     , directional_spreading_function(static_cast<uint32_t>(Ocean_Directional_Spreading_Function::Donelan_Banner))
     , gravity(9.81f)
@@ -475,6 +460,7 @@ void Ocean::process_gui()
         {
             ImGui::Checkbox("Update Time", &m_options.update_time);
             ImGui::Checkbox("Enabled##Ocean", &m_options.enabled);
+            ImGui::Checkbox("Wireframe##Ocean", &m_options.wireframe);
         }
     }
 }
