@@ -11,6 +11,10 @@ struct Tone_Map_Push_Constants
 
 struct GT7_Tone_Mapping_Data
 {
+    // EOTF and display
+    uint is_hdr;
+    float reference_luminance;
+
     // Curve data
     float alpha;
     float mid_point;
@@ -28,10 +32,11 @@ struct GT7_Tone_Mapping_Data
     float blend_ratio;
     float fade_start;
     float fade_end;
+};
 
-    // EOTF and display
-    uint is_hdr;
-    float reference_luminance;
+struct Tone_Map_Debug_Quads_Push_Constants
+{
+    float aspect;
 };
 
 #endif

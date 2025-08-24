@@ -45,7 +45,7 @@ private:
     Sampler m_texture_sampler;
 
 private:
-    void setup_render_state(rhi::Command_List* cmd) const;
+    void setup_render_state(rhi::Command_List* cmd, const Image& image) const;
     void setup_style();
 };
 }

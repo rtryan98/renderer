@@ -31,7 +31,7 @@ class Asset_Repository
 {
 public:
     Asset_Repository(std::shared_ptr<Logger> logger, rhi::Graphics_Device* graphics_device,
-        Asset_Repository_Paths&& paths, Application& app);
+        Asset_Repository_Paths&& paths);
     ~Asset_Repository();
 
     [[nodiscard]] rhi::Shader_Blob* get_shader_blob(const std::string_view& name, const std::string_view& variant) const;
@@ -66,7 +66,6 @@ private:
     std::shared_ptr<Logger> m_logger;
     rhi::Graphics_Device* m_graphics_device;
     Asset_Repository_Paths m_paths;
-    Application& m_app;
 
     class Shader_Compiler;
     std::unique_ptr<Shader_Compiler> m_shader_compiler;

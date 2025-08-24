@@ -36,7 +36,7 @@ Windows 10 and older Visual Studio versions are not tested and may not work. Bui
 - Parallelized asset baking into runtime format.
 - Pipeline and shader runtime precompilation and hot reloading (F5).
 - Simple resource barrier tracking for single-queue use.
-- (WIP) Wide color gamut (WCG) and High dynamic range (HDR) display support (via PQ inverse EOTF).
+- Wide color gamut (WCG) and High dynamic range (HDR) display support (via PQ inverse EOTF).
 
 ## Legal
 This project is licensed under the MIT license.

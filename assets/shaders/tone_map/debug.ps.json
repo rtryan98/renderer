@@ -1,0 +1,5 @@
+{
+    "name": "tone_map_debug",
+    "shader_type": "ps",
+    "entry_point": "main"
+}

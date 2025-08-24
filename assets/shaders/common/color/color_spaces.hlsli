@@ -189,7 +189,7 @@ float3 Rec2020_AP1(float3 Rec2020)
     return mul(MAT_Rec2020_AP1, Rec2020);
 }
 
-float3 Rec2020_ICtCp(float3 Rec2020)
+float3 Rec2020_ICtCp(float3 Rec2020, float reference_luminance = 1.0)
 {
     // As described in Dolby's ICtCp whitepaper.
     static const float3x3 Rec2020_LMS = rcp(4096.) * float3x3(
@@ -197,7 +197,7 @@ float3 Rec2020_ICtCp(float3 Rec2020)
          683.0, 2951.0,  462.0,
           99.0,  309.0, 3688.0
     );
-    float3 LMS = ren::color::transfer_functions::IEOTF_PQ(mul(Rec2020_LMS, Rec2020));
+    float3 LMS = ren::color::transfer_functions::IEOTF_PQ(mul(Rec2020_LMS, Rec2020) * reference_luminance);
     static const float3x3 LMS_ICtCp = rcp(4096.) * float3x3(
          2048.0,   2048.0,    0.0,
          6610.0, -13613.0, 7003.0,
@@ -206,14 +206,14 @@ float3 Rec2020_ICtCp(float3 Rec2020)
     return mul(LMS_ICtCp, LMS);
 }
 
-float3 Rec2020_Jzazbz(float3 Rec2020)
+float3 Rec2020_Jzazbz(float3 Rec2020, float reference_luminance = 1.0)
 {
     static const float3x3 Rec2020_LMS = float3x3(
         0.530004, 0.355700, 0.086090,
         0.289388, 0.525395, 0.157481,
         0.091098, 0.147588, 0.734234
     );
-    float3 LMS = ren::color::transfer_functions::IEOTF_PQ(mul(Rec2020_LMS, Rec2020), 1.7);
+    float3 LMS = ren::color::transfer_functions::IEOTF_PQ(mul(Rec2020_LMS, Rec2020) * reference_luminance, 1.7);
     float Iz = 0.5 * (LMS.x + LMS.y);
     float Jz = (0.44 * Iz) / (1.0 - 0.56 * Iz) - 1.6295499532821566e-11;
     static const float3x3 LMS_Jzazbz = float3x3(
@@ -313,14 +313,14 @@ float3 AP1_AP0(float3 AP1)
 
 // ICtCp conversions
 
-float3 ICtCp_Rec2020(float3 ICtCp)
+float3 ICtCp_Rec2020(float3 ICtCp, float reference_luminance = 1.0)
 {
     static const float3x3 ICtCp_LMS = float3x3(
         1.0,  0.00860904,  0.111030,
         1.0, -0.00860904, -0.111030,
         1.0,  0.56003100, -0.320627
     );
-    float3 LMS = ren::color::transfer_functions::EOTF_PQ(mul(ICtCp_LMS, ICtCp));
+    float3 LMS = ren::color::transfer_functions::EOTF_PQ(mul(ICtCp_LMS, ICtCp)) / reference_luminance;
     static const float3x3 LMS_Rec2020 = float3x3(
          3.4366100, -2.5064500,  0.0698454,
         -0.0791330,  1.9836000, -0.1922710,
@@ -332,7 +332,7 @@ float3 ICtCp_Rec2020(float3 ICtCp)
 
 // Jzazbz conversions
 
-float3 Jzazbz_Rec2020(float3 Jzazbz)
+float3 Jzazbz_Rec2020(float3 Jzazbz, float reference_luminance = 1.0)
 {
     float Jz = Jzazbz.x + 1.6295499532821566e-11;
     Jzazbz.x = Jz / (0.44 + 0.56 * Jz);
@@ -341,7 +341,7 @@ float3 Jzazbz_Rec2020(float3 Jzazbz)
         1.0, -1.386050432715393e-1, -5.804731615611869e-2,
         1.0, -9.601924202631895e-2, -8.118918960560390e-1
     );
-    float3 LMS = ren::color::transfer_functions::EOTF_PQ(mul(Jzazbz_LMS, Jzazbz), 1.7);
+    float3 LMS = ren::color::transfer_functions::EOTF_PQ(mul(Jzazbz_LMS, Jzazbz), 1.7) / reference_luminance;
     static const float3x3 LMS_Rec2020 = float3x3(
          2.990669, -2.049742,  0.088977,
         -1.634525,  3.145627, -0.483037,

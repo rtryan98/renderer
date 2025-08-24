@@ -33,11 +33,10 @@ private:
 
 Asset_Repository::Asset_Repository(
     std::shared_ptr<Logger> logger, rhi::Graphics_Device* graphics_device,
-    Asset_Repository_Paths&& paths, Application& app)
+    Asset_Repository_Paths&& paths)
     : m_logger(std::move(logger))
     , m_graphics_device(graphics_device)
     , m_paths(std::move(paths))
-    , m_app(app)
     , m_shader_compiler(std::make_unique<Shader_Compiler>())
 {
     m_logger->info("Asset repository created with the following asset paths:");

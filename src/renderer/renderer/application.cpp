@@ -44,8 +44,7 @@ Application::Application(const Application_Create_Info& create_info) noexcept
             "../",
             "../../src/shared/"
         },
-        .models = "../assets/cache/"},
-        *this))
+        .models = "../assets/cache/"}))
     , m_resource_blackboard(std::make_unique<Render_Resource_Blackboard>(m_device.get()))
     , m_static_scene_data(std::make_unique<Static_Scene_Data>(
         m_device.get(),
@@ -136,6 +135,23 @@ void Application::setup_frame(Frame& frame) noexcept
     {
         m_renderer.on_resize(width, height);
     }
+    m_gpu_transfer_context.garbage_collect();
+    if (m_is_hdr_mode_changed || m_is_hdr_luminance_changed)
+    {
+        m_renderer.set_hdr_state(m_enable_hdr, static_cast<float>(m_display_peak_luminance));
+    }
+    if (m_is_hdr_mode_changed)
+    {
+        const rhi::Image_Format format = m_enable_hdr
+            ? rhi::Image_Format::A2R10G10B10_UNORM_PACK32
+            : rhi::Image_Format::R8G8B8A8_UNORM;
+        m_swapchain->change_format(format);
+        m_is_hdr_mode_changed = false;
+    }
+    if (m_is_hdr_luminance_changed)
+    {
+        m_is_hdr_luminance_changed = false;
+    }
     m_swapchain->acquire_next_image();
 
     if (m_input_state->is_key_clicked(SDL_SCANCODE_F5))
@@ -144,8 +160,6 @@ void Application::setup_frame(Frame& frame) noexcept
         m_device->wait_idle();
         m_asset_repository->recompile_shaders();
     }
-
-    m_gpu_transfer_context.garbage_collect();
 
     m_renderer.setup_frame();
 }
@@ -187,6 +201,18 @@ void Application::process_gui() noexcept
         imutil::push_minimum_window_size();
         if (ImGui::Begin("Renderer Settings", &m_imgui_data.windows.renderer_settings))
         {
+            if (ImGui::CollapsingHeader("Common"))
+            {
+                const int previous_peak_luminance = m_display_peak_luminance;
+                const bool previous_hdr_enable = m_enable_hdr;
+
+                ImGui::SliderInt("Peak Luminance", &m_display_peak_luminance,
+                    250, 2000,
+                    "%d nits");
+                ImGui::Checkbox("Enable HDR output", &m_enable_hdr);
+                m_is_hdr_mode_changed = m_enable_hdr != previous_hdr_enable;
+                m_is_hdr_luminance_changed = m_display_peak_luminance != previous_peak_luminance;
+            }
             m_renderer.process_gui();
         }
         ImGui::End();

@@ -63,8 +63,8 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         m_asset_repository,
         m_gpu_transfer_context,
         m_resource_blackboard,
-        m_swapchain.get_image_format() == rhi::Image_Format::A2R10G10B10_UNORM_PACK32,
-        1405.0f)
+        false,
+        techniques::Tone_Map::SDR_DEFAULT_PAPER_WHITE)
 {
     const rhi::Image_Create_Info render_target_create_info = {
         .format = rhi::Image_Format::R16G16B16A16_SFLOAT,
@@ -91,6 +91,7 @@ Renderer::~Renderer()
 void Renderer::process_gui()
 {
     m_ocean.process_gui();
+    m_tone_map.process_gui();
 }
 
 void Renderer::update(const Input_State& input_state, double t, double dt) noexcept
@@ -151,6 +152,11 @@ void Renderer::render(
         m_camera_buffer,
         m_shaded_geometry_render_target,
         m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
+    m_tone_map.render_debug(
+        cmd,
+        tracker,
+        m_shaded_geometry_render_target,
+        m_camera_buffer);
     m_tone_map.blit_apply(
         cmd,
         tracker,
@@ -175,5 +181,11 @@ void Renderer::on_resize(uint32_t width, uint32_t height) noexcept
         image.recreate(create_info);
     };
     // TODO: resize techniques
+}
+
+void Renderer::set_hdr_state(const bool enabled, const float display_peak_luminance_nits) noexcept
+{
+    m_enable_hdr = enabled;
+    m_tone_map.set_hdr_state(m_enable_hdr, display_peak_luminance_nits);
 }
 }

@@ -139,7 +139,7 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
         index_copy_offset += draw_list->IdxBuffer.Size * sizeof(ImDrawIdx);
     }
 
-    setup_render_state(cmd);
+    setup_render_state(cmd, target);
 
     const float left = draw_data->DisplayPos.x;
     const float top = draw_data->DisplayPos.y;
@@ -159,7 +159,7 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
             {
                 if (imgui_cmd.UserCallback == ImDrawCallback_ResetRenderState)
                 {
-                    setup_render_state(cmd);
+                    setup_render_state(cmd, target);
                 }
                 else
                 {
@@ -204,11 +204,15 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
     cmd->end_debug_region(); // imgui
 }
 
-void Imgui::setup_render_state(rhi::Command_List* cmd) const
+void Imgui::setup_render_state(rhi::Command_List* cmd, const Image& image) const
 {
-    auto* draw_data = ImGui::GetDrawData();
+    const auto format = image.get_create_info().format;
+    const auto* draw_data = ImGui::GetDrawData();
     cmd->set_viewport(0.0f, 0.0f, draw_data->DisplaySize.x, draw_data->DisplaySize.y, 0.0f, 1.0f);
-    cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("imgui"));
+    if (format == rhi::Image_Format::A2R10G10B10_UNORM_PACK32)
+        cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("imgui_hdr"));
+    else
+        cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("imgui"));
     cmd->set_index_buffer(m_index_buffer, rhi::Index_Type::U16);
 }
 

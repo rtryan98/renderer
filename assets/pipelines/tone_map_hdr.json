@@ -1,0 +1,16 @@
+{
+    "name": "tone_map_hdr",
+    "vs": {
+        "name": "fullscreen_triangle.vs"
+    },
+    "ps": {
+        "name": "tone_map.ps"
+    },
+    "color_attachments": [
+        {
+            "format": "A2R10G10B10_UNORM_PACK32"
+        }
+    ],
+    "depth_stencil": {
+    }
+}

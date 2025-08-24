@@ -1,0 +1,22 @@
+{
+    "name": "imgui_hdr",
+    "vs": {
+        "name": "imgui.vs"
+    },
+    "ps": {
+        "name": "imgui.ps"
+    },
+    "color_attachments": [
+        {
+            "blend_enable": true,
+            "color_src_blend": "Src_Alpha",
+            "color_dst_blend": "One_Minus_Src_Alpha",
+            "alpha_src_blend": "One",
+            "alpha_dst_blend": "One_Minus_Src_Alpha",
+            "blend_op": "Add",
+            "format": "A2R10G10B10_UNORM_PACK32"
+        }
+    ],
+    "depth_stencil": {
+    }
+}

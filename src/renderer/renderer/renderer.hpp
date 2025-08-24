@@ -38,6 +38,8 @@ public:
     void render(const Static_Scene_Data& scene, rhi::Command_List* cmd, double t, double dt) noexcept;
     void on_resize(uint32_t width, uint32_t height) noexcept;
 
+    void set_hdr_state(bool enabled, float display_peak_luminance_nits) noexcept;
+
 private:
     GPU_Transfer_Context& m_gpu_transfer_context;
     rhi::Swapchain& m_swapchain;
@@ -47,6 +49,7 @@ private:
     Fly_Camera m_fly_cam;
     Buffer m_camera_buffer;
 
+    bool m_enable_hdr = false;
     float m_render_scale = 1.f;
     Image m_swapchain_image = {};
     Image m_shaded_geometry_render_target = {};

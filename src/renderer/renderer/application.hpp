@@ -74,6 +74,10 @@ private:
     std::unique_ptr<Asset_Repository> m_asset_repository;
     std::unique_ptr<Render_Resource_Blackboard> m_resource_blackboard;
     std::unique_ptr<Static_Scene_Data> m_static_scene_data;
+    int32_t m_display_peak_luminance = 250;
+    bool m_enable_hdr = false;
+    bool m_is_hdr_mode_changed = false;
+    bool m_is_hdr_luminance_changed = false;
     Renderer m_renderer;
     bool m_is_running;
     ImGui_Data m_imgui_data = {};
