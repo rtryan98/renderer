@@ -4,6 +4,7 @@
 #include "renderer/render_resource_blackboard.hpp"
 
 #include "renderer/techniques/g_buffer.hpp"
+#include "renderer/techniques/image_based_lighting.hpp"
 #include "renderer/techniques/imgui.hpp"
 #include "renderer/techniques/ocean.hpp"
 #include "renderer/techniques/tone_map.hpp"
@@ -55,6 +56,7 @@ private:
     Image m_shaded_geometry_render_target = {};
 
     techniques::G_Buffer m_g_buffer;
+    techniques::Image_Based_Lighting m_image_based_lighting;
     techniques::Imgui m_imgui;
     techniques::Ocean m_ocean;
     techniques::Tone_Map m_tone_map;

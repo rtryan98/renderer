@@ -8,6 +8,8 @@
 #include <TaskScheduler.h>
 #include <ankerl/unordered_dense.h>
 
+#include "asset_baker/hdr_image_loader.hpp"
+
 namespace asset_baker
 {
 
@@ -18,6 +20,8 @@ struct Asset_Bake_Context
     ankerl::unordered_dense::set<std::string> processed_hashes;
     // bool use_cache;
     enki::TaskScheduler task_scheduler;
+    bool enable_gltf_load;
+    bool enable_hdri_load;
 };
 
 void process_gltf(Asset_Bake_Context& context, const std::filesystem::path& input_file)
@@ -105,11 +109,32 @@ void process_gltf(Asset_Bake_Context& context, const std::filesystem::path& inpu
     }
 }
 
+void process_hdri(Asset_Bake_Context& context, const std::filesystem::path& input_file)
+{
+    spdlog::info("Processing HDRI file '{}'", input_file.string());
+    const auto image_data = load_radiance_hdr(input_file);
+    const auto outfile_path = context.output_directory.string()
+        + "/" + input_file.stem().string()
+        + serialization::TEXTURE_FILE_EXTENSION;
+
+    std::ofstream outfile(outfile_path, std::ios::binary | std::ios::out);
+    outfile.write(image_data.data(), static_cast<std::streamsize>(image_data.size()));
+    outfile.close();
+
+    spdlog::info("Successfully processed HDRI file '{}' and written it to '{}'",
+        input_file.string(),
+        outfile_path);
+}
+
 void process_file(Asset_Bake_Context& context, const std::filesystem::path& input_file)
 {
-    if (input_file.extension() == ".gltf")
+    if (context.enable_gltf_load && input_file.extension() == ".gltf")
     {
         process_gltf(context, input_file);
+    }
+    else if (context.enable_hdri_load && input_file.extension() == ".hdr")
+    {
+        process_hdri(context, input_file);
     }
 }
 
@@ -152,6 +177,18 @@ int32_t main(const int32_t argc, char** argv) try
     //     "If set, don't process resources that are already in 'output-dir'",
     //     false);
     // cmd.add(use_cache_arg);
+    TCLAP::SwitchArg enable_gltf_arg(
+        "",
+        "gltf",
+        "If set, allows GLTF processing",
+        false);
+    cmd.add(enable_gltf_arg);
+    TCLAP::SwitchArg enable_hdri_arg(
+        "",
+        "hdri",
+        "If set, allows HDRI processing",
+        false);
+    cmd.add(enable_hdri_arg);
     TCLAP::ValueArg<int32_t> log_level_arg(
         "l",
         "log-level",
@@ -168,7 +205,9 @@ int32_t main(const int32_t argc, char** argv) try
         .input_directory = input_directory_arg.getValue(),
         .output_directory = output_directory_arg.getValue(),
     //     .use_cache = use_cache_arg.getValue()
-        .task_scheduler = enki::TaskScheduler()
+        .task_scheduler = enki::TaskScheduler(),
+        .enable_gltf_load = enable_gltf_arg.getValue(),
+        .enable_hdri_load = enable_hdri_arg.getValue(),
     };
     asset_bake_context.task_scheduler.Initialize();
     asset_baker::process_files(asset_bake_context);

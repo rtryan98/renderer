@@ -36,10 +36,13 @@ set_target_properties(
 add_custom_command(
     TARGET asset_baker
     POST_BUILD
-    COMMAND $<TARGET_FILE:asset_baker> -i thirdparty/gltf-sample-assets/Models/ -o ${CMAKE_BINARY_DIR}/assets/cache
-    COMMAND $<TARGET_FILE:asset_baker> -i ${CMAKE_BINARY_DIR}/download/intel_sponza -o ${CMAKE_BINARY_DIR}/assets/cache
-    COMMAND $<TARGET_FILE:asset_baker> -i ${CMAKE_BINARY_DIR}/download/intel_sponza_curtains -o ${CMAKE_BINARY_DIR}/assets/cache
-    COMMAND $<TARGET_FILE:asset_baker> -i ${CMAKE_BINARY_DIR}/download/intel_sponza_ivy -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> --gltf -i thirdparty/gltf-sample-assets/Models/DamagedHelmet -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> --gltf -i thirdparty/gltf-sample-assets/Models/MetalRoughSpheres -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> --gltf -i thirdparty/gltf-sample-assets/Models/Sponza -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> --gltf -i ${CMAKE_BINARY_DIR}/download/intel_sponza -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> --gltf -i ${CMAKE_BINARY_DIR}/download/intel_sponza_curtains -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> --gltf -i ${CMAKE_BINARY_DIR}/download/intel_sponza_ivy -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> --hdri -i ${CMAKE_BINARY_DIR}/download/hdri -o ${CMAKE_BINARY_DIR}/assets/cache
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
 )
 # Asset baker is not supporting unicode right now.
@@ -63,6 +66,14 @@ core_download_and_extract_zip(
     ${CMAKE_BINARY_DIR}/download
     intel_sponza_ivy
 )
+if (NOT EXISTS ${CMAKE_BINARY_DIR}/download/hdri/lonely_road_afternoon_puresky_4k_hdri)
+    message(STATUS "Downloading https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/lonely_road_afternoon_puresky_4k.hdr to ${CMAKE_BINARY_DIR}/download/hdri/lonely_road_afternoon_puresky_4k.hdr.")
+    file(
+        DOWNLOAD
+        https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/lonely_road_afternoon_puresky_4k.hdr
+        ${CMAKE_BINARY_DIR}/download/hdri/lonely_road_afternoon_puresky_4k.hdr
+    )
+endif()
 
 add_executable(renderer)
 target_link_libraries(

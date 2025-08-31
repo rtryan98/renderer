@@ -49,6 +49,10 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         m_resource_blackboard,
         m_swapchain.get_width(),
         m_swapchain.get_height())
+    , m_image_based_lighting(
+        m_asset_repository,
+        m_gpu_transfer_context,
+        m_resource_blackboard)
     , m_imgui(
         m_asset_repository,
         m_gpu_transfer_context,
@@ -132,6 +136,9 @@ void Renderer::render(
 {
     Resource_State_Tracker tracker;
 
+    m_image_based_lighting.equirectangular_to_cubemap(
+        cmd,
+        tracker);
     m_ocean.simulate(
         cmd,
         tracker,
@@ -146,6 +153,12 @@ void Renderer::render(
         tracker,
         m_camera_buffer,
         m_shaded_geometry_render_target);
+    m_image_based_lighting.skybox_render(
+        cmd,
+        tracker,
+        m_camera_buffer,
+        m_shaded_geometry_render_target,
+        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
     m_ocean.opaque_forward_pass(
         cmd,
         tracker,
