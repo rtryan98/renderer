@@ -12,7 +12,6 @@ struct Imgui_Push_Constants
     float top;
     float right;
     float bottom;
-    uint vertex_offset;
 };
 
 struct Imgui_Vert

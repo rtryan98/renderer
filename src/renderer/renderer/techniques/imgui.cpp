@@ -117,7 +117,6 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
         float top;
         float right;
         float bottom;
-        uint32_t vertex_offset;
     };
 
     std::size_t vertex_copy_offset = 0;
@@ -139,12 +138,22 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
         index_copy_offset += draw_list->IdxBuffer.Size * sizeof(ImDrawIdx);
     }
 
-    setup_render_state(cmd, target);
-
     const float left = draw_data->DisplayPos.x;
     const float top = draw_data->DisplayPos.y;
     const float right = draw_data->DisplayPos.x + draw_data->DisplaySize.x;
     const float bottom = draw_data->DisplayPos.y + draw_data->DisplaySize.y;
+
+    setup_render_state(cmd, target);
+    Imgui_Push_Constants push_consts = {
+        .vertex_buffer = m_vertex_buffer,
+        .texture = static_cast<uint32_t>(draw_data->CmdLists[0]->CmdBuffer[0].GetTexID()),
+        .sampler = m_texture_sampler,
+        .left = left,
+        .top = top,
+        .right = right,
+        .bottom = bottom
+    };
+    cmd->set_push_constants(push_consts, rhi::Pipeline_Bind_Point::Graphics);
 
     auto global_vertex_offset = 0;
     auto global_index_offset = 0;
@@ -160,6 +169,16 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
                 if (imgui_cmd.UserCallback == ImDrawCallback_ResetRenderState)
                 {
                     setup_render_state(cmd, target);
+                    push_consts = {
+                        .vertex_buffer = m_vertex_buffer,
+                        .texture = static_cast<uint32_t>(imgui_cmd.GetTexID()),
+                        .sampler = m_texture_sampler,
+                        .left = left,
+                        .top = top,
+                        .right = right,
+                        .bottom = bottom
+                    };
+                    cmd->set_push_constants(push_consts, rhi::Pipeline_Bind_Point::Graphics);
                 }
                 else
                 {
@@ -176,24 +195,12 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
                     continue;
                 }
 
-                // TODO: only send changed data
-                Imgui_Push_Constants push_consts = {
-                    .vertex_buffer = m_vertex_buffer,
-                    .texture = static_cast<uint32_t>(imgui_cmd.GetTexID()),
-                    .sampler = m_texture_sampler,
-                    .left = left,
-                    .top = top,
-                    .right = right,
-                    .bottom = bottom,
-                    .vertex_offset = imgui_cmd.VtxOffset + global_vertex_offset
-                };
-                cmd->set_push_constants(push_consts, rhi::Pipeline_Bind_Point::Graphics);
                 cmd->set_scissor(clip_min.x, clip_min.y, clip_max.x - clip_min.x, clip_max.y - clip_min.y);
                 cmd->draw_indexed(
                     imgui_cmd.ElemCount,
                     1,
                     imgui_cmd.IdxOffset + global_index_offset,
-                    0,
+                    imgui_cmd.VtxOffset + global_vertex_offset,
                     0);
             }
         }
