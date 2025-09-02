@@ -22,7 +22,8 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         .graphics_api = rhi::Graphics_API::D3D12,
         .enable_validation = create_info.enable_validation,
         .enable_gpu_validation = create_info.enable_gpu_validation,
-        .enable_locking = true
+        .enable_locking = false,
+        .reserved_bindless_resource_index_count = 1000
         }))
     , m_swapchain(m_device->create_swapchain({
         .hwnd = m_window->get_native_handle(),

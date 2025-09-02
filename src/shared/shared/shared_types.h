@@ -11,6 +11,9 @@
     #ifndef SHADER_ENUM_CLASS
         #define SHADER_ENUM_CLASS class
     #endif
+    #ifndef SHADER_CONSTEXPR
+        #define SHADER_CONSTEXPR constexpr
+    #endif
     // Bindless
     #ifndef SHADER_HANDLE_TYPE
         #define SHADER_HANDLE_TYPE uint32_t
@@ -59,6 +62,9 @@
     // Utilities
     #ifndef SHADER_ENUM_CLASS
         #define SHADER_ENUM_CLASS
+    #endif
+    #ifndef SHADER_CONSTEXPR
+        #define SHADER_CONSTEXPR const
     #endif
     // Bindless
     #ifndef SHADER_HANDLE_TYPE

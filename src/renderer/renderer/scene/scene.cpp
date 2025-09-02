@@ -13,6 +13,8 @@
 
 #include "renderer/render_resource_blackboard.hpp"
 
+#include <shared/shared_resources.h>
+
 namespace ren
 {
 constexpr static auto DEFAULT_SAMPLER_CREATE_INFO = rhi::Sampler_Create_Info {
@@ -418,16 +420,16 @@ Static_Scene_Data::Static_Scene_Data(
         .size = INDEX_BUFFER_SIZE,
         .heap = rhi::Memory_Heap_Type::GPU
     };
-    m_global_index_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+    m_global_index_buffer = graphics_device->create_buffer(buffer_create_info, REN_GLOBAL_INDEX_BUFFER).value_or(nullptr);
     m_graphics_device->name_resource(m_global_index_buffer, "scene:global_index_buffer");
     buffer_create_info.size = INSTANCE_TRANSFORM_BUFFER_SIZE;
-    m_transform_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+    m_transform_buffer = graphics_device->create_buffer(buffer_create_info, REN_GLOBAL_INSTANCE_TRANSFORM_BUFFER).value_or(nullptr);
     m_graphics_device->name_resource(m_transform_buffer, "scene:instance_transform_buffer");
     buffer_create_info.size = MATERIAL_INSTANCE_BUFFER_SIZE;
-    m_material_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+    m_material_buffer = graphics_device->create_buffer(buffer_create_info, REN_GLOBAL_MATERIAL_INSTANCE_BUFFER).value_or(nullptr);
     m_graphics_device->name_resource(m_material_buffer, "scene:material_instance_buffer");
     buffer_create_info.size = INSTANCE_INDICES_BUFFER_SIZE;
-    m_instance_buffer = graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+    m_instance_buffer = graphics_device->create_buffer(buffer_create_info, REN_GLOBAL_INSTANCE_INDICES_BUFFER).value_or(nullptr);
     m_graphics_device->name_resource(m_instance_buffer, "scene:instance_indices_buffer");
 
     create_default_images();

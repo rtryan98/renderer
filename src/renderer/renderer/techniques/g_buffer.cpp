@@ -166,10 +166,7 @@ void G_Buffer::render_scene_cpu(
                 cmd->set_push_constants<Immediate_Draw_Push_Constants>({
                     .position_buffer = model->vertex_positions->buffer_view->bindless_index,
                     .attribute_buffer = model->vertex_attributes->buffer_view->bindless_index,
-                    .camera_buffer = camera,
-                    .instance_indices_buffer = scene_data.get_instance_buffer()->buffer_view->bindless_index,
-                    .instance_transform_buffer = scene_data.get_transform_buffer()->buffer_view->bindless_index,
-                    .material_instance_buffer = scene_data.get_material_buffer()->buffer_view->bindless_index,
+                    .camera_buffer = camera
                 }, rhi::Pipeline_Bind_Point::Graphics);
 
                 cmd->draw_indexed(

@@ -1,5 +1,6 @@
 #include "shared/camera_shared_types.h"
 #include "shared/draw_shared_types.h"
+#include "shared/shared_resources.h"
 #include "rhi/bindless.hlsli"
 #include "draw/basic_draw.hlsli"
 
@@ -19,9 +20,9 @@ VS_Out main(uint vertex_id : SV_VertexID, uint vertex_offset : SV_StartVertexLoc
 
     GPU_Camera_Data camera = rhi::uni::buf_load<GPU_Camera_Data>(pc.camera_buffer);
     GPU_Instance_Indices instance_indices =
-        rhi::uni::buf_load_arr<GPU_Instance_Indices>(pc.instance_indices_buffer, instance_index);
+        rhi::uni::buf_load_arr<GPU_Instance_Indices>(REN_GLOBAL_INSTANCE_INDICES_BUFFER, instance_index);
     GPU_Instance_Transform_Data instance_transform =
-        rhi::uni::buf_load_arr<GPU_Instance_Transform_Data>(pc.instance_transform_buffer, instance_indices.transform_index);
+        rhi::uni::buf_load_arr<GPU_Instance_Transform_Data>(REN_GLOBAL_INSTANCE_TRANSFORM_BUFFER, instance_indices.transform_index);
 
     float4 vertex_pos = float4(rhi::uni::buf_load_arr<float3>(pc.position_buffer, vertex_index), 1.0);
     vertex_pos = mul(camera.world_to_clip, mul(instance_transform.mesh_to_world, vertex_pos));

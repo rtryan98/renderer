@@ -149,9 +149,6 @@ public:
     [[nodiscard]] auto& get_models() const noexcept { return m_models; }
     [[nodiscard]] auto& get_instances() const noexcept { return m_model_Instances; }
     [[nodiscard]] auto* get_index_buffer() const noexcept { return m_global_index_buffer; }
-    [[nodiscard]] auto* get_transform_buffer() const noexcept { return m_transform_buffer; }
-    [[nodiscard]] auto* get_material_buffer() const noexcept { return m_material_buffer; }
-    [[nodiscard]] auto* get_instance_buffer() const noexcept { return m_instance_buffer; }
 
 private:
     uint32_t acquire_instance_index();
