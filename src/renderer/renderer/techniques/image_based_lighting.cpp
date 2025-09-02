@@ -33,7 +33,7 @@ Image_Based_Lighting::Image_Based_Lighting(
     m_gpu_transfer_context.enqueue_immediate_upload(m_hdri, &image_data);
 
     uint32_t size = std::min(hdri_create_info.width, hdri_create_info.height);
-    const rhi::Image_Create_Info cubemap_create_info = {
+    rhi::Image_Create_Info cubemap_create_info = {
         .format = hdri_texture->format,
         .width = size,
         .height = size,
@@ -44,24 +44,25 @@ Image_Based_Lighting::Image_Based_Lighting(
         .primary_view_type = rhi::Image_View_Type::Texture_Cube
     };
     m_cubemap = render_resource_blackboard.create_image(CUBEMAP_TEXTURE_NAME, cubemap_create_info);
+
+    // cubemap_create_info.format = rhi::Image_Format::R16G16B16A16_SFLOAT;
+    // const auto mip_level_count = std::countr_zero(size);
+    // cubemap_create_info.mip_levels = mip_level_count >> 4; // Need size of at least 16x16 for the compute shaders
+    m_prefiltered_cubemap = render_resource_blackboard.create_image(PREFILTERED_CUBEMAP_TEXTURE_NAME, cubemap_create_info);
 }
 
 Image_Based_Lighting::~Image_Based_Lighting()
-{}
+{
+    m_render_resource_blackboard.destroy_image(m_hdri);
+    m_render_resource_blackboard.destroy_image(m_cubemap);
+    m_render_resource_blackboard.destroy_image(m_prefiltered_cubemap);
+}
 
 void Image_Based_Lighting::equirectangular_to_cubemap(rhi::Command_List* cmd, Resource_State_Tracker& tracker)
 {
-    static bool first_frame = true;
-    if (!first_frame)
-    {
-        first_frame = false;
-        // return;
-    }
-    cmd->begin_debug_region("image_based_lighting:equirectangular_to_cubemap", 0.1f, 0.25f, 0.1f);
+    cmd->begin_debug_region("image_based_lighting:bake:equirectangular_to_cubemap", 0.1f, 0.25f, 0.1f);
     const auto cube_width = m_cubemap.get_create_info().width;
     const auto cube_height = m_cubemap.get_create_info().height;
-    const auto hdri_width = m_hdri.get_create_info().width;
-    const auto hdri_height = m_hdri.get_create_info().height;
     const auto pipeline = m_asset_repository.get_compute_pipeline("equirectangular_to_cubemap");
     tracker.use_resource(m_hdri,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
@@ -100,6 +101,68 @@ void Image_Based_Lighting::equirectangular_to_cubemap(rhi::Command_List* cmd, Re
         rhi::Barrier_Image_Layout::Shader_Read_Only);
     tracker.flush_barriers(cmd);
     cmd->end_debug_region();
+}
+
+void Image_Based_Lighting::prefilter_diffuse_irradiance(rhi::Command_List* cmd, Resource_State_Tracker& tracker)
+{
+    cmd->begin_debug_region("image_based_lighting:bake:prefilter_diffuse_irradiance", 0.1f, 0.25f, 0.1f);
+
+    const auto cube_width = m_prefiltered_cubemap.get_create_info().width;
+    const auto cube_height = m_prefiltered_cubemap.get_create_info().height;
+    const auto pipeline = m_asset_repository.get_compute_pipeline("ibl_prefilter_diffuse");
+    tracker.use_resource(m_prefiltered_cubemap,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Write,
+        rhi::Barrier_Image_Layout::Unordered_Access);
+    tracker.flush_barriers(cmd);
+    cmd->set_pipeline(pipeline);
+    cmd->set_push_constants<Prefilter_Diffuse_Irradiance_Push_Constants>({
+        .image_size = { cube_width, cube_height },
+        .source_cubemap = m_cubemap,
+        .cubemap_sampler = m_render_resource_blackboard.get_sampler({
+            .filter_min = rhi::Sampler_Filter::Linear,
+            .filter_mag = rhi::Sampler_Filter::Linear,
+            .filter_mip = rhi::Sampler_Filter::Linear,
+            .address_mode_u = rhi::Image_Sample_Address_Mode::Wrap,
+            .address_mode_v = rhi::Image_Sample_Address_Mode::Wrap,
+            .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
+            .mip_lod_bias = 0.0f,
+            .max_anisotropy = 0,
+            .comparison_func = rhi::Comparison_Func::None,
+            .reduction = rhi::Sampler_Reduction_Type::Standard,
+            .min_lod = 0.0,
+            .max_lod = 0.0,
+            .anisotropy_enable = false
+        }),
+        .target_cubemap = m_prefiltered_cubemap,
+    }, rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(cube_width / pipeline.get_group_size_x(), cube_height / pipeline.get_group_size_y(), 6);
+    tracker.use_resource(m_prefiltered_cubemap,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Shader_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
+    tracker.flush_barriers(cmd);
+
+    cmd->end_debug_region();
+}
+
+void Image_Based_Lighting::bake(rhi::Command_List* cmd, Resource_State_Tracker& tracker)
+{
+    if (m_baked)
+    {
+        return;
+    }
+
+    cmd->begin_debug_region("image_based_lighting:bake", 0.25f, 0.25f, 0.25f);
+    equirectangular_to_cubemap(
+        cmd,
+        tracker);
+    prefilter_diffuse_irradiance(
+        cmd,
+        tracker);
+    cmd->end_debug_region();
+
+    m_baked = true;
 }
 
 void Image_Based_Lighting::skybox_render(

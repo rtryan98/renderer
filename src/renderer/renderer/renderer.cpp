@@ -136,7 +136,7 @@ void Renderer::render(
 {
     Resource_State_Tracker tracker;
 
-    m_image_based_lighting.equirectangular_to_cubemap(
+    m_image_based_lighting.bake(
         cmd,
         tracker);
     m_ocean.simulate(

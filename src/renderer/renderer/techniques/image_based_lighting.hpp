@@ -20,6 +20,7 @@ class Image_Based_Lighting
 public:
     constexpr static auto HDRI_TEXTURE_NAME = "image_based_lighting:hdri_texture";
     constexpr static auto CUBEMAP_TEXTURE_NAME = "image_based_lighting:cubemap_texture";
+    constexpr static auto PREFILTERED_CUBEMAP_TEXTURE_NAME = "image_based_lighting:prefiltered_cubemap_texture";
 
     Image_Based_Lighting(Asset_Repository& asset_repository,
         GPU_Transfer_Context& gpu_transfer_context,
@@ -31,7 +32,7 @@ public:
     Image_Based_Lighting(Image_Based_Lighting&&) = delete;
     Image_Based_Lighting& operator=(Image_Based_Lighting&&) = delete;
 
-    void equirectangular_to_cubemap(
+    void bake(
         rhi::Command_List* cmd,
         Resource_State_Tracker& tracker);
 
@@ -49,6 +50,18 @@ private:
 
     Image m_hdri = {};
     Image m_cubemap = {};
+    Image m_prefiltered_cubemap = {};
+
+    bool m_baked = false;
+
+private:
+    void equirectangular_to_cubemap(
+        rhi::Command_List* cmd,
+        Resource_State_Tracker& tracker);
+
+    void prefilter_diffuse_irradiance(
+        rhi::Command_List* cmd,
+        Resource_State_Tracker& tracker);
 };
 }
 }
