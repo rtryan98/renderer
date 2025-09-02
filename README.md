@@ -43,12 +43,16 @@ This project is licensed under the MIT license.
 
 Beyond this, it also makes use of several third party libraries and assets, each of which have their respective licensing information stored in their repositories.
 Currently the following third party libraries and assets are used:
+- [Dear Imgui](https://github.com/ocornut/imgui)
 - [enkiTS](https://github.com/dougbinks/enkiTS)
 - [fastgltf](https://github.com/spnda/fastgltf)
+- [glm](https://github.com/g-truc/glm)
 - [glTF-Sample-Assets](https://github.com/KhronosGroup/glTF-Sample-Assets)
-- [Dear Imgui](https://github.com/ocornut/imgui)
 - [MikkTSpace](https://github.com/mmikk/MikkTSpace)
+- [OffsetAllocator](https://github.com/sebbbi/OffsetAllocator)
 - [RHI](https://github.com/rtryan98/rhi)
+- [RobotoMono](https://github.com/googlefonts/RobotoMono)
+- [SDL3](https://github.com/libsdl-org/SDL)
 - [spdlog](https://github.com/gabime/spdlog)
 - [stb](https://github.com/nothings/stb)
 - [tclap](https://github.com/mirror/tclap)
