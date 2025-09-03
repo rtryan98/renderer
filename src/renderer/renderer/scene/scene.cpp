@@ -282,6 +282,29 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
     }
 }
 
+void Static_Scene_Data::update_lights()
+{
+    // TODO: this is for testing
+    m_punctual_lights.resize(1);
+    m_punctual_lights[0] = {
+        .disabled = false,
+        .type = static_cast<uint32_t>(Light_Type::Directional),
+        .color = glm::packUnorm4x8(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)) >> 8,
+        .intensity = 2.5f,
+        .position = glm::vec3(0.0f, 0.0f, 0.0f),
+        .direction = glm::normalize(glm::vec3(-0.8f, -0.8f, -1.0f)),
+        .arguments = glm::vec2(0.0f, 0.0f),
+    };
+
+    m_gpu_transfer_context.enqueue_immediate_upload(m_light_buffer, m_punctual_lights.data(), sizeof(Punctual_Light), 0);
+
+    Scene_Info scene_info = {
+        .light_count = static_cast<uint32_t>(m_punctual_lights.size())
+    };
+
+    m_gpu_transfer_context.enqueue_immediate_upload(m_scene_info_buffer, &scene_info, sizeof(Scene_Info), 0);
+}
+
 uint32_t Static_Scene_Data::acquire_instance_index()
 {
     const auto val = m_instance_freelist.back();
@@ -431,6 +454,12 @@ Static_Scene_Data::Static_Scene_Data(
     buffer_create_info.size = INSTANCE_INDICES_BUFFER_SIZE;
     m_instance_buffer = graphics_device->create_buffer(buffer_create_info, REN_GLOBAL_INSTANCE_INDICES_BUFFER).value_or(nullptr);
     m_graphics_device->name_resource(m_instance_buffer, "scene:instance_indices_buffer");
+    buffer_create_info.size = LIGHT_BUFFER_SIZE;
+    m_light_buffer = graphics_device->create_buffer(buffer_create_info, REN_GLOBAL_LIGHT_LIST_BUFFER).value_or(nullptr);
+    m_graphics_device->name_resource(m_light_buffer, "scene:light_list_buffer");
+    buffer_create_info.size = sizeof(Scene_Info);
+    m_scene_info_buffer = graphics_device->create_buffer(buffer_create_info, REN_GLOBAL_SCENE_INFORMATION_BUFFER).value_or(nullptr);
+    graphics_device->name_resource(m_scene_info_buffer, "scene:scene_info_buffer");
 
     create_default_images();
 
@@ -458,6 +487,8 @@ Static_Scene_Data::~Static_Scene_Data()
     m_graphics_device->destroy_buffer(m_transform_buffer);
     m_graphics_device->destroy_buffer(m_material_buffer);
     m_graphics_device->destroy_buffer(m_instance_buffer);
+    m_graphics_device->destroy_buffer(m_light_buffer);
+    m_graphics_device->destroy_buffer(m_scene_info_buffer);
     m_graphics_device->destroy_image(m_default_albedo_tex);
     m_graphics_device->destroy_image(m_default_normal_tex);
     m_graphics_device->destroy_image(m_default_metallic_roughness_tex);

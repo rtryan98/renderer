@@ -6,6 +6,7 @@
 #include <string>
 #include <rhi/resource.hpp>
 #include <shared/draw_shared_types.h>
+#include <shared/scene_shared_types.h>
 #include <offsetAllocator.hpp>
 
 #include "ankerl/unordered_dense.h"
@@ -125,10 +126,12 @@ public:
     constexpr static auto MAX_TRANSFORMS = 1 << 20; // ~1M transforms (meshes)
     constexpr static auto MAX_MATERIALS = 1 << 17; // 128k Materials
     constexpr static auto MAX_INSTANCES = 1 << 22; // ~4M instances
+    constexpr static auto MAX_LIGHTS = 1 << 10; // 1024 lights
 
     constexpr static auto INSTANCE_TRANSFORM_BUFFER_SIZE = sizeof(GPU_Instance_Transform_Data) * MAX_TRANSFORMS;
     constexpr static auto MATERIAL_INSTANCE_BUFFER_SIZE = sizeof(GPU_Material) * MAX_MATERIALS;
     constexpr static auto INSTANCE_INDICES_BUFFER_SIZE = sizeof(GPU_Instance_Indices) * MAX_INSTANCES;
+    constexpr static auto LIGHT_BUFFER_SIZE = sizeof(Punctual_Light) * MAX_LIGHTS;
 
     Static_Scene_Data(
         rhi::Graphics_Device* graphics_device,
@@ -145,10 +148,11 @@ public:
 
     void add_model(const Model_Descriptor& model_descriptor);
 
-    // TODO: those should be const but rhi::Array_Vector currently has no const iterator
     [[nodiscard]] auto& get_models() const noexcept { return m_models; }
     [[nodiscard]] auto& get_instances() const noexcept { return m_model_Instances; }
     [[nodiscard]] auto* get_index_buffer() const noexcept { return m_global_index_buffer; }
+
+    void update_lights();
 
 private:
     uint32_t acquire_instance_index();
@@ -176,12 +180,15 @@ private:
 
     plf::colony<Model> m_models = {};
     plf::colony<Model_Instance> m_model_Instances = {};
+    std::vector<Punctual_Light> m_punctual_lights = {};
 
     ankerl::unordered_dense::map<std::string, rhi::Image*> m_images = {};
     rhi::Buffer* m_global_index_buffer = nullptr;
     rhi::Buffer* m_transform_buffer = nullptr;
     rhi::Buffer* m_material_buffer = nullptr;
     rhi::Buffer* m_instance_buffer = nullptr;
+    rhi::Buffer* m_light_buffer = nullptr;
+    rhi::Buffer* m_scene_info_buffer = nullptr;
 
     rhi::Image* m_default_albedo_tex = nullptr;
     rhi::Image* m_default_normal_tex = nullptr;

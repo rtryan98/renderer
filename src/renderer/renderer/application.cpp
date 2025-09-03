@@ -228,6 +228,7 @@ void Application::process_gui() noexcept
 
 void Application::update(double t, double dt) noexcept
 {
+    m_static_scene_data->update_lights();
     m_renderer.update(*m_input_state, t, dt);
 }
 

@@ -7,44 +7,9 @@
 #include "common/pbr/pbr.hlsli"
 #include "common/color/color_spaces.hlsli"
 
+#include "common/pbr/lighting.hlsli"
+
 DECLARE_PUSH_CONSTANTS(Ocean_Render_Patch_Push_Constants, pc);
-
-struct Surface
-{
-    float3 albedo;
-    float3 normal;
-    float metallic;
-    float roughness;
-};
-
-struct Directional_Light
-{
-    float3 color;
-    float3 direction;
-};
-
-// All vectors and directions are in WORLD SPACE.
-float3 evaluate_light(Directional_Light light, float3 V, Surface surface)
-{
-    float3 L = light.direction;
-    float3 N = surface.normal;
-    float3 H = normalize(L + V);
-
-    float NdotL = saturate(dot(N, L));
-    float NdotV = saturate(dot(N, V));
-    float NdotH = saturate(dot(N, H));
-    float VdotH = saturate(dot(V, H));
-
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), surface.albedo, surface.metallic);
-    float3 kd = lerp(1.0 - ren::pbr::F_SphericalGaussian(VdotH, F0), 0.0, surface.metallic);
-    float3 diffuse = kd * ren::pbr::BRDF_Diffuse_Lambert(surface.albedo);
-    float3 specular = ren::pbr::BRDF_Specular_CookTorrance(NdotL, NdotV, NdotH, VdotH, surface.roughness, F0);
-
-    if (NdotL > 0.0) // ignore all divisions by 0
-        return (diffuse + specular) * NdotL * light.color;
-    else
-        return 0.0;
-}
 
 float4 main(PS_In ps_in) : SV_Target
 {
@@ -64,8 +29,9 @@ float4 main(PS_In ps_in) : SV_Target
 
     float jacobian = calculate_det_jacobian(x_dx, y_dx, y_dx, y_dy);
 
-    float3 diffuse_color = float3(0.02352941176, 0.25882352941, 0.45098039215);
-    Surface surface;
+    float3 diffuse_color = float3(0.11952194901, 0.24474843921, 0.42706129019);
+    ren::pbr::Surface surface;
+    surface.position = ps_in.position_ws.xyz;
     surface.albedo = ren::color::spaces::Rec709_Rec2020(diffuse_color);
     surface.normal = calculate_normals(calculate_slope(z_dx, z_dy, x_dx, y_dy));
     surface.metallic = 0.0625;
@@ -79,12 +45,7 @@ float4 main(PS_In ps_in) : SV_Target
 
     float3 V = normalize(float3(ps_in.position_camera.xyz - ps_in.position_ws.xyz));
 
-    Directional_Light light;
-    light.color = 2.5;
-    light.direction = normalize(float3(0.8, 0.8, 1.0));
+    float3 color = ren::pbr::evaluate_lights(V, surface);
 
-    float3 direct = evaluate_light(light, V, surface);
-    float3 ambient = surface.albedo * 0.1;
-
-    return float4(direct + ambient, 1.0);
+    return float4(color, 1.0);
 }
