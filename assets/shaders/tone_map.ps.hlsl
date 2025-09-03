@@ -51,6 +51,10 @@ float4 main(PS_In ps_in) : SV_Target
     }
     else
     {
+        // Colors are in Rec.2020 so we need to convert them back to Rec.709.
+        // Clipping should be acceptable so long as the image was properly exposed, as the tone mapper does a color volume transform.
+        // TODO: if clipping looks bad, implement gamut compression.
+        color.xyz = saturate(ren::color::spaces::Rec2020_Rec709(color.xyz));
         color.xyz = ren::color::transfer_functions::IEOTF_sRGB(color.xyz);
     }
 
