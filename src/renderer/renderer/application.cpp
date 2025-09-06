@@ -6,8 +6,13 @@
 
 #include "imgui/imgui_util.hpp"
 
+#include <shared/shared_resources.h>
+
 namespace ren
 {
+static const uint32_t RESERVED_BINDLESS_RESOURCE_COUNT = 1000;
+static const uint32_t RESERVED_BINDLESS_SAMPLER_COUNT = 20;
+
 Application::Application(const Application_Create_Info& create_info) noexcept
     : m_logger(std::make_shared<Logger>())
     , m_window(Window::create({
@@ -23,7 +28,8 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         .enable_validation = create_info.enable_validation,
         .enable_gpu_validation = create_info.enable_gpu_validation,
         .enable_locking = false,
-        .reserved_bindless_resource_index_count = 1000
+        .reserved_bindless_resource_index_count = RESERVED_BINDLESS_RESOURCE_COUNT,
+        .reserved_bindless_sampler_index_count = RESERVED_BINDLESS_SAMPLER_COUNT
         }))
     , m_swapchain(m_device->create_swapchain({
         .hwnd = m_window->get_native_handle(),
@@ -74,6 +80,60 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         frame.compute_command_pool = m_device->create_command_pool({ .queue_type = rhi::Queue_Type::Compute });
         frame.copy_command_pool = m_device->create_command_pool({ .queue_type = rhi::Queue_Type::Copy });
     }
+
+    m_predefined_samplers.reserve(RESERVED_BINDLESS_SAMPLER_COUNT);
+    rhi::Sampler_Create_Info sampler_create_info = {
+        .mip_lod_bias = 0.0f,
+        .max_anisotropy = 16,
+        .comparison_func = rhi::Comparison_Func::None,
+        .reduction = rhi::Sampler_Reduction_Type::Standard,
+        .border_color = {},
+        .min_lod = 0.0f,
+        .max_lod = 128.0f,
+        .anisotropy_enable = false
+    };
+    auto set_sampler_filter = [&](const rhi::Sampler_Filter filter)
+    {
+        sampler_create_info.filter_min = filter;
+        sampler_create_info.filter_mag = filter;
+        sampler_create_info.filter_mip = filter;
+    };
+    auto set_sampler_address_mode = [&](const rhi::Image_Sample_Address_Mode address_mode)
+    {
+        sampler_create_info.address_mode_u = address_mode;
+        sampler_create_info.address_mode_v = address_mode;
+        sampler_create_info.address_mode_w = address_mode;
+    };
+
+    set_sampler_filter(rhi::Sampler_Filter::Nearest);
+    set_sampler_address_mode(rhi::Image_Sample_Address_Mode::Wrap);
+    m_predefined_samplers.push_back(m_device->create_sampler(sampler_create_info, REN_SAMPLER_NEAREST_WRAP).value_or(nullptr));
+
+    set_sampler_address_mode(rhi::Image_Sample_Address_Mode::Mirror);
+    m_predefined_samplers.push_back(m_device->create_sampler(sampler_create_info, REN_SAMPLER_NEAREST_MIRROR).value_or(nullptr));
+
+    set_sampler_address_mode(rhi::Image_Sample_Address_Mode::Clamp);
+    m_predefined_samplers.push_back(m_device->create_sampler(sampler_create_info, REN_SAMPLER_NEAREST_CLAMP).value_or(nullptr));
+
+    set_sampler_filter(rhi::Sampler_Filter::Linear);
+    set_sampler_address_mode(rhi::Image_Sample_Address_Mode::Wrap);
+    m_predefined_samplers.push_back(m_device->create_sampler(sampler_create_info, REN_SAMPLER_LINEAR_WRAP).value_or(nullptr));
+
+    set_sampler_address_mode(rhi::Image_Sample_Address_Mode::Mirror);
+    m_predefined_samplers.push_back(m_device->create_sampler(sampler_create_info, REN_SAMPLER_LINEAR_MIRROR).value_or(nullptr));
+
+    set_sampler_address_mode(rhi::Image_Sample_Address_Mode::Clamp);
+    m_predefined_samplers.push_back(m_device->create_sampler(sampler_create_info, REN_SAMPLER_LINEAR_CLAMP).value_or(nullptr));
+
+    sampler_create_info.anisotropy_enable = true;
+    set_sampler_address_mode(rhi::Image_Sample_Address_Mode::Wrap);
+    m_predefined_samplers.push_back(m_device->create_sampler(sampler_create_info, REN_SAMPLER_ANISO_WRAP).value_or(nullptr));
+
+    set_sampler_address_mode(rhi::Image_Sample_Address_Mode::Mirror);
+    m_predefined_samplers.push_back(m_device->create_sampler(sampler_create_info, REN_SAMPLER_ANISO_MIRROR).value_or(nullptr));
+
+    set_sampler_address_mode(rhi::Image_Sample_Address_Mode::Clamp);
+    m_predefined_samplers.push_back(m_device->create_sampler(sampler_create_info, REN_SAMPLER_ANISO_CLAMP).value_or(nullptr));
 
     m_logger->info("Finished initializing.");
 }

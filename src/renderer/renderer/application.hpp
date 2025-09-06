@@ -81,5 +81,7 @@ private:
     Renderer m_renderer;
     bool m_is_running;
     ImGui_Data m_imgui_data = {};
+
+    std::vector<rhi::Sampler*> m_predefined_samplers;
 };
 }

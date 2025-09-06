@@ -6,6 +6,7 @@
 
 #include <shared/serialized_asset_formats.hpp>
 #include <shared/ibl_shared_types.h>
+#include <shared/shared_resources.h>
 
 namespace ren::techniques
 {
@@ -48,7 +49,8 @@ Image_Based_Lighting::Image_Based_Lighting(
     // cubemap_create_info.format = rhi::Image_Format::R16G16B16A16_SFLOAT;
     // const auto mip_level_count = std::countr_zero(size);
     // cubemap_create_info.mip_levels = mip_level_count >> 4; // Need size of at least 16x16 for the compute shaders
-    m_prefiltered_cubemap = render_resource_blackboard.create_image(PREFILTERED_CUBEMAP_TEXTURE_NAME, cubemap_create_info);
+    cubemap_create_info.width = cubemap_create_info.height = 512;
+    m_prefiltered_cubemap = render_resource_blackboard.create_image(PREFILTERED_CUBEMAP_TEXTURE_NAME, cubemap_create_info, REN_LIGHTING_DIFFUSE_IRRADIANCE_CUBEMAP);
 }
 
 Image_Based_Lighting::~Image_Based_Lighting()

@@ -53,6 +53,8 @@ float3 F_SphericalGaussian(float VdotH, float3 F0)
 
 float3 BRDF_Diffuse_Lambert(float3 albedo)
 {
+    // No scaling by 1/pi.
+    // https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
     return albedo;
 }
 

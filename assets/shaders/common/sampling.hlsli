@@ -25,38 +25,26 @@ float2 Hammersley(uint i, uint sample_count)
 float3 hemisphere_uniform(uint i, uint sample_count)
 {
     float2 xi = sequences::Hammersley(i, sample_count);
-    float phi = xi.x * ren::TWO_PI;
-    float cos_theta = 1.0 - xi.y;
-    float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
-    float3 result = float3(0.0, 0.0, cos_theta);
-    sincos(phi, result.y, result.x);
-    result.xy *= sin_theta;
-    return result;
+    float phi = ren::TWO_PI * xi.x;
+    float theta = acos(1.0 - xi.y);
+    return float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
 }
 
 float3 hemisphere_cosine_weighted(uint i, uint sample_count)
 {
     float2 xi = sequences::Hammersley(i, sample_count);
-    float phi = xi.x * ren::TWO_PI;
-    float cos_theta = sqrt(1.0 - xi.y);
-    float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
-    float3 result = float3(0.0, 0.0, cos_theta);
-    sincos(phi, result.y, result.x);
-    result.xy *= sin_theta;
-    return result;
+    float phi = ren::TWO_PI * xi.x;
+    float theta = asin(sqrt(xi.y));
+    return float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
 }
 
 float3 hemisphere_ggx(uint i, uint sample_count, float roughness)
 {
     float alpha = roughness * roughness;
     float2 xi = sequences::Hammersley(i, sample_count);
-    float phi = xi.x * ren::TWO_PI;
-    float cos_theta = sqrt((1.0 - xi.y) / (1.0 + (alpha * alpha - 1.0) * xi.y));
-    float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
-    float3 result = float3(0.0, 0.0, cos_theta);
-    sincos(phi, result.y, result.x);
-    result.xy *= sin_theta;
-    return result;
+    float phi = ren::TWO_PI * xi.x;
+    float theta = acos(sqrt( (1.0 - xi.y) / ( 1.0 + (alpha*alpha - 1) * xi.y )));
+    return float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
 }
 
 } // namespace sampling

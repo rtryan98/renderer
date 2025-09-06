@@ -18,6 +18,15 @@ struct Prefilter_Diffuse_Irradiance_Push_Constants
     SHADER_HANDLE_TYPE target_cubemap;
 };
 
+struct Prefilter_Specular_Irradiance_Push_Constants
+{
+    uint2 image_size;
+    SHADER_HANDLE_TYPE source_cubemap;
+    SHADER_HANDLE_TYPE cubemap_sampler;
+    SHADER_HANDLE_TYPE target_cubemap;
+    float roughness;
+};
+
 struct Skybox_Push_Constants
 {
     uint2 image_size;

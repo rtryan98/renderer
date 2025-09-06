@@ -23,7 +23,7 @@ void main(uint3 id : SV_DispatchThreadID)
     direction = normalize(direction);
     float depth = rhi::uni::tex_load<float>(pc.depth_buffer, id.xy);
     float4 color = rhi::uni::tex_sample_level_cube<float4>(pc.cubemap, pc.cubemap_sampler, direction.xyz, 0.0);
-    if (depth > 0.9999)
+    if (depth == 1.0)
     {
         rhi::uni::tex_store(pc.target_image, id.xy, color);
     }

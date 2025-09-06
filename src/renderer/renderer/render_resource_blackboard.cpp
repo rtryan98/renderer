@@ -167,12 +167,12 @@ Sampler Render_Resource_Blackboard::get_sampler(const rhi::Sampler_Create_Info& 
     return m_samplers[create_info];
 }
 
-Buffer Render_Resource_Blackboard::create_buffer(const std::string& name, const rhi::Buffer_Create_Info& create_info)
+Buffer Render_Resource_Blackboard::create_buffer(const std::string& name, const rhi::Buffer_Create_Info& create_info, const uint32_t index)
 {
     if (has_buffer(name)) return Buffer(*this, &(m_buffer_wrapper_ptrs[name]->buffer), name);
     const auto buffer = &*m_buffers.emplace();
     m_buffer_wrapper_ptrs[name] = buffer;
-    buffer->buffer = m_device->create_buffer(create_info).value_or(nullptr);
+    buffer->buffer = m_device->create_buffer(create_info, index).value_or(nullptr);
     m_device->name_resource(buffer->buffer, name.c_str());
     return Buffer(*this, &(m_buffer_wrapper_ptrs[name]->buffer), name);
 }
@@ -197,12 +197,12 @@ void Render_Resource_Blackboard::destroy_buffer(const std::string& name)
     m_buffer_wrapper_ptrs.erase(name);
 }
 
-Image Render_Resource_Blackboard::create_image(const std::string& name, const rhi::Image_Create_Info& create_info)
+Image Render_Resource_Blackboard::create_image(const std::string& name, const rhi::Image_Create_Info& create_info, const uint32_t index)
 {
     if (has_image(name)) return Image(*this, &(m_image_wrapper_ptrs[name]->image), name);
     const auto image = &*m_images.emplace();
     m_image_wrapper_ptrs[name] = image;
-    image->image = m_device->create_image(create_info).value_or(nullptr);
+    image->image = m_device->create_image(create_info, index).value_or(nullptr);
     m_device->name_resource(image->image, name.c_str());
     return Image(*this, &(m_image_wrapper_ptrs[name]->image), name);
 }

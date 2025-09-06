@@ -83,12 +83,12 @@ public:
 
     Sampler get_sampler(const rhi::Sampler_Create_Info& create_info);
 
-    Buffer create_buffer(const std::string& name, const rhi::Buffer_Create_Info& create_info);
+    Buffer create_buffer(const std::string& name, const rhi::Buffer_Create_Info& create_info, uint32_t index = rhi::NO_RESOURCE_INDEX);
     Buffer get_buffer(const std::string& name);
     bool has_buffer(const std::string& name);
     void destroy_buffer(const std::string& name);
 
-    Image create_image(const std::string& name, const rhi::Image_Create_Info& create_info);
+    Image create_image(const std::string& name, const rhi::Image_Create_Info& create_info, uint32_t index = rhi::NO_RESOURCE_INDEX);
     Image get_image(const std::string& name);
     bool has_image(const std::string& name);
     void destroy_image(const std::string& name);
