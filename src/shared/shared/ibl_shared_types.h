@@ -27,6 +27,12 @@ struct Prefilter_Specular_Irradiance_Push_Constants
     float roughness;
 };
 
+struct BRDF_LUT_Bake_Push_Constants
+{
+    uint2 image_size;
+    SHADER_HANDLE_TYPE lut;
+};
+
 struct Skybox_Push_Constants
 {
     uint2 image_size;

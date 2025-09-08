@@ -31,7 +31,7 @@ float G_GGX1_k(float roughness)
 
 float G_GGX1_k_ibl(float roughness)
 {
-    return (roughness * roughness) / 2.0;
+    return roughness * roughness;
 }
 
 float G_GGX(float NdotL, float NdotV, float roughness)

@@ -25,15 +25,37 @@ public:
 
     uint64_t size() const noexcept;
 
-    operator uint32_t() const;
-    operator rhi::Buffer*() const;
-    operator void*() const;
-    operator const std::string&() const;
+    operator uint32_t() const; //NOLINT
+    operator rhi::Buffer*() const; //NOLINT
+    operator void*() const; //NOLINT
+    operator const std::string&() const; //NOLINT
 
 private:
     Render_Resource_Blackboard* m_blackboard;
     rhi::Buffer** m_buffer;
     std::string m_name;
+};
+
+struct Image_View_Subresource_Info
+{
+    uint16_t mip_level;
+    uint16_t first_array_level;
+    uint16_t array_levels;
+    rhi::Image_View_Type view_type;
+};
+
+class Image_View
+{
+public:
+    Image_View() = default;
+    Image_View(rhi::Image_View** image_view);
+
+    operator uint32_t() const; //NOLINT
+    operator rhi::Image*() const; //NOLINT
+    operator rhi::Image_View*() const; //NOLINT
+
+private:
+    rhi::Image_View** m_image_view;
 };
 
 class Image
@@ -45,16 +67,23 @@ public:
 
     rhi::Image_Create_Info get_create_info() const;
     void recreate(const rhi::Image_Create_Info& create_info);
+    [[nodiscard]] Image_View create_image_view(const Image_View_Subresource_Info& subresource);
 
-    operator uint32_t() const;
-    operator rhi::Image*() const;
-    operator rhi::Image_View*() const;
-    operator const std::string&() const;
+    operator uint32_t() const; //NOLINT
+    operator rhi::Image*() const; //NOLINT
+    operator rhi::Image_View*() const; //NOLINT
+    operator const std::string&() const; //NOLINT
 
 private:
+    static constexpr auto MAX_IMAGE_VIEWS = 16;
+
     Render_Resource_Blackboard* m_blackboard;
     rhi::Image** m_image;
     std::string m_name;
+    std::array<std::pair<Image_View_Subresource_Info, rhi::Image_View*>, MAX_IMAGE_VIEWS> m_image_views;
+
+private:
+    rhi::Image_View* create_image_view_internal(const Image_View_Subresource_Info& subresource) const;
 };
 
 class Sampler
@@ -63,8 +92,8 @@ public:
     Sampler() = default;
     Sampler(rhi::Sampler* sampler);
 
-    operator uint32_t() const;
-    operator rhi::Sampler*() const;
+    operator uint32_t() const; //NOLINT
+    operator rhi::Sampler*() const; //NOLINT
 
 private:
     rhi::Sampler* m_sampler;
@@ -94,6 +123,9 @@ public:
     void destroy_image(const std::string& name);
 
     void garbage_collect(uint64_t frame);
+
+    // TODO: should this be public?
+    [[nodiscard]] rhi::Graphics_Device* get_graphics_device() const { return m_device; }
 
 private:
     void delete_resource(rhi::Buffer* buffer);

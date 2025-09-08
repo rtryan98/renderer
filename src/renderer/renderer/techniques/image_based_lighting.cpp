@@ -7,6 +7,7 @@
 #include <shared/serialized_asset_formats.hpp>
 #include <shared/ibl_shared_types.h>
 #include <shared/shared_resources.h>
+#include <shared/mipmap_gen_shared_types.h>
 
 namespace ren::techniques
 {
@@ -33,53 +34,101 @@ Image_Based_Lighting::Image_Based_Lighting(
     void* image_data = hdri_texture->get_mip_data(0);
     m_gpu_transfer_context.enqueue_immediate_upload(m_hdri, &image_data);
 
-    uint32_t size = std::min(hdri_create_info.width, hdri_create_info.height);
+    constexpr uint32_t SIZE = 2048;
     rhi::Image_Create_Info cubemap_create_info = {
         .format = hdri_texture->format,
-        .width = size,
-        .height = size,
+        .width = SIZE,
+        .height = SIZE,
         .depth = 1,
         .array_size = 6,
-        .mip_levels = 1,
+        .mip_levels = 8,
         .usage = rhi::Image_Usage::Sampled | rhi::Image_Usage::Unordered_Access,
         .primary_view_type = rhi::Image_View_Type::Texture_Cube
     };
-    m_cubemap = render_resource_blackboard.create_image(CUBEMAP_TEXTURE_NAME, cubemap_create_info);
+    m_environment_cubemap = render_resource_blackboard.create_image(ENVIRONMENT_CUBEMAP_TEXTURE_NAME, cubemap_create_info);
+    m_environment_cubemap_views.reserve(cubemap_create_info.mip_levels);
+    for (uint16_t i = 0; i < cubemap_create_info.mip_levels; ++i)
+    {
+        Image_View_Subresource_Info subresource = {
+            .mip_level = i,
+            .first_array_level = 0,
+            .array_levels = 6,
+            .view_type = rhi::Image_View_Type::Texture_2D_Array,
+        };
+        m_environment_cubemap_views.push_back(m_environment_cubemap.create_image_view(subresource));
+    }
 
-    // cubemap_create_info.format = rhi::Image_Format::R16G16B16A16_SFLOAT;
-    // const auto mip_level_count = std::countr_zero(size);
-    // cubemap_create_info.mip_levels = mip_level_count >> 4; // Need size of at least 16x16 for the compute shaders
     cubemap_create_info.width = cubemap_create_info.height = 512;
-    m_prefiltered_cubemap = render_resource_blackboard.create_image(PREFILTERED_CUBEMAP_TEXTURE_NAME, cubemap_create_info, REN_LIGHTING_DIFFUSE_IRRADIANCE_CUBEMAP);
+    cubemap_create_info.mip_levels = 1;
+    m_prefiltered_diffuse_irradiance_cubemap = render_resource_blackboard.create_image(
+        PREFILTERED_DIFFUSE_IRRADIANCE_CUBEMAP_TEXTURE_NAME,
+        cubemap_create_info,
+        REN_LIGHTING_DIFFUSE_IRRADIANCE_CUBEMAP);
+
+    cubemap_create_info.mip_levels = 5;
+    m_prefiltered_specular_irradiance_cubemap = render_resource_blackboard.create_image(
+        PREFILTERED_SPECULAR_IRRADIANCE_CUBEMAP_TEXTURE_NAME,
+        cubemap_create_info,
+        REN_LIGHTING_SPECULAR_IRRADIANCE_CUBEMAP);
+
+    for (uint16_t i = 0; i < cubemap_create_info.mip_levels; ++i)
+    {
+        Image_View_Subresource_Info subresource = {
+            .mip_level = i,
+            .first_array_level = 0,
+            .array_levels = 6,
+            .view_type = rhi::Image_View_Type::Texture_Cube,
+        };
+        m_prefiltered_specular_irradiance_cubemap_views[i] = m_prefiltered_specular_irradiance_cubemap.create_image_view(subresource);
+    }
+
+    constexpr rhi::Image_Create_Info brdf_lut_create_info = {
+        .format = rhi::Image_Format::R16G16_SFLOAT,
+        .width = 256,
+        .height = 256,
+        .depth = 1,
+        .array_size = 1,
+        .mip_levels = 1,
+        .usage = rhi::Image_Usage::Sampled | rhi::Image_Usage::Unordered_Access,
+        .primary_view_type = rhi::Image_View_Type::Texture_2D
+    };
+    m_brdf_lut = m_render_resource_blackboard.create_image(
+        BRDF_LUT_TEXTURE_NAME,
+        brdf_lut_create_info,
+        REN_LIGHTING_BRDF_LUT_TEXTURE);
 }
 
 Image_Based_Lighting::~Image_Based_Lighting()
 {
     m_render_resource_blackboard.destroy_image(m_hdri);
-    m_render_resource_blackboard.destroy_image(m_cubemap);
-    m_render_resource_blackboard.destroy_image(m_prefiltered_cubemap);
+    m_render_resource_blackboard.destroy_image(m_environment_cubemap);
+    m_render_resource_blackboard.destroy_image(m_prefiltered_diffuse_irradiance_cubemap);
+    m_render_resource_blackboard.destroy_image(m_prefiltered_specular_irradiance_cubemap);
+    m_render_resource_blackboard.destroy_image(m_brdf_lut);
 }
 
 void Image_Based_Lighting::equirectangular_to_cubemap(rhi::Command_List* cmd, Resource_State_Tracker& tracker)
 {
     cmd->begin_debug_region("image_based_lighting:bake:equirectangular_to_cubemap", 0.1f, 0.25f, 0.1f);
-    const auto cube_width = m_cubemap.get_create_info().width;
-    const auto cube_height = m_cubemap.get_create_info().height;
-    const auto pipeline = m_asset_repository.get_compute_pipeline("equirectangular_to_cubemap");
+    const auto cube_size = m_environment_cubemap.get_create_info().width;
+    const auto mip_levels = m_environment_cubemap.get_create_info().mip_levels;
+    const auto equirectangular_to_cubemap_pipeline = m_asset_repository.get_compute_pipeline("equirectangular_to_cubemap");
+    const auto mipmap_gen_pipeline = m_asset_repository.get_compute_pipeline("mipmap_gen");
+
     tracker.use_resource(m_hdri,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Shader_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
-    tracker.use_resource(m_cubemap,
+    tracker.use_resource(m_environment_cubemap,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Unordered_Access_Write,
         rhi::Barrier_Image_Layout::Unordered_Access);
     tracker.flush_barriers(cmd);
-    cmd->set_pipeline(pipeline);
+    cmd->set_pipeline(equirectangular_to_cubemap_pipeline);
     cmd->set_push_constants<Equirectangular_To_Cubemap_Push_Constants>({
-        .image_size = { cube_width, cube_height },
+        .image_size = { cube_size, cube_size },
         .source_image = m_hdri,
-        .target_cubemap = m_cubemap,
+        .target_cubemap = m_environment_cubemap,
         .source_image_sampler = m_render_resource_blackboard.get_sampler({
             .filter_min = rhi::Sampler_Filter::Linear,
             .filter_mag = rhi::Sampler_Filter::Linear,
@@ -96,8 +145,29 @@ void Image_Based_Lighting::equirectangular_to_cubemap(rhi::Command_List* cmd, Re
             .anisotropy_enable = false
         }),
     }, rhi::Pipeline_Bind_Point::Compute);
-    cmd->dispatch(cube_width / pipeline.get_group_size_x(), cube_height / pipeline.get_group_size_y(), 6);
-    tracker.use_resource(m_cubemap,
+    cmd->dispatch(
+        cube_size / equirectangular_to_cubemap_pipeline.get_group_size_x(),
+        cube_size / equirectangular_to_cubemap_pipeline.get_group_size_y(),
+        6);
+    cmd->set_pipeline(mipmap_gen_pipeline);
+    for (auto i = 1; i < mip_levels; ++i)
+    {
+        tracker.use_resource(m_environment_cubemap,
+            rhi::Barrier_Pipeline_Stage::Compute_Shader,
+            rhi::Barrier_Access::Unordered_Access_Read | rhi::Barrier_Access::Unordered_Access_Write,
+            rhi::Barrier_Image_Layout::Unordered_Access);
+        tracker.flush_barriers(cmd);
+        cmd->set_push_constants<Mipmap_Gen_Push_Constants>({
+            .src = m_environment_cubemap_views[i - 1],
+            .dst = m_environment_cubemap_views[i],
+            .is_array = true
+        }, rhi::Pipeline_Bind_Point::Compute);
+        cmd->dispatch(
+            (cube_size >> i) / mipmap_gen_pipeline.get_group_size_x(),
+            (cube_size >> i) / mipmap_gen_pipeline.get_group_size_y(),
+            6);
+    }
+    tracker.use_resource(m_environment_cubemap,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Shader_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
@@ -109,18 +179,17 @@ void Image_Based_Lighting::prefilter_diffuse_irradiance(rhi::Command_List* cmd, 
 {
     cmd->begin_debug_region("image_based_lighting:bake:prefilter_diffuse_irradiance", 0.1f, 0.25f, 0.1f);
 
-    const auto cube_width = m_prefiltered_cubemap.get_create_info().width;
-    const auto cube_height = m_prefiltered_cubemap.get_create_info().height;
+    const auto cube_size = m_prefiltered_diffuse_irradiance_cubemap.get_create_info().width;
     const auto pipeline = m_asset_repository.get_compute_pipeline("ibl_prefilter_diffuse");
-    tracker.use_resource(m_prefiltered_cubemap,
+    tracker.use_resource(m_prefiltered_diffuse_irradiance_cubemap,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Unordered_Access_Write,
         rhi::Barrier_Image_Layout::Unordered_Access);
     tracker.flush_barriers(cmd);
     cmd->set_pipeline(pipeline);
     cmd->set_push_constants<Prefilter_Diffuse_Irradiance_Push_Constants>({
-        .image_size = { cube_width, cube_height },
-        .source_cubemap = m_cubemap,
+        .image_size = { cube_size, cube_size },
+        .source_cubemap = m_environment_cubemap,
         .cubemap_sampler = m_render_resource_blackboard.get_sampler({
             .filter_min = rhi::Sampler_Filter::Linear,
             .filter_mag = rhi::Sampler_Filter::Linear,
@@ -133,14 +202,88 @@ void Image_Based_Lighting::prefilter_diffuse_irradiance(rhi::Command_List* cmd, 
             .comparison_func = rhi::Comparison_Func::None,
             .reduction = rhi::Sampler_Reduction_Type::Standard,
             .min_lod = 0.0,
-            .max_lod = 0.0,
+            .max_lod = 16.0,
             .anisotropy_enable = false
         }),
-        .target_cubemap = m_prefiltered_cubemap,
+        .target_cubemap = m_prefiltered_diffuse_irradiance_cubemap,
     }, rhi::Pipeline_Bind_Point::Compute);
-    cmd->dispatch(cube_width / pipeline.get_group_size_x(), cube_height / pipeline.get_group_size_y(), 6);
-    tracker.use_resource(m_prefiltered_cubemap,
+    cmd->dispatch(cube_size / pipeline.get_group_size_x(), cube_size / pipeline.get_group_size_y(), 6);
+    tracker.use_resource(m_prefiltered_diffuse_irradiance_cubemap,
+        rhi::Barrier_Pipeline_Stage::All_Commands,
+        rhi::Barrier_Access::Shader_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
+    tracker.flush_barriers(cmd);
+
+    cmd->end_debug_region();
+}
+
+void Image_Based_Lighting::prefilter_specular_irradiance(rhi::Command_List* cmd, Resource_State_Tracker& tracker)
+{
+    cmd->begin_debug_region("image_based_lighting:bake:prefilter_specular_irradiance", 0.1f, 0.25f, 0.1f);
+
+    const auto cube_size = m_prefiltered_specular_irradiance_cubemap.get_create_info().width;
+    const auto mip_count = m_prefiltered_specular_irradiance_cubemap.get_create_info().mip_levels;
+    const auto pipeline = m_asset_repository.get_compute_pipeline("ibl_prefilter_specular");
+    tracker.use_resource(m_prefiltered_specular_irradiance_cubemap,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Write,
+        rhi::Barrier_Image_Layout::Unordered_Access);
+    tracker.flush_barriers(cmd);
+    cmd->set_pipeline(pipeline);
+    for (auto i = 0; i < mip_count; ++i)
+    {
+        cmd->set_push_constants<Prefilter_Specular_Irradiance_Push_Constants>({
+            .image_size = { cube_size >> i, cube_size >> i },
+            .source_cubemap = m_environment_cubemap,
+            .cubemap_sampler = m_render_resource_blackboard.get_sampler({
+                .filter_min = rhi::Sampler_Filter::Linear,
+                .filter_mag = rhi::Sampler_Filter::Linear,
+                .filter_mip = rhi::Sampler_Filter::Linear,
+                .address_mode_u = rhi::Image_Sample_Address_Mode::Wrap,
+                .address_mode_v = rhi::Image_Sample_Address_Mode::Wrap,
+                .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
+                .mip_lod_bias = 0.0f,
+                .max_anisotropy = 0,
+                .comparison_func = rhi::Comparison_Func::None,
+                .reduction = rhi::Sampler_Reduction_Type::Standard,
+                .min_lod = 0.0,
+                .max_lod = 16.0,
+                .anisotropy_enable = false
+            }),
+            .target_cubemap = m_prefiltered_specular_irradiance_cubemap_views[i],
+            .roughness = static_cast<float>(i) / static_cast<float>(mip_count - 1)
+        }, rhi::Pipeline_Bind_Point::Compute);
+        cmd->dispatch((cube_size >> i) / pipeline.get_group_size_x(), (cube_size >> i) / pipeline.get_group_size_y(), 6);
+    }
+    tracker.use_resource(m_prefiltered_specular_irradiance_cubemap,
+        rhi::Barrier_Pipeline_Stage::All_Commands,
+        rhi::Barrier_Access::Shader_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
+    tracker.flush_barriers(cmd);
+
+    cmd->end_debug_region();
+}
+
+void Image_Based_Lighting::bake_brdf_lut(rhi::Command_List* cmd, Resource_State_Tracker& tracker)
+{
+    cmd->begin_debug_region("image_based_lighting:bake:prefilter_specular_irradiance", 0.1f, 0.25f, 0.1f);
+
+    const auto width = m_brdf_lut.get_create_info().width;
+    const auto height = m_brdf_lut.get_create_info().height;
+    const auto pipeline = m_asset_repository.get_compute_pipeline("brdf_bake");
+    tracker.use_resource(m_brdf_lut,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Write,
+        rhi::Barrier_Image_Layout::Unordered_Access);
+    tracker.flush_barriers(cmd);
+    cmd->set_pipeline(pipeline);
+    cmd->set_push_constants<BRDF_LUT_Bake_Push_Constants>({
+        .image_size = { width, height },
+        .lut = m_brdf_lut,
+    }, rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(width / pipeline.get_group_size_x(), height / pipeline.get_group_size_y(), 1);
+    tracker.use_resource(m_brdf_lut,
+        rhi::Barrier_Pipeline_Stage::All_Commands,
         rhi::Barrier_Access::Shader_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
     tracker.flush_barriers(cmd);
@@ -160,6 +303,12 @@ void Image_Based_Lighting::bake(rhi::Command_List* cmd, Resource_State_Tracker& 
         cmd,
         tracker);
     prefilter_diffuse_irradiance(
+        cmd,
+        tracker);
+    prefilter_specular_irradiance(
+        cmd,
+        tracker);
+    bake_brdf_lut(
         cmd,
         tracker);
     cmd->end_debug_region();
@@ -195,7 +344,7 @@ void Image_Based_Lighting::skybox_render(
         .image_size = { width, height },
         .depth_buffer = geometry_depth_buffer,
         .target_image = shaded_geometry_render_target,
-        .cubemap = m_cubemap,
+        .cubemap = m_environment_cubemap,
         .cubemap_sampler = m_render_resource_blackboard.get_sampler({
             .filter_min = rhi::Sampler_Filter::Linear,
             .filter_mag = rhi::Sampler_Filter::Linear,

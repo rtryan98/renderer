@@ -35,10 +35,10 @@ float4 main(PS_In ps_in) : SV_Target
     surface.albedo = ren::color::spaces::Rec709_Rec2020(diffuse_color);
     surface.normal = calculate_normals(calculate_slope(z_dx, z_dy, x_dx, y_dy));
     surface.metallic = 0.0625;
-    surface.roughness = 0.1;
-    if (jacobian < 0.66)
+    surface.roughness = 0.0125;
+    if (jacobian < 0.7)
     {
-        surface.albedo = float3(0.7, 0.7, 0.7);
+        surface.albedo = 1.0;
         surface.roughness = 1.0;
         surface.metallic = 0.0;
     }

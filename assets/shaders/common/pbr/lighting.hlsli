@@ -117,10 +117,15 @@ float3 evaluate_skylight_ibl(float3 V, Surface surface, float3 F0)
 
     float3 ks = lerp(F_SphericalGaussian(NdotV, F0), 0.0, surface.metallic);
     float3 kd = 1.0 - ks;
-    float3 irradiance = rhi::uni::tex_sample_level_cube<float4>(REN_LIGHTING_DIFFUSE_IRRADIANCE_CUBEMAP, REN_SAMPLER_LINEAR_WRAP, surface.normal, 0.0).xyz;
-    float3 diffuse = kd * irradiance * surface.albedo;
+    float3 diffuse_irradiance = rhi::uni::tex_sample_level_cube<float4>(REN_LIGHTING_DIFFUSE_IRRADIANCE_CUBEMAP, REN_SAMPLER_LINEAR_WRAP, surface.normal, 0.0).xyz;
+    float3 diffuse = kd * diffuse_irradiance * surface.albedo;
+
+    float3 specular_irradiance = rhi::uni::tex_sample_level_cube<float4>(REN_LIGHTING_SPECULAR_IRRADIANCE_CUBEMAP, REN_SAMPLER_LINEAR_WRAP, surface.normal, 4.0 * surface.roughness).xyz;
+    float2 specular_brdf_lut = rhi::uni::tex_sample_level<float2>(REN_LIGHTING_BRDF_LUT_TEXTURE, REN_SAMPLER_LINEAR_CLAMP, float2(NdotV, surface.roughness), 0.0);
+    float3 specular = (F0 * specular_brdf_lut.x + specular_brdf_lut.y) * specular_irradiance;
 
     color += diffuse;
+    color += specular;
 
     return color;
 }

@@ -20,16 +20,22 @@ float3 prefilter_irradiance(float3 R)
     float3 N = R;
 
     float3 irradiance = 0.0;
-    static const uint SAMPLE_COUNT = 1 << 14;
+    static const uint SAMPLE_COUNT = 1 << 12;
     for (uint i = 0; i < SAMPLE_COUNT; ++i)
     {
         float3 L = tangent_to_world(ren::sampling::hemisphere_cosine_weighted(i, SAMPLE_COUNT), N);
         float NdotL = saturate(dot(N, L));
-        float3 cube_sample = rhi::uni::tex_sample_level_cube<float4>(pc.source_cubemap, pc.cubemap_sampler, L, 0.0).xyz;
-        irradiance += NdotL * clamp(cube_sample, 0.0, 250.0) / float(SAMPLE_COUNT);
+
+        // Using lower mip level to forcibly reduce frequency.
+        float3 cube_sample = rhi::uni::tex_sample_level_cube<float4>(pc.source_cubemap, pc.cubemap_sampler, L, 3.0).xyz;
+
+        // Hack: clamping sample value in case sun is in environment map.
+        // Assuming 1.0 = 1 nit here, so anything above 10000 nits is irrelevant for current displays.
+        // For diffuse, this is clamped to a much lower value, as high nits mostly generally correspond to specular reflections.
+        irradiance += NdotL * clamp(cube_sample, 0.0, 100.0);
     }
 
-    return irradiance * ren::PI;
+    return irradiance / (float) SAMPLE_COUNT;
 }
 
 [shader("compute")]
@@ -37,7 +43,7 @@ float3 prefilter_irradiance(float3 R)
 void main(uint3 id : SV_DispatchThreadID)
 {
     float2 uv = float2(id.xy) / float2(pc.image_size);
-    uv = uv * 2.0 - 1.0;
+    uv = 2.0 * float2(uv.x, 1.0 - uv.y) - 1.0;
     float3 R = ren::cubemap_utils::direction_from_uv_thread_id(uv, id);
     float3 irradiance = prefilter_irradiance(R);
     rhi::uni::tex_store_arr(pc.target_cubemap, id.xy, id.z, float4(irradiance, 1.0));

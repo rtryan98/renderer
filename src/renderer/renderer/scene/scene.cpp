@@ -284,7 +284,8 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
 
 void Static_Scene_Data::update_lights()
 {
-    // TODO: this is for testing
+    // TODO: this is for
+    /*
     m_punctual_lights.resize(1);
     m_punctual_lights[0] = {
         .disabled = false,
@@ -303,6 +304,7 @@ void Static_Scene_Data::update_lights()
     };
 
     m_gpu_transfer_context.enqueue_immediate_upload(m_scene_info_buffer, &scene_info, sizeof(Scene_Info), 0);
+    */
 }
 
 uint32_t Static_Scene_Data::acquire_instance_index()

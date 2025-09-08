@@ -10,8 +10,14 @@ DECLARE_PUSH_CONSTANTS(Equirectangular_To_Cubemap_Push_Constants, pc);
 void main(uint3 id : SV_DispatchThreadID)
 {
     float2 uv = float2(id.xy) / float2(pc.image_size);
-    uv = uv * 2.0 - 1.0;
+    uv = 2.0 * float2(uv.x, 1.0 - uv.y) - 1.0;
     float3 direction = ren::cubemap_utils::direction_from_uv_thread_id(uv, id);
+
+    // Fix for Z-Up coordinates
+    direction = direction.xzy;
+    // Flip
+    direction.y *= -1.0;
+
     float theta = acos(direction.y);
     float phi = atan2(direction.z, direction.x);
     uv = float2((phi + ren::PI) / ren::TWO_PI, 1.0 - theta / ren::PI);

@@ -29,7 +29,7 @@ Windows 10 and older Visual Studio versions are not tested and may not work. Bui
 - Physically based rendering:
     - Implemented microfacet BRDFs:
         - Cook-Torrance.
-    - (WIP) Image based lighting (IBL).
+    - Image based lighting (IBL).
 - Tone mapping:
     - Implementation of GT7 tone mapping operator as presented in [*'Driving Toward Reality: Physically Based Tone Mapping and Perceptual Fidelity in Gran Turismo 7'*](https://blog.selfshadow.com/publications/s2025-shading-course/pdi/s2025_pbs_pdi_slides.pdf).
 ### General and Architectural Features

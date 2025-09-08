@@ -18,8 +18,6 @@ void main(uint3 id : SV_DispatchThreadID)
     uv.y *= -1.0;
     float4 position = float4(uv, 0.0, 1.0);
     float3 direction = mul((float3x3) camera.camera_to_world, mul(camera.clip_to_camera, position).xyz);
-    direction = direction.xzy;
-    // direction.y *= -1.0;
     direction = normalize(direction);
     float depth = rhi::uni::tex_load<float>(pc.depth_buffer, id.xy);
     float4 color = rhi::uni::tex_sample_level_cube<float4>(pc.cubemap, pc.cubemap_sampler, direction.xyz, 0.0);

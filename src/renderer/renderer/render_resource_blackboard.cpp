@@ -60,6 +60,28 @@ Buffer::operator const std::string&() const
     return m_name;
 }
 
+Image_View::Image_View(rhi::Image_View** image_view)
+    : m_image_view(image_view)
+{}
+
+Image_View::operator unsigned int() const
+{
+    if (!m_image_view) return 0u;
+    return (*m_image_view)->bindless_index;
+}
+
+Image_View::operator rhi::Image*() const
+{
+    if (!m_image_view) return nullptr;
+    return (*m_image_view)->image;
+}
+
+Image_View::operator rhi::Image_View*() const
+{
+    if (!m_image_view) return nullptr;
+    return *m_image_view;
+}
+
 Image::Image(Render_Resource_Blackboard& blackboard, rhi::Image** image, const std::string& name)
     : m_blackboard(&blackboard)
     , m_image(image)
@@ -96,6 +118,26 @@ void Image::recreate(const rhi::Image_Create_Info& create_info)
     auto device = m_blackboard->m_device;
     *m_image = device->create_image(create_info).value_or(nullptr);
     device->name_resource(*m_image, m_name.c_str());
+
+    for (auto& image_view : m_image_views)
+    {
+        if (image_view.second)
+            image_view.second = create_image_view_internal(image_view.first);
+    }
+}
+
+Image_View Image::create_image_view(const Image_View_Subresource_Info& subresource)
+{
+    for (auto& image_view : m_image_views)
+    {
+        if (image_view.second)
+            continue;
+        image_view.first = subresource;
+        image_view.second = create_image_view_internal(subresource);
+        return&image_view.second;
+    }
+    // TODO: handle overflows
+    return {};
 }
 
 Image::operator unsigned int() const
@@ -119,6 +161,21 @@ Image::operator rhi::Image_View*() const
 Image::operator const std::string&() const
 {
     return m_name;
+}
+
+rhi::Image_View* Image::create_image_view_internal(const Image_View_Subresource_Info& subresource) const
+{
+    auto* graphics_device = m_blackboard->get_graphics_device();
+    const auto create_info = get_create_info();
+    rhi::Image_View_Create_Info image_view_create_info = {
+        .first_array_level = subresource.first_array_level,
+        .array_levels = subresource.array_levels,
+        .first_mip_level = subresource.mip_level,
+        .mip_levels = static_cast<uint16_t>(create_info.mip_levels - subresource.mip_level),
+        .view_type = subresource.view_type,
+        .descriptor_type = rhi::Descriptor_Type::Resource
+    };
+    return graphics_device->create_image_view(*m_image, image_view_create_info, rhi::NO_RESOURCE_INDEX).value_or(nullptr);
 }
 
 Sampler::Sampler(rhi::Sampler* sampler)
