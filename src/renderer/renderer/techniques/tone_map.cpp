@@ -213,7 +213,7 @@ void Tone_Map::process_gui()
         ImGui::SliderFloat("Fade start", &m_fade_start, 0.f, 2.f);
         ImGui::SliderFloat("Fade end", &m_fade_end, 0.f, 2.f);
         ImGui::SeparatorText("Debug##TM");
-        ImGui::Checkbox("Render Debug quads##TM", &m_render_debug);
+        ImGui::Checkbox("Display debug colors##TM", &m_render_debug);
     }
 }
 
