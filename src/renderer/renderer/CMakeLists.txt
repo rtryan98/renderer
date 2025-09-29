@@ -6,6 +6,8 @@ add_subdirectory(techniques)
 
 target_sources(
     renderer PRIVATE
+    acceleration_structure_builder.cpp
+    acceleration_structure_builder.hpp
     application.cpp
     application.hpp
     gpu_transfer.cpp

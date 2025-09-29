@@ -5,6 +5,10 @@ function(renderer_setup)
     if(NOT EXISTS ${CMAKE_BINARY_DIR}/assets/cache)
         file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/assets/cache)
     endif()
+
+    if(CMAKE_GENERATOR MATCHES "Visual Studio")
+        set_target_properties(renderer PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+    endif()
 endfunction()
 
 function(renderer_symlink_binary SRC_DIR DST_DIR)

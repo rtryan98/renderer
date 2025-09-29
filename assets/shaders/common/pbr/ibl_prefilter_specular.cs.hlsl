@@ -22,7 +22,7 @@ float3 prefilter_irradiance(float3 R, float roughness)
     float3 V = R;
 
     float3 irradiance = 0.0;
-    static const uint SAMPLE_COUNT = 1 << 15;
+    static const uint SAMPLE_COUNT = 1 << 12;
     float weight = 0.0;
 
     float solid_angle_total = 4.0 * ren::PI / (6.0 * pc.image_size.x * pc.image_size.y);
@@ -47,9 +47,7 @@ float3 prefilter_irradiance(float3 R, float roughness)
             float3 cube_sample = rhi::uni::tex_sample_level_cube<float4>(pc.source_cubemap, pc.cubemap_sampler, L, mip_level).xyz;
 
             // Hack: clamping sample value in case sun is in environment map.
-            // Assuming 1.0 = 1 nit here, so anything above 10000 nits is theoretically irrelevant for display.
-            // Clamping to 1600 to match my own display, even if physically inaccurate and causing loss of information.
-            irradiance += NdotL * clamp(cube_sample, 0.0, 1600.0);
+            irradiance += NdotL * clamp(cube_sample, 0.0, 100.0);
             weight += NdotL;
         }
     }

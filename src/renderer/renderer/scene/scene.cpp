@@ -3,6 +3,7 @@
 #include "renderer/gpu_transfer.hpp"
 #include "renderer/asset/asset_formats.hpp"
 #include "renderer/asset/asset_repository.hpp"
+#include "renderer/acceleration_structure_builder.hpp"
 
 #include <numeric>
 #include <ranges>
@@ -17,6 +18,12 @@
 
 namespace ren
 {
+uint64_t pow2_align(uint64_t value, uint64_t pow2)
+{
+    auto mask = pow2 - 1;
+    return (value &(~mask)) + ((value & mask) > 0) * pow2;
+}
+
 constexpr static auto DEFAULT_SAMPLER_CREATE_INFO = rhi::Sampler_Create_Info {
     .filter_min = rhi::Sampler_Filter::Linear,
     .filter_mag = rhi::Sampler_Filter::Linear,
@@ -167,6 +174,17 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
             material.material_index * sizeof(GPU_Material));
     }
 
+    uint64_t acceleration_structure_buffer_size = 0;
+    struct Acceleration_Structure_Info
+    {
+        rhi::Acceleration_Structure_Build_Sizes build_sizes;
+        rhi::Acceleration_Structure** reference;
+        uint64_t buffer_offset;
+        rhi::Acceleration_Structure_Geometry_Data geometry;
+    };
+    std::vector<Acceleration_Structure_Info> submesh_blas_infos = {};
+    submesh_blas_infos.reserve(loadable_model->submesh_count);
+
     model.submeshes.resize(loadable_model->submesh_count);
     for (auto i = 0; i < loadable_model->submesh_count; ++i)
     {
@@ -180,6 +198,86 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
         submesh.material = loadable_submesh.material_index != MESH_PARENT_INDEX_NO_PARENT
             ? model.materials[loadable_submesh.material_index]
             : &m_default_material;
+
+        auto& blas_info = submesh_blas_infos.emplace_back();
+        blas_info.geometry = {
+            .type = rhi::Acceleration_Structure_Geometry_Type::Triangles,
+            .flags = submesh.material->alpha_mode == Material_Alpha_Mode::Opaque
+                ? rhi::Acceleration_Structure_Geometry_Flags::Opaque
+                : rhi::Acceleration_Structure_Geometry_Flags::None,
+            .geometry = {
+                .triangles = {
+                    .transform_gpu_address = 0ull,
+                    .vertex_gpu_address = model.vertex_positions->gpu_address + sizeof(glm::vec3) * submesh.first_vertex,
+                    .index_gpu_address = m_global_index_buffer->gpu_address + sizeof(uint32_t) * (submesh.first_index + model.index_buffer_allocation.offset),
+                    .vertex_format = rhi::Image_Format::R32G32B32_SFLOAT,
+                    .vertex_count = loadable_submesh.vertex_position_range_end - loadable_submesh.vertex_position_range_start,
+                    .vertex_stride = 12,
+                    .index_count = submesh.index_count,
+                    .index_type = rhi::Index_Type::U32
+                }
+            }
+        };
+        rhi::Acceleration_Structure_Build_Geometry_Info blas_build_geometry_info = {
+            .type = rhi::Acceleration_Structure_Type::Bottom_Level,
+            .flags = rhi::Acceleration_Structure_Flags::Fast_Trace,
+            .geometry_or_instance_count = 1,
+            .src = nullptr,
+            .dst = nullptr,
+            .geometry = &blas_info.geometry
+        };
+
+        auto blas_build_sizes = m_graphics_device->get_acceleration_structure_build_sizes(blas_build_geometry_info);
+
+        blas_info.build_sizes = blas_build_sizes;
+        blas_info.reference = &submesh.blas;
+        blas_info.buffer_offset = acceleration_structure_buffer_size;
+
+        acceleration_structure_buffer_size += pow2_align(blas_build_sizes.acceleration_structure_size, 256);
+    }
+
+    rhi::Buffer_Create_Info blas_buffer_create_info = {
+        .size = acceleration_structure_buffer_size,
+        .heap = rhi::Memory_Heap_Type::GPU,
+        .acceleration_structure_memory = true
+    };
+    model.blas_allocation = m_graphics_device->create_buffer(blas_buffer_create_info).value_or(nullptr);
+    m_graphics_device->name_resource(model.blas_allocation, (std::string("gltf:") + model_descriptor.name + ":blas_allocation").c_str());
+
+    for (auto& blas_info : submesh_blas_infos)
+    {
+        rhi::Acceleration_Structure_Create_Info blas_create_info = {
+            .buffer = model.blas_allocation,
+            .offset = blas_info.buffer_offset,
+            .size = blas_info.build_sizes.acceleration_structure_size,
+            .type = rhi::Acceleration_Structure_Type::Bottom_Level
+        };
+        auto blas = m_graphics_device->create_acceleration_structure(blas_create_info);
+        if (!blas.has_value())
+        {
+            switch (blas.error())
+            {
+            case rhi::Result::Error_Acceleration_Structure_Invalid_Alignment:
+                m_logger->warn("BLAS creation error: invalid alignment.");
+                break;
+            default:
+                m_logger->warn("BLAS creation error: unknown error.");
+                break;
+            }
+        }
+        else
+        {
+            *blas_info.reference = blas.value();
+
+            BLAS_Build_Request blas_request = {
+                .acceleration_structure = *blas_info.reference,
+                .build_sizes = blas_info.build_sizes,
+                .flags = rhi::Acceleration_Structure_Flags::Fast_Trace,
+                .geometry_data = blas_info.geometry
+            };
+            m_acceleration_structure_builder.add_blas_build_request(blas_request);
+        }
+
     }
 
     model.meshes.resize(loadable_model->instance_count);
@@ -307,6 +405,14 @@ void Static_Scene_Data::update_lights()
     */
 }
 
+void Static_Scene_Data::update_tlas()
+{
+    for (auto& instance : m_model_Instances)
+    {
+
+    }
+}
+
 uint32_t Static_Scene_Data::acquire_instance_index()
 {
     const auto val = m_instance_freelist.back();
@@ -423,12 +529,14 @@ Static_Scene_Data::Static_Scene_Data(
     std::shared_ptr<Logger> logger,
     GPU_Transfer_Context& gpu_transfer_context,
     Asset_Repository& asset_repository,
-    Render_Resource_Blackboard& render_resource_blackboard)
+    Render_Resource_Blackboard& render_resource_blackboard,
+    Acceleration_Structure_Builder& acceleration_structure_builder)
     : m_graphics_device(graphics_device)
     , m_logger(std::move(logger))
     , m_gpu_transfer_context(gpu_transfer_context)
     , m_asset_repository(asset_repository)
     , m_render_resource_blackboard(render_resource_blackboard)
+    , m_acceleration_structure_builder(acceleration_structure_builder)
     , m_index_buffer_allocator(MAX_INDICES)
 {
     m_instance_freelist.resize(MAX_INSTANCES);
@@ -499,6 +607,11 @@ Static_Scene_Data::~Static_Scene_Data()
     {
         m_graphics_device->destroy_buffer(model.vertex_positions);
         m_graphics_device->destroy_buffer(model.vertex_attributes);
+        for (const auto& submesh : model.submeshes)
+        {
+            m_graphics_device->destroy_acceleration_structure(submesh.blas);
+        }
+        m_graphics_device->destroy_buffer(model.blas_allocation);
     }
     for (const auto image : m_images | std::views::values)
     {

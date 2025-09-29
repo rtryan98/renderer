@@ -39,6 +39,7 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         .present_mode = rhi::Present_Mode::Immediate
         }))
     , m_gpu_transfer_context(m_device.get())
+    , m_acceleration_structure_builder(m_device.get())
     , m_frames()
     , m_frame_counter(0)
     , m_asset_repository(std::make_unique<Asset_Repository>(
@@ -58,7 +59,8 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         m_logger,
         m_gpu_transfer_context,
         *m_asset_repository,
-        *m_resource_blackboard))
+        *m_resource_blackboard,
+        m_acceleration_structure_builder))
     , m_renderer(
         m_gpu_transfer_context,
         *m_swapchain,
@@ -229,11 +231,13 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
 {
     auto graphics_cmd = frame.graphics_command_pool->acquire_command_list();
     auto upload_cmd = frame.graphics_command_pool->acquire_command_list();
+    auto acceleration_structure_cmd = frame.graphics_command_pool->acquire_command_list();
 
     m_renderer.render(*m_static_scene_data, graphics_cmd, t, dt);
     m_gpu_transfer_context.process_immediate_uploads_on_graphics_queue(upload_cmd);
+    m_acceleration_structure_builder.build_acceleration_structures(acceleration_structure_cmd);
 
-    auto cmds = std::to_array({ upload_cmd, graphics_cmd });
+    auto cmds = std::to_array({ upload_cmd, acceleration_structure_cmd, graphics_cmd });
 
     frame.fence_value += 1;
     rhi::Submit_Fence_Info frame_fence_signal_info = {

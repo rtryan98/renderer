@@ -55,6 +55,9 @@ int32_t main(uint32_t argc, const char* argv[])
         app_create_info.height = window_height_arg.getValue();
         app_create_info.enable_validation = validation_arg.getValue();
         app_create_info.enable_gpu_validation = gpu_validation_arg.getValue();
+
+        if (app_create_info.enable_validation) printf("Validation enabled.\n");
+        if (app_create_info.enable_gpu_validation) printf("GPU Validation enabled.\n");
     }
     catch (...)
     {} // do nothing on error.

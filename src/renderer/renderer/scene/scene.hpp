@@ -22,6 +22,7 @@ namespace ren
 {
 class Asset_Repository;
 class GPU_Transfer_Context;
+class Acceleration_Structure_Builder;
 
 enum class Material_Alpha_Mode
 {
@@ -66,6 +67,7 @@ struct Submesh
     glm::vec3 aabb_min;
     glm::vec3 aabb_max;
     Material* material;
+    rhi::Acceleration_Structure* blas;
 };
 
 struct Submesh_Instance
@@ -100,6 +102,7 @@ struct Model
     rhi::Buffer* vertex_positions;
     rhi::Buffer* vertex_attributes;
     OffsetAllocator::Allocation index_buffer_allocation;
+    rhi::Buffer* blas_allocation;
 };
 
 struct Model_Instance
@@ -138,7 +141,8 @@ public:
         std::shared_ptr<Logger> logger,
         GPU_Transfer_Context& gpu_transfer_context,
         Asset_Repository& asset_repository,
-        Render_Resource_Blackboard& render_resource_blackboard);
+        Render_Resource_Blackboard& render_resource_blackboard,
+        Acceleration_Structure_Builder& acceleration_structure_builder);
     ~Static_Scene_Data();
 
     Static_Scene_Data(const Static_Scene_Data&) = delete;
@@ -153,6 +157,7 @@ public:
     [[nodiscard]] auto* get_index_buffer() const noexcept { return m_global_index_buffer; }
 
     void update_lights();
+    void update_tlas();
 
 private:
     uint32_t acquire_instance_index();
@@ -169,6 +174,7 @@ private:
     GPU_Transfer_Context& m_gpu_transfer_context;
     Asset_Repository& m_asset_repository;
     Render_Resource_Blackboard& m_render_resource_blackboard;
+    Acceleration_Structure_Builder& m_acceleration_structure_builder;
 
     OffsetAllocator::Allocator m_index_buffer_allocator;
 

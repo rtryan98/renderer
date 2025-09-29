@@ -6,6 +6,7 @@
 #include "renderer/asset/asset_repository.hpp"
 #include "renderer/render_resource_blackboard.hpp"
 #include "renderer/gpu_transfer.hpp"
+#include "renderer/acceleration_structure_builder.hpp"
 
 #include <rhi/graphics_device.hpp>
 #include <rhi/swapchain.hpp>
@@ -69,6 +70,7 @@ private:
     std::unique_ptr<rhi::Graphics_Device> m_device;
     std::unique_ptr<rhi::Swapchain> m_swapchain;
     GPU_Transfer_Context m_gpu_transfer_context;
+    Acceleration_Structure_Builder m_acceleration_structure_builder;
     std::array<Frame, REN_MAX_FRAMES_IN_FLIGHT> m_frames;
     uint64_t m_frame_counter;
     std::unique_ptr<Asset_Repository> m_asset_repository;
