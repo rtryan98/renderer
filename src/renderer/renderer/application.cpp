@@ -225,6 +225,7 @@ void Application::setup_frame(Frame& frame) noexcept
     }
 
     m_renderer.setup_frame();
+    m_static_scene_data->update_tlas();
 }
 
 void Application::render_frame(Frame& frame, double t, double dt) noexcept

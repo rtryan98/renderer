@@ -407,10 +407,57 @@ void Static_Scene_Data::update_lights()
 
 void Static_Scene_Data::update_tlas()
 {
+    if (m_model_Instances.empty())
+    {
+        return;
+    }
+
+    static auto ping_pong = 0;
+    auto* selected_buffer = m_tlas_instance_buffers[ping_pong];
+
+    std::vector<rhi::Acceleration_Structure_Instance> tlas_instance_data;
+    tlas_instance_data.reserve(1ull << 16);
     for (auto& instance : m_model_Instances)
     {
-
+        for (auto& mesh_instance : instance.mesh_instances)
+        {
+            for (auto& submesh_instance : mesh_instance.submesh_instances)
+            {
+                auto& tlas_instance = tlas_instance_data.emplace_back() = {
+                    .instance_id = submesh_instance.instance_index,
+                    .instance_mask = 0xFF,
+                    .instance_sbt_record_offset = 0,
+                    .flags = 0,
+                    .acceleration_structure_gpu_address = submesh_instance.submesh->blas->address
+                };
+                glm::mat3x4 transform = glm::mat3x4(glm::transpose(mesh_instance.mesh_to_world));
+                memcpy_s(&tlas_instance, sizeof(glm::mat3x4), &transform, sizeof(glm::mat3x4));
+            }
+        }
     }
+    memcpy_s(selected_buffer->data, selected_buffer->size, tlas_instance_data.data(),
+        tlas_instance_data.size() * sizeof(rhi::Acceleration_Structure_Instance));
+    rhi::Acceleration_Structure_Build_Geometry_Info build_info = {
+        .type = rhi::Acceleration_Structure_Type::Top_Level,
+        .flags = rhi::Acceleration_Structure_Flags::Fast_Build,
+        .geometry_or_instance_count = static_cast<uint32_t>(tlas_instance_data.size()),
+        .src = nullptr,
+        .dst = nullptr,
+        .instances = {
+            .array_of_pointers = false,
+            .instance_gpu_address = selected_buffer->gpu_address
+        }
+    };
+    TLAS_Build_Request tlas_build_request = {
+        .acceleration_structure = m_tlas,
+        .build_sizes = m_graphics_device->get_acceleration_structure_build_sizes(build_info),
+        .instance_count = static_cast<uint32_t>(tlas_instance_data.size()),
+        .array_of_pointers = false,
+        .instances_gpu_address = selected_buffer->gpu_address
+    };
+    m_acceleration_structure_builder.add_tlas_build_request(tlas_build_request);
+
+    ping_pong = (ping_pong + 1) % REN_MAX_FRAMES_IN_FLIGHT;
 }
 
 uint32_t Static_Scene_Data::acquire_instance_index()
@@ -588,17 +635,49 @@ Static_Scene_Data::Static_Scene_Data(
         .alpha_mode = Material_Alpha_Mode::Opaque,
         .double_sided = false
     };
+
+    buffer_create_info.acceleration_structure_memory = true;
+    rhi::Acceleration_Structure_Build_Geometry_Info tlas_geometry_info = {
+        .type = rhi::Acceleration_Structure_Type::Top_Level,
+        .flags = rhi::Acceleration_Structure_Flags::Fast_Build,
+        .geometry_or_instance_count = 1ull < 16,
+        .src = nullptr,
+        .dst = nullptr
+    };
+    buffer_create_info.size = m_graphics_device->get_acceleration_structure_build_sizes(tlas_geometry_info).acceleration_structure_size;
+    m_tlas_buffer = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+
+    rhi::Acceleration_Structure_Create_Info tlas_create_info = {
+        .buffer = m_tlas_buffer,
+        .offset = 0,
+        .size = m_tlas_buffer->size,
+        .type = rhi::Acceleration_Structure_Type::Top_Level
+    };
+    m_tlas = m_graphics_device->create_acceleration_structure(tlas_create_info).value_or(nullptr);
+
+    buffer_create_info.size = sizeof(rhi::Acceleration_Structure_Instance) * (1ull << 16);
+    buffer_create_info.heap = rhi::Memory_Heap_Type::CPU_Upload;
+    buffer_create_info.acceleration_structure_memory = false;
+
+    for (auto& tlas_instance_buffer : m_tlas_instance_buffers)
+    {
+        tlas_instance_buffer = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
+    }
 }
 
 Static_Scene_Data::~Static_Scene_Data()
 {
     m_graphics_device->wait_idle();
+    m_graphics_device->destroy_acceleration_structure(m_tlas);
     m_graphics_device->destroy_buffer(m_global_index_buffer);
     m_graphics_device->destroy_buffer(m_transform_buffer);
     m_graphics_device->destroy_buffer(m_material_buffer);
     m_graphics_device->destroy_buffer(m_instance_buffer);
     m_graphics_device->destroy_buffer(m_light_buffer);
     m_graphics_device->destroy_buffer(m_scene_info_buffer);
+    for (auto& buffer : m_tlas_instance_buffers)
+        m_graphics_device->destroy_buffer(buffer);
+    m_graphics_device->destroy_buffer(m_tlas_buffer);
     m_graphics_device->destroy_image(m_default_albedo_tex);
     m_graphics_device->destroy_image(m_default_normal_tex);
     m_graphics_device->destroy_image(m_default_metallic_roughness_tex);

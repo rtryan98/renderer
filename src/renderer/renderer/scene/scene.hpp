@@ -13,6 +13,8 @@
 #include "glm/ext/matrix_transform.hpp"
 #include "renderer/logger.hpp"
 
+#include <array>
+
 namespace rhi
 {
 class Graphics_Device;
@@ -195,6 +197,10 @@ private:
     rhi::Buffer* m_instance_buffer = nullptr;
     rhi::Buffer* m_light_buffer = nullptr;
     rhi::Buffer* m_scene_info_buffer = nullptr;
+    std::array<rhi::Buffer*, REN_MAX_FRAMES_IN_FLIGHT> m_tlas_instance_buffers = {};
+    rhi::Buffer* m_tlas_buffer = nullptr;
+
+    rhi::Acceleration_Structure* m_tlas = nullptr;
 
     rhi::Image* m_default_albedo_tex = nullptr;
     rhi::Image* m_default_normal_tex = nullptr;

@@ -38,6 +38,19 @@ void Acceleration_Structure_Builder::build_acceleration_structures(rhi::Command_
         return (value & (~mask)) + ((value & mask) > 0) * pow2;
     };
 
+    {
+        rhi::Memory_Barrier_Info memory_barrier_info = {
+            .stage_before = rhi::Barrier_Pipeline_Stage::Copy,
+            .stage_after = rhi::Barrier_Pipeline_Stage::Acceleration_Structure_Build,
+            .access_before = rhi::Barrier_Access::Transfer_Write,
+            .access_after = rhi::Barrier_Access::Acceleration_Structure_Write,
+        };
+        rhi::Barrier_Info barrier_info = {
+            .memory_barriers = { &memory_barrier_info, 1 }
+        };
+        cmd->barrier(barrier_info);
+    }
+
     uint64_t scratch_buffer_size_usage = 0;
     for (auto& build_request : m_blas_build_requests)
     {
