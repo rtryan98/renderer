@@ -15,6 +15,7 @@
 #include "renderer/render_resource_blackboard.hpp"
 
 #include <shared/shared_resources.h>
+#include <imgui.h>
 
 namespace ren
 {
@@ -277,7 +278,6 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
             };
             m_acceleration_structure_builder.add_blas_build_request(blas_request);
         }
-
     }
 
     model.meshes.resize(loadable_model->instance_count);
@@ -380,29 +380,16 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
     }
 }
 
-void Static_Scene_Data::update_lights()
+void Static_Scene_Data::upload_scene_info()
 {
-    // TODO: this is for
-    /*
-    m_punctual_lights.resize(1);
-    m_punctual_lights[0] = {
-        .disabled = false,
-        .type = static_cast<uint32_t>(Light_Type::Directional),
-        .color = glm::packUnorm4x8(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)) >> 8,
-        .intensity = 2.5f,
-        .position = glm::vec3(0.0f, 0.0f, 0.0f),
-        .direction = glm::normalize(glm::vec3(-0.8f, -0.8f, -1.0f)),
-        .arguments = glm::vec2(0.0f, 0.0f),
-    };
-
     m_gpu_transfer_context.enqueue_immediate_upload(m_light_buffer, m_punctual_lights.data(), sizeof(Punctual_Light), 0);
 
     Scene_Info scene_info = {
-        .light_count = static_cast<uint32_t>(m_punctual_lights.size())
+        .light_count = static_cast<uint32_t>(m_punctual_lights.size()),
+        .tlas = m_tlas->bindless_index
     };
 
     m_gpu_transfer_context.enqueue_immediate_upload(m_scene_info_buffer, &scene_info, sizeof(Scene_Info), 0);
-    */
 }
 
 void Static_Scene_Data::update_tlas()
@@ -427,7 +414,9 @@ void Static_Scene_Data::update_tlas()
                     .instance_id = submesh_instance.instance_index,
                     .instance_mask = 0xFF,
                     .instance_sbt_record_offset = 0,
-                    .flags = 0,
+                    .flags = static_cast<uint32_t>(
+                        rhi::Acceleration_Structure_Instance_Flags::Triangle_Cull_Disable |
+                        rhi::Acceleration_Structure_Instance_Flags::Triangle_Front_CCW),
                     .acceleration_structure_gpu_address = submesh_instance.submesh->blas->address
                 };
                 glm::mat3x4 transform = glm::mat3x4(glm::transpose(mesh_instance.mesh_to_world));
@@ -458,6 +447,26 @@ void Static_Scene_Data::update_tlas()
     m_acceleration_structure_builder.add_tlas_build_request(tlas_build_request);
 
     ping_pong = (ping_pong + 1) % REN_MAX_FRAMES_IN_FLIGHT;
+}
+
+void Static_Scene_Data::gui()
+{
+    if (ImGui::Begin("Scene Lights"))
+    {
+        auto& direction = m_punctual_lights[0].direction;
+        float pitch = glm::asin(direction.z);
+        float yaw = glm::atan(direction.x, direction.y);
+        ImGui::SliderFloat("pitch", &pitch, -glm::half_pi<float>() + 0.001f, glm::half_pi<float>() - 0.001f);
+        ImGui::SliderFloat("yaw", &yaw, -glm::pi<float>(), glm::pi<float>());
+        direction = glm::normalize(
+            glm::vec3(
+                glm::sin(yaw) * glm::cos(pitch),
+                glm::cos(yaw) * glm::cos(pitch),
+                glm::sin(pitch)
+            ));
+        ImGui::Text("Direction: %.3f, %.3f, %.3f", direction.x, direction.y, direction.z);
+    }
+    ImGui::End();
 }
 
 uint32_t Static_Scene_Data::acquire_instance_index()
@@ -637,14 +646,7 @@ Static_Scene_Data::Static_Scene_Data(
     };
 
     buffer_create_info.acceleration_structure_memory = true;
-    rhi::Acceleration_Structure_Build_Geometry_Info tlas_geometry_info = {
-        .type = rhi::Acceleration_Structure_Type::Top_Level,
-        .flags = rhi::Acceleration_Structure_Flags::Fast_Build,
-        .geometry_or_instance_count = 1ull < 16,
-        .src = nullptr,
-        .dst = nullptr
-    };
-    buffer_create_info.size = m_graphics_device->get_acceleration_structure_build_sizes(tlas_geometry_info).acceleration_structure_size;
+    buffer_create_info.size = 1 << 20;
     m_tlas_buffer = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
 
     rhi::Acceleration_Structure_Create_Info tlas_create_info = {
@@ -663,6 +665,17 @@ Static_Scene_Data::Static_Scene_Data(
     {
         tlas_instance_buffer = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
     }
+
+    m_punctual_lights.resize(1);
+    m_punctual_lights[0] = {
+        .disabled = false,
+        .type = static_cast<uint32_t>(Light_Type::Directional),
+        .color = glm::packUnorm4x8(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)) >> 8,
+        .intensity = 2.5f,
+        .position = glm::vec3(0.0f, 0.0f, 0.0f),
+        .direction = glm::normalize(glm::vec3(-0.456f, -0.334f, -0.825f)),
+        .arguments = glm::vec2(0.0f, 0.0f),
+    };
 }
 
 Static_Scene_Data::~Static_Scene_Data()

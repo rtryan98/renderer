@@ -1,0 +1,5 @@
+{
+    "name": "nop",
+    "shader_type": "ps",
+    "entry_point": "main"
+}

@@ -49,10 +49,17 @@ int32_t main(uint32_t argc, const char* argv[])
             "Enable gpu-based validation layers.",
             false);
         cmd.add(gpu_validation_arg);
+        TCLAP::SwitchArg fullscreen_arg(
+            "f",
+            "fullscreen",
+            "Start in fullscreen.",
+            false);
+        cmd.add(fullscreen_arg);
         cmd.parse(argc, argv);
 
         app_create_info.width = window_width_arg.getValue();
         app_create_info.height = window_height_arg.getValue();
+        app_create_info.fullscreen = fullscreen_arg.getValue();
         app_create_info.enable_validation = validation_arg.getValue();
         app_create_info.enable_gpu_validation = gpu_validation_arg.getValue();
 

@@ -15,10 +15,19 @@ float4 main(PS_In ps_in) : SV_Target
 {
     float4 x_y_z_xdx = float4(0.,0.,0.,0.);
     float4 ydx_zdx_ydy_zdy = float4(0.,0.,0.,0.);
+
+    float4 weights = calculate_cascade_sampling_weights(
+        distance(ps_in.position_camera.xy, ps_in.position_ws.xy),
+        0.25,
+        5.0,
+        pc.length_scales);
+
     for (uint i = 0; i < 4; ++i)
     {
-        x_y_z_xdx += rhi::uni::tex_sample_arr<float4>(pc.x_y_z_xdx_tex, pc.tex_sampler, ps_in.uvs[i], i);
-        ydx_zdx_ydy_zdy += rhi::uni::tex_sample_arr<float4>(pc.ydx_zdx_ydy_zdy_tex, pc.tex_sampler, ps_in.uvs[i], i);
+        if (weights[i] <= 0.0) continue;
+
+        x_y_z_xdx += weights * rhi::uni::tex_sample_arr<float4>(pc.x_y_z_xdx_tex, pc.tex_sampler, ps_in.uvs[i], i);
+        ydx_zdx_ydy_zdy += weights * rhi::uni::tex_sample_arr<float4>(pc.ydx_zdx_ydy_zdy_tex, pc.tex_sampler, ps_in.uvs[i], i);
     }
 
     float x_dx = x_y_z_xdx[3];

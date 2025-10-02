@@ -1,0 +1,18 @@
+{
+    "name": "ocean_render_patch_depth_prepass_wireframe",
+    "vs": {
+        "name": "surface_patch_render_ocean.vs"
+    },
+    "ps": {
+        "name": "nop.ps"
+    },
+    "depth_stencil": {
+        "format": "D32_SFLOAT",
+        "depth_enable": true,
+        "depth_write_enable": true,
+        "comparison_func": "Less"
+    },
+    "rasterizer_state": {
+        "wireframe": true
+    }
+}

@@ -24,7 +24,6 @@ public:
     constexpr static auto SPECTRUM_ANGULAR_FREQUENCY_TEXTURE_NAME = "ocean:spectrum_angular_frequency_texture";
     constexpr static auto DISPLACEMENT_X_Y_Z_XDX_TEXTURE_NAME = "ocean:displacement_x_y_z_xdx";
     constexpr static auto DISPLACEMENT_YDX_ZDX_YDY_ZDY_TEXTURE_NAME = "ocean:displacement_ydx_zdx_ydy_zdy_texture";
-    constexpr static auto FORWARD_PASS_COLOR_RENDER_TARGET_NAME = "ocean:forward_pass_color_render_target";
     constexpr static auto FORWARD_PASS_DEPTH_RENDER_TARGET_NAME = "ocean:forward_pass_depth_render_target";
 
     Ocean(Asset_Repository& asset_repository,
@@ -42,6 +41,12 @@ public:
         rhi::Command_List* cmd,
         Resource_State_Tracker& tracker,
         float dt);
+
+    void depth_pre_pass(
+        rhi::Command_List* cmd,
+        Resource_State_Tracker& tracker,
+        const Buffer& camera,
+        const Image& shaded_scene_depth_render_target);
 
     // TODO: add proper translucent pass instead.
     void opaque_forward_pass(
@@ -68,8 +73,8 @@ private:
 
     struct Options
     {
-        bool use_fp16_textures = false;
-        bool use_fp16_maths = false;
+        bool use_fp16_textures = true;
+        bool use_fp16_maths = true;
         bool update_time = true;
         bool enabled = true;
         bool wireframe = false;

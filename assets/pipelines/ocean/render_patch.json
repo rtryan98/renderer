@@ -14,7 +14,7 @@
     "depth_stencil": {
         "format": "D32_SFLOAT",
         "depth_enable": true,
-        "depth_write_enable": true,
-        "comparison_func": "Less"
+        "depth_write_enable": false,
+        "comparison_func": "Equal"
     }
 }

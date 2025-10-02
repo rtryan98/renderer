@@ -22,9 +22,9 @@ void Resource_State_Tracker::use_resource(
     auto& resource_state = get_resource_state(decay_resource(buffer));
     resource_state = {
         .buffer = buffer,
-        .stage_before = resource_state.stage_after,
+        .stage_before = resource_state.stage_before,
         .stage_after = stage,
-        .access_before = resource_state.access_after,
+        .access_before = resource_state.access_before,
         .access_after = access,
         .image_layout_before = rhi::Barrier_Image_Layout::Undefined,
         .image_layout_after = rhi::Barrier_Image_Layout::Undefined,
@@ -43,11 +43,11 @@ void Resource_State_Tracker::use_resource(
     auto& resource_state = get_resource_state(decay_resource(image));
     resource_state = {
         .image = image,
-        .stage_before = resource_state.stage_after,
+        .stage_before = resource_state.stage_before,
         .stage_after = stage,
-        .access_before = resource_state.access_after,
+        .access_before = resource_state.access_before,
         .access_after = access,
-        .image_layout_before = resource_state.image_layout_after,
+        .image_layout_before = resource_state.image_layout_before,
         .image_layout_after = layout,
         .discard = discard,
     };

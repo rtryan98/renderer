@@ -19,7 +19,7 @@ target_sources(
     renderer.cpp
     renderer.hpp
     resource_state_tracker.cpp
-    render_resource_blackboard.hpp
+    resource_state_tracker.hpp
     render_resource_blackboard.cpp
     render_resource_blackboard.hpp
     window.cpp

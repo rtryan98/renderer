@@ -32,25 +32,21 @@ VS_Out main(uint vertex_id : SV_VertexID)
     };
 
     float4 x_y_z_xdx = float4(0.,0.,0.,0.);
-    float4 ydx_zdx_ydy_zdy = float4(0.,0.,0.,0.);
+
+    float4 weights = calculate_cascade_sampling_weights(
+        distance(camera.position.xy, vertex_pos),
+        0.25,
+        5.0,
+        pc.length_scales);
 
     for (uint i = 0; i < 4; ++i)
     {
-        x_y_z_xdx += rhi::uni::tex_sample_level_arr<float4>(pc.x_y_z_xdx_tex, pc.tex_sampler, uvs[i], i, 0.);
-        ydx_zdx_ydy_zdy += rhi::uni::tex_sample_level_arr<float4>(pc.ydx_zdx_ydy_zdy_tex, pc.tex_sampler, uvs[i], i, 0.);
+        if (weights[i] <= 0.0) continue;
+
+        x_y_z_xdx += weights[i] * rhi::uni::tex_sample_level_arr<float4>(pc.x_y_z_xdx_tex, pc.tex_sampler, uvs[i], i, 0.);
     }
 
-    float x_dx = x_y_z_xdx.w;
-    float y_dx = ydx_zdx_ydy_zdy.x;
-    float z_dx = ydx_zdx_ydy_zdy.y;
-    float y_dy = ydx_zdx_ydy_zdy.z;
-    float z_dy = ydx_zdx_ydy_zdy.w;
-
     float3 displacement = float3(x_y_z_xdx.x, x_y_z_xdx.y, x_y_z_xdx.z);
-    // float3 normal = calculate_normals(calculate_slope(z_dx, z_dy, x_dx, y_dy));
-    // float jacobian = calculate_det_jacobian(x_dx, y_dx, y_dx, y_dy);
-    // float2 loop_remove = heaviside(-jacobian) * normal.xy * jacobian;
-    // displacement.xy += loop_remove;
     float4 pos_ws = float4(vertex_pos.x + displacement.x, vertex_pos.y + displacement.y, displacement.z, 1.);
 
     float4 pos = mul(camera.world_to_clip, pos_ws);

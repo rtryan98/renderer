@@ -59,4 +59,9 @@ float3 calculate_normals(float2 slope)
     return normalize(float3(-slope.x, -slope.y, 1.0));
 }
 
+float4 calculate_cascade_sampling_weights(float distance, float distance_factor, float lod_lengthscale_factor, float4 lengthscales)
+{
+    return 1.0 - smoothstep(0.0, lod_lengthscale_factor * lengthscales, distance_factor * distance);
+}
+
 #endif

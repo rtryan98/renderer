@@ -259,6 +259,87 @@ void Ocean::simulate(
     cmd->end_debug_region(); // ocean:simulation
 }
 
+void Ocean::depth_pre_pass(rhi::Command_List* cmd, Resource_State_Tracker& tracker, const Buffer& camera,
+    const Image& shaded_scene_depth_render_target)
+{
+    if (!m_options.enabled) return;
+
+    cmd->begin_debug_region("ocean:render:depth_pre_pass", 0.25f, 0.0f, 1.0f);
+
+    const uint32_t width = static_cast<rhi::Image*>(m_forward_pass_depth_render_target)->width;
+    const uint32_t height = static_cast<rhi::Image*>(m_forward_pass_depth_render_target)->height;
+
+    tracker.use_resource(
+        shaded_scene_depth_render_target,
+        rhi::Barrier_Pipeline_Stage::Copy,
+        rhi::Barrier_Access::Transfer_Read,
+        rhi::Barrier_Image_Layout::Copy_Src);
+    tracker.use_resource(
+        m_forward_pass_depth_render_target,
+        rhi::Barrier_Pipeline_Stage::Copy,
+        rhi::Barrier_Access::Transfer_Write,
+        rhi::Barrier_Image_Layout::Copy_Dst);
+    tracker.flush_barriers(cmd);
+
+    cmd->copy_image(
+        shaded_scene_depth_render_target, {}, 0, 0,
+        m_forward_pass_depth_render_target, {}, 0, 0,
+        { width, height, 1 });
+
+    tracker.use_resource(
+        m_forward_pass_depth_render_target,
+        rhi::Barrier_Pipeline_Stage::Early_Fragment_Tests,
+        rhi::Barrier_Access::Depth_Stencil_Attachment_Write,
+        rhi::Barrier_Image_Layout::Depth_Stencil_Write);
+    tracker.use_resource(
+        m_displacement_x_y_z_xdx_texture,
+        rhi::Barrier_Pipeline_Stage::Pixel_Shader,
+        rhi::Barrier_Access::Shader_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
+    tracker.use_resource(
+        m_displacement_ydx_zdx_zdz_zdy_texture,
+        rhi::Barrier_Pipeline_Stage::Pixel_Shader,
+        rhi::Barrier_Access::Shader_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
+
+    tracker.flush_barriers(cmd);
+
+    const rhi::Render_Pass_Begin_Info render_pass_info = {
+        .color_attachments = {},
+        .depth_stencil_attachment = {
+            .attachment = m_forward_pass_depth_render_target,
+            .depth_load_op = rhi::Render_Pass_Attachment_Load_Op::Load,
+            .depth_store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
+            .stencil_load_op = rhi::Render_Pass_Attachment_Load_Op::No_Access,
+            .stencil_store_op = rhi::Render_Pass_Attachment_Store_Op::No_Access,
+            .clear_value = {}
+        }
+    };
+    cmd->begin_render_pass(render_pass_info);
+
+    cmd->set_viewport(0.f, 0.f,
+        static_cast<float>(width), static_cast<float>(height), 0.f, 1.f);
+    cmd->set_scissor(0, 0, width, height);
+
+    constexpr static auto SIZE = 2048;
+    if (m_options.wireframe)
+        cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch_depth_prepass_wireframe"));
+    else
+        cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch_depth_prepass"));
+    cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
+        .length_scales = m_simulation_data.full_spectrum_parameters.length_scales,
+        .tex_sampler = m_displacement_sampler,
+        .camera = camera,
+        .x_y_z_xdx_tex = m_displacement_x_y_z_xdx_texture,
+        .ydx_zdx_ydy_zdy_tex = m_displacement_ydx_zdx_zdz_zdy_texture,
+        .vertex_position_dist = .25f,
+        .field_size = SIZE
+        }, rhi::Pipeline_Bind_Point::Graphics);
+    cmd->draw(6 * SIZE * SIZE, 1, 0, 0);
+    cmd->end_render_pass();
+    cmd->end_debug_region(); // ocean:render:depth_pre_pass
+}
+
 void Ocean::opaque_forward_pass(
         rhi::Command_List* cmd,
         Resource_State_Tracker& tracker,
@@ -271,24 +352,19 @@ void Ocean::opaque_forward_pass(
     cmd->begin_debug_region("ocean:render:opaque_pass", 0.25f, 0.0f, 1.0f);
 
     tracker.use_resource(
-        m_displacement_x_y_z_xdx_texture,
-        rhi::Barrier_Pipeline_Stage::Pixel_Shader,
-        rhi::Barrier_Access::Shader_Read,
-        rhi::Barrier_Image_Layout::Shader_Read_Only);
-    tracker.use_resource(
-        m_displacement_ydx_zdx_zdz_zdy_texture,
-        rhi::Barrier_Pipeline_Stage::Pixel_Shader,
-        rhi::Barrier_Access::Shader_Read,
-        rhi::Barrier_Image_Layout::Shader_Read_Only);
-    tracker.use_resource(
         shaded_scene_render_target,
         rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
         rhi::Barrier_Access::Color_Attachment_Write,
         rhi::Barrier_Image_Layout::Color_Attachment);
     tracker.use_resource(
         shaded_scene_depth_render_target,
+        rhi::Barrier_Pipeline_Stage::Pixel_Shader,
+        rhi::Barrier_Access::Shader_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
+    tracker.use_resource(
+        m_forward_pass_depth_render_target,
         rhi::Barrier_Pipeline_Stage::Early_Fragment_Tests,
-        rhi::Barrier_Access::Depth_Stencil_Attachment_Write,
+        rhi::Barrier_Access::Depth_Stencil_Attachment_Read,
         rhi::Barrier_Image_Layout::Depth_Stencil_Write);
     tracker.flush_barriers(cmd);
 
@@ -302,9 +378,9 @@ void Ocean::opaque_forward_pass(
     const rhi::Render_Pass_Begin_Info render_pass_info = {
         .color_attachments = color_attachment_infos,
         .depth_stencil_attachment = {
-            .attachment = shaded_scene_depth_render_target,
+            .attachment = m_forward_pass_depth_render_target,
             .depth_load_op = rhi::Render_Pass_Attachment_Load_Op::Load,
-            .depth_store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
+            .depth_store_op = rhi::Render_Pass_Attachment_Store_Op::Discard,
             .stencil_load_op = rhi::Render_Pass_Attachment_Load_Op::No_Access,
             .stencil_store_op = rhi::Render_Pass_Attachment_Store_Op::No_Access,
             .clear_value = {}

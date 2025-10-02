@@ -38,6 +38,30 @@ void main(uint3 id : SV_DispatchThreadID)
 
     float3 color = ren::pbr::evaluate_lights(V, surface);
 
+    Scene_Info scene_info = rhi::uni::buf_load<Scene_Info>(REN_GLOBAL_SCENE_INFORMATION_BUFFER);
+    Punctual_Light light = rhi::uni::buf_load_arr<Punctual_Light>(REN_GLOBAL_LIGHT_LIST_BUFFER, 0);
+
+    RayDesc ray = {
+        surface.position + 0.005 * surface.normal,
+        0.05,
+        -light.direction,
+        500.0
+    };
+
+    RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> q;
+    q.TraceRayInline(
+        rhi::get_rtas(scene_info.tlas),
+        0,
+        0xFF,
+        ray
+    );
+
+    q.Proceed();
+    if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+    {
+        color *= 0.125;
+    }
+
     float4 result = float4(color, 1.0);
     rhi::uni::tex_store(pc.resolve_target, id.xy, result);
 }

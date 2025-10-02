@@ -19,7 +19,7 @@ Image_Based_Lighting::Image_Based_Lighting(
     , m_gpu_transfer_context(gpu_transfer_context)
     , m_render_resource_blackboard(render_resource_blackboard)
 {
-    auto* hdri_texture = static_cast<serialization::Image_Data_00*>(m_asset_repository.get_texture("lonely_road_afternoon_puresky_4k.rentex")->data);
+    auto* hdri_texture = static_cast<serialization::Image_Data_00*>(m_asset_repository.get_texture("qwantani_noon_puresky_4k.rentex")->data);
     const rhi::Image_Create_Info hdri_create_info = {
         .format = hdri_texture->format,
         .width = hdri_texture->mips[0].width,
@@ -115,6 +115,10 @@ void Image_Based_Lighting::equirectangular_to_cubemap(rhi::Command_List* cmd, Re
     const auto equirectangular_to_cubemap_pipeline = m_asset_repository.get_compute_pipeline("equirectangular_to_cubemap");
     const auto mipmap_gen_pipeline = m_asset_repository.get_compute_pipeline("mipmap_gen");
 
+    tracker.set_resource_state(m_hdri,
+        rhi::Barrier_Pipeline_Stage::All_Commands,
+        rhi::Barrier_Access::Shader_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
     tracker.use_resource(m_hdri,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Shader_Read,

@@ -11,7 +11,7 @@ Acceleration_Structure_Builder::Acceleration_Structure_Builder(rhi::Graphics_Dev
     , m_tlas_build_requests()
 {
     rhi::Buffer_Create_Info scratch_buffer_create_info = {
-        .size = 1 << 24, // 16MB
+        .size = 1 << 27, // 128MB
         .heap = rhi::Memory_Heap_Type::GPU
     };
     m_scratch_buffer = m_graphics_device->create_buffer(scratch_buffer_create_info).value_or(nullptr);

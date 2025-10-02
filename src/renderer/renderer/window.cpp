@@ -15,13 +15,16 @@ public:
             create_info.title,
             static_cast<int32_t>(create_info.width),
             static_cast<int32_t>(create_info.height),
-            create_info.borderless ? SDL_WINDOW_BORDERLESS : SDL_WINDOW_CREATE_FLAGS))
+            SDL_WINDOW_CREATE_FLAGS |
+            (create_info.borderless ? SDL_WINDOW_BORDERLESS : 0) |
+            (create_info.fullscreen ? SDL_WINDOW_FULLSCREEN : 0)))
         , m_data {
             .width = create_info.width,
             .height = create_info.height,
             .is_alive = true,
             .dpi_aware_size = create_info.dpi_aware_size
         }
+        , m_is_fullscreen{create_info.fullscreen}
     {
         ImGui_ImplSDL3_InitForOther(m_sdl_window);
     }
@@ -70,9 +73,16 @@ public:
     {
         return m_data;
     }
+
+    void toggle_fullscreen() noexcept override
+    {
+        m_is_fullscreen = !m_is_fullscreen;
+        SDL_SetWindowFullscreen(m_sdl_window, m_is_fullscreen);
+    }
 private:
     SDL_Window* m_sdl_window;
     Window_Data m_data;
+    bool m_is_fullscreen = false;
 };
 
 std::unique_ptr<Window> Window::create(const Window_Create_Info& create_info) noexcept

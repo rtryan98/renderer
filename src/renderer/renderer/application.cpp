@@ -18,6 +18,7 @@ Application::Application(const Application_Create_Info& create_info) noexcept
     , m_window(Window::create({
         .width = create_info.width,
         .height = create_info.height,
+        .fullscreen = create_info.fullscreen,
         .title = "Renderer",
         .dpi_aware_size = false,
         .borderless = true
@@ -162,6 +163,12 @@ void Application::run()
         m_window->update();
         m_input_state->update();
 
+        if (m_input_state->is_key_pressed(SDL_SCANCODE_LSHIFT) &&
+            m_input_state->is_key_clicked(SDL_SCANCODE_F))
+        {
+            m_window->toggle_fullscreen();
+        }
+
         delta_time = std::chrono::duration_cast<std::chrono::duration<double>>(
             current_time - last_time)
             .count();
@@ -285,6 +292,14 @@ void Application::process_gui() noexcept
     }
     if (m_imgui_data.windows.demo)
         ImGui::ShowDemoWindow(&m_imgui_data.windows.demo);
+    if (m_imgui_data.windows.scene_lights)
+    {
+        if (ImGui::Begin("Scene Lights", &m_imgui_data.windows.scene_lights))
+        {
+            m_static_scene_data->gui();
+        }
+        ImGui::End();
+    }
 
     imgui_process_modals();
 
@@ -293,14 +308,13 @@ void Application::process_gui() noexcept
 
 void Application::update(double t, double dt) noexcept
 {
-    m_static_scene_data->update_lights();
+    m_static_scene_data->upload_scene_info();
     m_renderer.update(*m_input_state, t, dt);
 }
 
 void Application::imgui_close_all_windows() noexcept
 {
-    m_imgui_data.windows.demo = false;
-    m_imgui_data.windows.renderer_settings = false;
+    memset(&m_imgui_data.windows, 0, sizeof(m_imgui_data.windows));
 }
 
 void Application::imgui_process_modals() noexcept
@@ -373,6 +387,7 @@ void Application::imgui_menubar() noexcept
             {
                 m_imgui_data.modals.add_model = true;
             }
+            imgui_menu_toggle_window("Scene Lights", m_imgui_data.windows.scene_lights);
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Window"))

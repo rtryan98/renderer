@@ -159,6 +159,11 @@ void Renderer::render(
         m_camera_buffer,
         m_shaded_geometry_render_target,
         m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
+    m_ocean.depth_pre_pass(
+        cmd,
+        tracker,
+        m_camera_buffer,
+        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
     m_ocean.opaque_forward_pass(
         cmd,
         tracker,

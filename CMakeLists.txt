@@ -45,10 +45,6 @@ add_custom_command(
     COMMAND $<TARGET_FILE:asset_baker> --hdri -i ${CMAKE_BINARY_DIR}/download/hdri -o ${CMAKE_BINARY_DIR}/assets/cache
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
 )
-# Asset baker is not supporting unicode right now.
-# So long as the support is not there, it will crash with unicode inputs.
-# To "remedy" it, delete this folder.
-file(REMOVE_RECURSE thirdparty/gltf-sample-assets/Models/Unicode❤♻Test)
 
 # Additional assets
 core_download_and_extract_zip(
@@ -72,6 +68,14 @@ if (NOT EXISTS ${CMAKE_BINARY_DIR}/download/hdri/lonely_road_afternoon_puresky_4
         DOWNLOAD
         https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/lonely_road_afternoon_puresky_4k.hdr
         ${CMAKE_BINARY_DIR}/download/hdri/lonely_road_afternoon_puresky_4k.hdr
+    )
+endif()
+if (NOT EXISTS ${CMAKE_BINARY_DIR}/download/hdri/qwantani_noon_puresky_4k_hdri)
+    message(STATUS "Downloading https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/qwantani_noon_puresky_4k.hdr to ${CMAKE_BINARY_DIR}/download/hdri/qwantani_noon_puresky_4k.hdr.")
+    file(
+        DOWNLOAD
+        https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/qwantani_noon_puresky_4k.hdr
+        ${CMAKE_BINARY_DIR}/download/hdri/qwantani_noon_puresky_4k.hdr
     )
 endif()
 

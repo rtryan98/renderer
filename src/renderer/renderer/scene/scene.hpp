@@ -158,8 +158,10 @@ public:
     [[nodiscard]] auto& get_instances() const noexcept { return m_model_Instances; }
     [[nodiscard]] auto* get_index_buffer() const noexcept { return m_global_index_buffer; }
 
-    void update_lights();
+    void upload_scene_info();
     void update_tlas();
+
+    void gui();
 
 private:
     uint32_t acquire_instance_index();

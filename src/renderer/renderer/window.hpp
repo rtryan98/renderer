@@ -13,6 +13,7 @@ struct Window_Create_Info
 {
     uint32_t width;
     uint32_t height;
+    bool fullscreen;
     const char* title;
     bool dpi_aware_size;
     bool borderless;
@@ -39,6 +40,7 @@ public:
     virtual float get_dpi_scale() noexcept = 0;
     virtual void* get_native_handle() noexcept = 0;
     virtual const Window_Data& get_window_data() const noexcept = 0;
+    virtual void toggle_fullscreen() noexcept = 0;
 };
 
 class Input_State

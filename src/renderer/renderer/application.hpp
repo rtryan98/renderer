@@ -21,6 +21,7 @@ struct ImGui_Data
     {
         bool demo = false;
         bool renderer_settings = false;
+        bool scene_lights = false;
     } windows;
     struct
     {
@@ -32,6 +33,7 @@ struct Application_Create_Info
 {
     uint32_t width;
     uint32_t height;
+    bool fullscreen;
     bool enable_validation;
     bool enable_gpu_validation;
 };
