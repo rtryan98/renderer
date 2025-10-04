@@ -91,9 +91,7 @@ float omega_peak_pierson_moskowitz(Omega_Peak_Args args)
 
 float omega_peak_jonswap(Omega_Peak_Args args)
 {
-    float chi = min(1000, args.g * args.f * 1000. / args.u / args.u);
-    float nu = 3.5 * pow(chi, -0.33);
-    return TWO_PI * args.g * nu / args.u;
+    return 22.0 * args.g * args.g / (args.u * args.f);
 }
 
 // Non-directional wave spectra
@@ -136,9 +134,7 @@ float spectrum_jonswap(Spectrum_Args args)
     float sigma = args.omega <= args.omega_peak
         ? sigma_0
         : sigma_1;
-    // float alpha = 0.076f * pow(pow(u, 2.0f) / (f * g), 0.22f);
-    float chi = min(1000., args.g * args.f * 1000. / args.u / args.u);
-    float alpha = 0.076 * pow(chi, -0.22);
+    float alpha = 0.076 * pow(args.u * args.u / (args.f * args.g), 0.22);
     float r = exp(-(pow(args.omega - args.omega_peak, 2.) / (2. * pow(sigma, 2.) * pow(args.omega_peak, 2.))));
     return ((alpha * pow(args.g, 2.0f))/(pow(args.omega, 5.))) * exp(-1.25 * pow(args.omega_peak / args.omega, 4.)) * pow(gamma, r);
 }
