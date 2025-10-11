@@ -1,5 +1,12 @@
 {
     "name": "surface_patch_render_ocean",
     "shader_type": "vs",
-    "entry_point": "main"
+    "entry_point": "main",
+    "permutation_groups": [
+        {
+            "name": "prepass",
+            "type": "bool",
+            "define_name": "OCEAN_PATCH_PREPASS"
+        }
+    ]
 }

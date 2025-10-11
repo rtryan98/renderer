@@ -7,7 +7,17 @@
 
 DECLARE_PUSH_CONSTANTS(Ocean_Render_Patch_Push_Constants, pc);
 
-VS_Out main(uint vertex_id : SV_VertexID)
+#if OCEAN_PATCH_PREPASS
+struct Prepass_Out
+{
+    float4 position : SV_POSITION;
+};
+typedef Prepass_Out VS_OUT_TYPE;
+#else
+typedef VS_Out VS_OUT_TYPE;
+#endif
+
+VS_OUT_TYPE main(uint vertex_id : SV_VertexID)
 {
     GPU_Camera_Data camera = rhi::buf_load<GPU_Camera_Data>(pc.camera);
 
@@ -18,10 +28,10 @@ VS_Out main(uint vertex_id : SV_VertexID)
     vertex_pos += float2(pc.offset_x, pc.offset_y);
 
     float2 uvs[4] = {
-        vertex_pos / pc.length_scales[0],
-        vertex_pos / pc.length_scales[1],
-        vertex_pos / pc.length_scales[2],
-        vertex_pos / pc.length_scales[3]
+        fmod(vertex_pos / pc.length_scales[0], 2.0),
+        fmod(vertex_pos / pc.length_scales[1], 2.0),
+        fmod(vertex_pos / pc.length_scales[2], 2.0),
+        fmod(vertex_pos / pc.length_scales[3], 2.0)
     };
 
     float4 x_y_z_xdx = float4(0.,0.,0.,0.);
@@ -43,6 +53,10 @@ VS_Out main(uint vertex_id : SV_VertexID)
     float4 pos_ws = float4(vertex_pos.x + displacement.x, vertex_pos.y + displacement.y, displacement.z, 1.);
 
     float4 pos = mul(camera.world_to_clip, pos_ws);
-    VS_Out result = { pos, uvs, pos_ws, camera.position };
+#if OCEAN_PATCH_PREPASS
+    VS_OUT_TYPE result = { pos };
+#else
+    VS_OUT_TYPE result = { pos, uvs, pos_ws.xyz };
+#endif
     return result;
 }

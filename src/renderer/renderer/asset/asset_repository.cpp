@@ -342,6 +342,11 @@ void Asset_Repository::compile_shader_library(
             permutation_name.append(postfix);
 
             m_logger->debug("Created shader variant: '{}'", permutation_name);
+            for (const auto& define : defines)
+            {
+                auto define_chars = std::string(define.begin(), define.end());
+                m_logger->debug("Defined: '{}'", define_chars.c_str());
+            };
         }
     }
 
@@ -437,7 +442,7 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
             {
                 const auto name = pipeline_json[type]["name"].get<std::string>();
                 auto variant_name = pipeline_json[type].contains("variant")
-                    ? pipeline_json[type]["name"]["variant"].get<std::string>()
+                    ? pipeline_json[type]["variant"].get<std::string>()
                     : "";
                 if (!m_shader_library_ptrs.contains(name))
                 {

@@ -1,7 +1,8 @@
 {
     "name": "ocean_render_patch_depth_prepass_wireframe",
     "vs": {
-        "name": "surface_patch_render_ocean.vs"
+        "name": "surface_patch_render_ocean.vs",
+        "variant": "surface_patch_render_ocean_prepass"
     },
     "ps": {
         "name": "nop.ps"

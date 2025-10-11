@@ -14,11 +14,13 @@ DECLARE_PUSH_CONSTANTS(Ocean_Render_Patch_Push_Constants, pc);
 
 float4 main(PS_In ps_in) : SV_Target
 {
+    GPU_Camera_Data camera = rhi::buf_load<GPU_Camera_Data>(pc.camera);
+
     float4 x_y_z_xdx = float4(0.,0.,0.,0.);
     float4 ydx_zdx_ydy_zdy = float4(0.,0.,0.,0.);
 
     float4 weights = calculate_cascade_sampling_weights(
-        distance(ps_in.position_camera.xy, ps_in.position_ws.xy),
+        distance(camera.position.xy, ps_in.position_ws.xy),
         0.25,
         5.0,
         pc.length_scales);
@@ -53,7 +55,7 @@ float4 main(PS_In ps_in) : SV_Target
         surface.metallic = 0.0;
     }
 
-    float3 V = normalize(float3(ps_in.position_camera.xyz - ps_in.position_ws.xyz));
+    float3 V = normalize(float3(camera.position.xyz - ps_in.position_ws.xyz));
 
     float3 color = ren::pbr::evaluate_lights(V, surface);
 
