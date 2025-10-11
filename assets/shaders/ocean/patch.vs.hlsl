@@ -11,8 +11,8 @@ VS_Out main(uint vertex_id : SV_VertexID)
 {
     GPU_Camera_Data camera = rhi::buf_load<GPU_Camera_Data>(pc.camera);
 
-    uint row = vertex_id / (pc.field_size);
-    uint column = vertex_id % (pc.field_size);
+    uint row = vertex_id / pc.field_size;
+    uint column = vertex_id % pc.field_size;
     float2 vertex_pos = -pc.vertex_position_dist * float2(pc.field_size, pc.field_size) / 2.;
     vertex_pos += pc.vertex_position_dist * (float2(row, column));
     vertex_pos += float2(pc.offset_x, pc.offset_y);

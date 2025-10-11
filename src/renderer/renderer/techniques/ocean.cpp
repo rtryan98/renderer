@@ -16,7 +16,7 @@ namespace ren::techniques
 {
 constexpr static auto FIELD_SIZE = 2048;
 constexpr static auto TILES_PER_AXIS = 16u;
-constexpr static auto TILE_VERTEX_COUNT = FIELD_SIZE / TILES_PER_AXIS;
+constexpr static auto TILE_VERTEX_COUNT = FIELD_SIZE / TILES_PER_AXIS + 1;
 constexpr static auto VERTEX_DIST = 0.25f;
 constexpr static auto TILE_SIZE = static_cast<float>(TILE_VERTEX_COUNT - 1) * VERTEX_DIST;
 
@@ -56,18 +56,18 @@ Ocean::Ocean(Asset_Repository& asset_repository, GPU_Transfer_Context& gpu_trans
     {
         std::vector<uint16_t> index_buffer;
         index_buffer.reserve(3 * 2 * (TILE_VERTEX_COUNT - 1) * (TILE_VERTEX_COUNT - 1));
-        for (auto i = 0; i < (TILE_VERTEX_COUNT - 1); ++i)
+        for (auto i = 0; i < (TILE_VERTEX_COUNT - 1) * (TILE_VERTEX_COUNT - 1); ++i)
         {
-            for (auto j = 0; j < (TILE_VERTEX_COUNT - 1); ++j)
-            {
-                index_buffer.push_back(i * TILE_VERTEX_COUNT + j);
-                index_buffer.push_back(i * TILE_VERTEX_COUNT + j + 1);
-                index_buffer.push_back(i * TILE_VERTEX_COUNT + j + TILE_VERTEX_COUNT);
-                index_buffer.push_back(i * TILE_VERTEX_COUNT + j + 1);
-                index_buffer.push_back(i * TILE_VERTEX_COUNT + j + 1 + TILE_VERTEX_COUNT);
-                index_buffer.push_back(i * TILE_VERTEX_COUNT + j + TILE_VERTEX_COUNT);
-            }
+            uint16_t x = _pext_u32(i, 0x55555555);
+            uint16_t y = _pext_u32(i, 0xaaaaaaaa);
+            index_buffer.push_back(y * TILE_VERTEX_COUNT + x);
+            index_buffer.push_back(y * TILE_VERTEX_COUNT + x + 1);
+            index_buffer.push_back(y * TILE_VERTEX_COUNT + x + TILE_VERTEX_COUNT);
+            index_buffer.push_back(y * TILE_VERTEX_COUNT + x + 1);
+            index_buffer.push_back(y * TILE_VERTEX_COUNT + x + 1 + TILE_VERTEX_COUNT);
+            index_buffer.push_back(y * TILE_VERTEX_COUNT + x + TILE_VERTEX_COUNT);
         }
+
         m_tile_index_buffer = m_render_resource_blackboard.create_buffer(
             OCEAN_TILE_INDEX_BUFFER_NAME,
             {
