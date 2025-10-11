@@ -15,9 +15,10 @@ DECLARE_PUSH_CONSTANTS(Ocean_Render_Patch_Push_Constants, pc);
 float4 main(PS_In ps_in) : SV_Target
 {
     GPU_Camera_Data camera = rhi::buf_load<GPU_Camera_Data>(pc.camera);
+    Ocean_Min_Max_Values min_max_values = rhi::uni::buf_load<Ocean_Min_Max_Values>(pc.min_max_buffer);
 
-    float4 x_y_z_xdx = float4(0.,0.,0.,0.);
-    float4 ydx_zdx_ydy_zdy = float4(0.,0.,0.,0.);
+    float x_dx = 0.0;
+    float4 ydx_zdx_ydy_zdy = 0.0;
 
     float4 weights = calculate_cascade_sampling_weights(
         distance(camera.position.xy, ps_in.position_ws.xy),
@@ -29,11 +30,21 @@ float4 main(PS_In ps_in) : SV_Target
     {
         if (weights[i] <= 0.0) continue;
 
-        x_y_z_xdx += weights * rhi::uni::tex_sample_arr<float4>(pc.x_y_z_xdx_tex, REN_SAMPLER_LINEAR_WRAP, ps_in.uvs[i], i);
-        ydx_zdx_ydy_zdy += weights * rhi::uni::tex_sample_arr<float4>(pc.ydx_zdx_ydy_zdy_tex, REN_SAMPLER_LINEAR_WRAP, ps_in.uvs[i], i);
+        float4 x_y_z_xdx_ranges = min_max_values.cascades[i].max_values - min_max_values.cascades[i].min_values;
+        float4 ydx_zdx_ydy_zdy_ranges = min_max_values.cascades[i + 4].max_values - min_max_values.cascades[i + 4].min_values;
+        
+        float packed_xdx = rhi::uni::tex_sample_level_arr<float>(pc.packed_xdx_tex, REN_SAMPLER_LINEAR_WRAP, ps_in.uvs[i], i, 0.);
+        packed_xdx *= x_y_z_xdx_ranges.w;
+        packed_xdx += min_max_values.cascades[i].min_values.w;
+
+        x_dx += weights[i] * packed_xdx;
+
+        float4 packed_derivatives = rhi::uni::tex_sample_level_arr<float4>(pc.packed_derivatives_tex, REN_SAMPLER_LINEAR_WRAP, ps_in.uvs[i], i, 0.);
+        packed_derivatives *= ydx_zdx_ydy_zdy_ranges;
+        packed_derivatives += min_max_values.cascades[i + 4].min_values;
+        ydx_zdx_ydy_zdy += weights[i] * packed_derivatives;
     }
 
-    float x_dx = x_y_z_xdx[3];
     float y_dx = ydx_zdx_ydy_zdy[0];
     float z_dx = ydx_zdx_ydy_zdy[1];
     float y_dy = ydx_zdx_ydy_zdy[2];

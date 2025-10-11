@@ -33,13 +33,13 @@ Ocean::Ocean(Asset_Repository& asset_repository, GPU_Transfer_Context& gpu_trans
             .heap = rhi::Memory_Heap_Type::GPU
         });
     m_spectrum_state_texture = m_render_resource_blackboard.create_image(
-        SPECTRUM_STATE_TEXTURE_NAME, options.generate_create_info(true));
+        SPECTRUM_STATE_TEXTURE_NAME, options.generate_create_info(rhi::Image_Format::R16G16B16A16_SFLOAT));
     m_spectrum_angular_frequency_texture = m_render_resource_blackboard.create_image(
-        SPECTRUM_ANGULAR_FREQUENCY_TEXTURE_NAME, options.generate_create_info(false));
+        SPECTRUM_ANGULAR_FREQUENCY_TEXTURE_NAME, options.generate_create_info(rhi::Image_Format::R16_SFLOAT));
     m_displacement_x_y_z_xdx_texture = m_render_resource_blackboard.create_image(
-        DISPLACEMENT_X_Y_Z_XDX_TEXTURE_NAME, options.generate_create_info(true));
+        DISPLACEMENT_X_Y_Z_XDX_TEXTURE_NAME, options.generate_create_info(rhi::Image_Format::R16G16B16A16_SFLOAT));
     m_displacement_ydx_zdx_zdz_zdy_texture = m_render_resource_blackboard.create_image(
-        DISPLACEMENT_YDX_ZDX_YDY_ZDY_TEXTURE_NAME, options.generate_create_info(true));
+        DISPLACEMENT_YDX_ZDX_YDY_ZDY_TEXTURE_NAME, options.generate_create_info(rhi::Image_Format::R16G16B16A16_SFLOAT));
     const rhi::Image_Create_Info depth_stencil_create_info = {
         .format = rhi::Image_Format::D32_SFLOAT,
         .width = width,
@@ -69,13 +69,38 @@ Ocean::Ocean(Asset_Repository& asset_repository, GPU_Transfer_Context& gpu_trans
         }
 
         m_tile_index_buffer = m_render_resource_blackboard.create_buffer(
-            OCEAN_TILE_INDEX_BUFFER_NAME,
+            TILE_INDEX_BUFFER_NAME,
             {
                 .size = sizeof(uint16_t) * index_buffer.size(),
                 .heap = rhi::Memory_Heap_Type::GPU
             });
         m_gpu_transfer_context.enqueue_immediate_upload(m_tile_index_buffer, index_buffer.data(), m_tile_index_buffer.size(), 0);
     }
+
+    rhi::Image_Create_Info min_max_texture_create_info = {
+        .format = rhi::Image_Format::R32G32B32A32_SFLOAT,
+        .width = 1024,
+        .height = 2,
+        .depth = 1,
+        .array_size = 2 * 4,
+        .mip_levels = 1,
+        .usage = rhi::Image_Usage::Unordered_Access | rhi::Image_Usage::Sampled,
+        .primary_view_type = rhi::Image_View_Type::Texture_2D_Array
+    };
+    m_minmax_texture = m_render_resource_blackboard.create_image(
+        FFT_MIN_MAX_TEXTURE_NAME, min_max_texture_create_info);
+    m_minmax_buffer = m_render_resource_blackboard.create_buffer(
+        FFT_MINMAX_BUFFER_NAME,
+        {
+            .size = sizeof(glm::vec4) * 2 * 2 * 4,
+            .heap = rhi::Memory_Heap_Type::GPU
+        });
+    m_packed_displacement_texture = m_render_resource_blackboard.create_image(
+        PACKED_DISPLACEMENT_TEXTURE_NAME, options.generate_create_info(rhi::Image_Format::A2R10G10B10_UNORM_PACK32));
+    m_packed_derivatives_texture = m_render_resource_blackboard.create_image(
+        PACKED_DERIVATIVES_TEXTURE_NAME, options.generate_create_info(rhi::Image_Format::R8G8B8A8_UNORM));
+    m_packed_xdx_texture = m_render_resource_blackboard.create_image(
+        FOAM_WEIGHT_TEXTURE_NAME, options.generate_create_info(rhi::Image_Format::R8_UNORM));
 }
 
 Ocean::~Ocean()
@@ -157,7 +182,7 @@ void Ocean::simulate(
         options.cascade_count);
     cmd->end_debug_region(); // ocean:simulation:initial_spectrum
 
-    cmd->begin_debug_region("ocean:simulation:time_dependent_spectrum", 0.25f, 0.25f, 1.0f);
+    cmd->begin_debug_region("ocean:simulation:time_dependent_spectrum", 0.25f, 0.125f, 1.0f);
     tracker.use_resource(m_spectrum_state_texture,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Shader_Read,
@@ -190,18 +215,17 @@ void Ocean::simulate(
         options.cascade_count);
     cmd->end_debug_region(); // ocean:simulation:time_dependent_spectrum
 
-    cmd->begin_debug_region("ocean:simulation:inverse_fft", 0.25f, 0.5f, 1.0f);
-    auto select_fft_variant = [&]()
+    auto select_fft_variant = [&](bool minmax = false)
     {
         std::stringstream ss;
         ss << "fft_";
         ss << std::to_string(options.texture_size);
-        if (options.use_fp16_maths) ss << "_fp16";
         ss << "_float4";
+        if (minmax) ss << "_minmax";
         return ss.str();
     };
     cmd->set_pipeline(m_asset_repository.get_compute_pipeline("fft").set_variant(select_fft_variant()));
-    cmd->begin_debug_region("ocean:simulation:inverse_fft:vertical", 0.25f, 0.5f, 1.0f);
+    cmd->begin_debug_region("ocean:simulation:inverse_fft:vertical", 0.25f, 0.25f, 1.0f);
     tracker.use_resource(
         m_displacement_x_y_z_xdx_texture,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
@@ -219,6 +243,7 @@ void Ocean::simulate(
             .inverse = true },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(1, options.texture_size, options.cascade_count);
+    tracker.flush_barriers(cmd);
     cmd->set_push_constants<FFT_Push_Constants>({
             .image = m_displacement_ydx_zdx_zdz_zdy_texture,
             .vertical_or_horizontal = FFT_VERTICAL,
@@ -237,7 +262,8 @@ void Ocean::simulate(
         rhi::Barrier_Image_Layout::Unordered_Access);
     cmd->end_debug_region(); // ocean:simulation:inverse_fft:vertical
 
-    cmd->begin_debug_region("ocean:simulation:inverse_fft:horizontal", 0.25f, 0.5f, 1.0f);
+    cmd->begin_debug_region("ocean:simulation:inverse_fft:horizontal", 0.25f, 0.375f, 1.0f);
+    cmd->set_pipeline(m_asset_repository.get_compute_pipeline("fft").set_variant(select_fft_variant(true)));
     tracker.use_resource(
         m_displacement_x_y_z_xdx_texture,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
@@ -248,17 +274,27 @@ void Ocean::simulate(
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Unordered_Access_Read,
         rhi::Barrier_Image_Layout::Unordered_Access);
+    tracker.use_resource(
+        m_minmax_texture,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Write,
+        rhi::Barrier_Image_Layout::Unordered_Access);
     tracker.flush_barriers(cmd);
     cmd->set_push_constants<FFT_Push_Constants>({
             .image = m_displacement_x_y_z_xdx_texture,
             .vertical_or_horizontal = FFT_HORIZONTAL,
-            .inverse = true },
-        rhi::Pipeline_Bind_Point::Compute);
+            .inverse = true,
+            .min_max_tex = m_minmax_texture,
+            .min_max_tex_store_offset = 0},
+            rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(1, options.texture_size, options.cascade_count);
+    tracker.flush_barriers(cmd);
     cmd->set_push_constants<FFT_Push_Constants>({
             .image = m_displacement_ydx_zdx_zdz_zdy_texture,
             .vertical_or_horizontal = FFT_HORIZONTAL,
-            .inverse = true },
+            .inverse = true,
+            .min_max_tex = m_minmax_texture,
+            .min_max_tex_store_offset = 4 },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(1, options.texture_size, options.cascade_count);
     tracker.set_resource_state(
@@ -272,7 +308,86 @@ void Ocean::simulate(
         rhi::Barrier_Access::Unordered_Access_Write,
         rhi::Barrier_Image_Layout::Unordered_Access);
     cmd->end_debug_region(); // ocean:simulation:inverse_fft:horizontal
-    cmd->end_debug_region(); // ocean:simulation:inverse_fft
+    cmd->begin_debug_region("ocean:simulation:inverse_fft:min_max_resolve", 0.25f, 0.5f, 1.0f);
+    tracker.use_resource(
+        m_minmax_texture,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Shader_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
+    tracker.use_resource(
+        m_minmax_buffer,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Write);
+    auto select_fft_min_max_resolve_variant = [&]()
+        {
+            std::stringstream ss;
+            ss << "fft_min_max_resolve";
+            ss << std::to_string(options.texture_size);
+            return ss.str();
+        };
+    cmd->set_pipeline(m_asset_repository.get_compute_pipeline("fft_min_max_resolve").set_variant(select_fft_min_max_resolve_variant()));
+    cmd->set_push_constants<FFT_Min_Max_Resolve_Push_Constants>({
+        .min_max_tex = m_minmax_texture,
+        .min_max_tex_load_offset = 0,
+        .min_max_buffer = m_minmax_buffer,
+        .min_max_buffer_store_offset = 0},
+        rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(1, 1, options.cascade_count);
+    cmd->set_push_constants<FFT_Min_Max_Resolve_Push_Constants>({
+        .min_max_tex = m_minmax_texture,
+        .min_max_tex_load_offset = 4,
+        .min_max_buffer = m_minmax_buffer,
+        .min_max_buffer_store_offset = 2 * 4 },
+        rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(1, 1, options.cascade_count);
+
+    cmd->end_debug_region(); // ocean:simulation:inverse_fft:min_max_resolve
+
+    cmd->begin_debug_region("ocean:simulation:reorder_textures", 0.25f, 0.625f, 1.0f);
+    tracker.use_resource(
+        m_displacement_x_y_z_xdx_texture,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Shader_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
+    tracker.use_resource(
+        m_displacement_ydx_zdx_zdz_zdy_texture,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Shader_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
+    tracker.use_resource(
+        m_minmax_buffer,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Read);
+    tracker.use_resource(
+        m_displacement_ydx_zdx_zdz_zdy_texture,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Write,
+        rhi::Barrier_Image_Layout::Unordered_Access);
+    tracker.use_resource(
+        m_displacement_ydx_zdx_zdz_zdy_texture,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Write,
+        rhi::Barrier_Image_Layout::Unordered_Access);
+    tracker.use_resource(
+        m_displacement_ydx_zdx_zdz_zdy_texture,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Write,
+        rhi::Barrier_Image_Layout::Unordered_Access);
+    tracker.flush_barriers(cmd);
+    auto reorder_pipeline = m_asset_repository.get_compute_pipeline("ocean_texture_reorder");
+    dispatch_group_count = options.texture_size / reorder_pipeline.get_group_size_x();
+    cmd->set_pipeline(reorder_pipeline);
+    cmd->set_push_constants<Ocean_Reorder_Push_Constants>({
+        .min_max_buffer = m_minmax_buffer,
+        .x_y_z_xdx_tex = m_displacement_x_y_z_xdx_texture,
+        .ydx_zdx_ydy_zdy_tex = m_displacement_ydx_zdx_zdz_zdy_texture,
+        .displacement_tex = m_packed_displacement_texture,
+        .derivatives_tex = m_packed_derivatives_texture,
+        .foam_tex = m_packed_xdx_texture },
+        rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(dispatch_group_count, dispatch_group_count, options.cascade_count);
+
+    cmd->end_debug_region(); // ocean:simulation:reorder_textures
 
     cmd->end_debug_region(); // ocean:simulation
 }
@@ -310,12 +425,17 @@ void Ocean::depth_pre_pass(rhi::Command_List* cmd, Resource_State_Tracker& track
         rhi::Barrier_Access::Depth_Stencil_Attachment_Write,
         rhi::Barrier_Image_Layout::Depth_Stencil_Write);
     tracker.use_resource(
-        m_displacement_x_y_z_xdx_texture,
+        m_packed_displacement_texture,
         rhi::Barrier_Pipeline_Stage::Pixel_Shader,
         rhi::Barrier_Access::Shader_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
     tracker.use_resource(
-        m_displacement_ydx_zdx_zdz_zdy_texture,
+        m_packed_derivatives_texture,
+        rhi::Barrier_Pipeline_Stage::Pixel_Shader,
+        rhi::Barrier_Access::Shader_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
+    tracker.use_resource(
+        m_packed_xdx_texture,
         rhi::Barrier_Pipeline_Stage::Pixel_Shader,
         rhi::Barrier_Access::Shader_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
@@ -443,39 +563,25 @@ void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const F
                 cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
                     .length_scales = simulation_data.full_spectrum_parameters.length_scales,
                     .camera = camera,
-                    .x_y_z_xdx_tex = m_displacement_x_y_z_xdx_texture,
-                    .ydx_zdx_ydy_zdy_tex = m_displacement_ydx_zdx_zdz_zdy_texture,
+                    .min_max_buffer = m_minmax_buffer,
+                    .packed_displacement_tex = m_packed_displacement_texture,
+                    .packed_derivatives_tex = m_packed_derivatives_texture,
+                    .packed_xdx_tex = m_packed_xdx_texture,
                     .vertex_position_dist = VERTEX_DIST,
                     .field_size = TILE_VERTEX_COUNT,
                     .offset_x = offset.x,
                     .offset_y = offset.y
                     }, rhi::Pipeline_Bind_Point::Graphics);
                 cmd->draw_indexed(3 * 2 * (TILE_VERTEX_COUNT - 1) * (TILE_VERTEX_COUNT - 1), 1, 0, 0, 0);
-                // cmd->draw(6 * TILE_VERTEX_COUNT * TILE_VERTEX_COUNT, 1, 0, 0);
             }
         }
     }
 }
 
-rhi::Image_Create_Info Ocean::Options::generate_create_info(bool four_components) const noexcept
+rhi::Image_Create_Info Ocean::Options::generate_create_info(rhi::Image_Format format) const noexcept
 {
-    rhi::Image_Format target_format;
-    if (four_components)
-    {
-        if (use_fp16_textures)
-            target_format = rhi::Image_Format::R16G16B16A16_SFLOAT;
-        else
-            target_format = rhi::Image_Format::R32G32B32A32_SFLOAT;
-    }
-    else
-    {
-        if (use_fp16_textures)
-            target_format = rhi::Image_Format::R16_SFLOAT;
-        else
-            target_format = rhi::Image_Format::R32_SFLOAT;
-    }
     return {
-        .format = target_format,
+        .format = format,
         .width = texture_size,
         .height = texture_size,
         .depth = 1,
@@ -639,18 +745,9 @@ void Ocean::process_gui_options()
         }
         imutil::help_marker(OCEAN_HELP_TEXT_CASCADES);
     }
-    {
-        ImGui::Checkbox("Use fp16 textures", &options_tmp.use_fp16_textures);
-        imutil::help_marker(OCEAN_HELP_TEXT_FP16_TEXTURES);
-    }
-    {
-        ImGui::Checkbox("Use fp16 maths", &options_tmp.use_fp16_maths);
-        imutil::help_marker(OCEAN_HELP_TEXT_FP16_MATH);
-    }
 
     const bool recreate_textures =
         options_tmp.texture_size != options.texture_size ||
-        options_tmp.use_fp16_textures != options.use_fp16_textures ||
         options_tmp.cascade_count != options.cascade_count;
     if (recreate_textures)
     {
@@ -666,6 +763,9 @@ void Ocean::process_gui_options()
         recreate_texture(m_spectrum_angular_frequency_texture);
         recreate_texture(m_displacement_x_y_z_xdx_texture);
         recreate_texture(m_displacement_ydx_zdx_zdz_zdy_texture);
+        recreate_texture(m_packed_displacement_texture);
+        recreate_texture(m_packed_derivatives_texture);
+        recreate_texture(m_packed_xdx_texture);
     }
     options = options_tmp;
 }

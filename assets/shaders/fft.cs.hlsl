@@ -7,30 +7,59 @@ DECLARE_PUSH_CONSTANTS(FFT_Push_Constants, pc);
 
 #if FFT_FLOAT4
 #define FFT_VECTOR_LOAD_TYPE float4
-#if FFT_FP16
 #define FFT_VECTOR_TYPE float16_t4
-#else
-#define FFT_VECTOR_TYPE float4
-#endif
+#define FFT_VECTOR_UINT_TYPE uint4
 #else
 #define FFT_VECTOR_LOAD_TYPE float2
-#if FFT_FP16
 #define FFT_VECTOR_TYPE float16_t2
-#else
-#define FFT_VECTOR_TYPE float2
-#endif
+#define FFT_VECTOR_UINT_TYPE uint2
 #endif
 
-#if FFT_FP16
 #define FFT_FLOAT_TYPE float16_t
 #define FFT_VECTOR_2_TYPE float16_t2
-#else
-#define FFT_FLOAT_TYPE float
-#define FFT_VECTOR_2_TYPE float2
-#endif
-
 
 groupshared FFT_VECTOR_TYPE ping_pong_buffer[2][FFT_SIZE];
+
+#if FFT_STORE_MINMAX
+// https://www.jeremyong.com/graphics/2023/09/05/f32-interlocked-min-max-hlsl/
+uint order_preserving_float_mask(float value)
+{
+    uint uvalue = asuint(value);
+    uint mask = -int(uvalue >> 31) | 0x80000000;
+    return uvalue ^ mask;
+}
+
+template<typename T, uint COUNT>
+T vec_order_preserving_float_map(T value)
+{
+    T result;
+    for (uint i = 0; i < COUNT; ++i)
+    {
+        result[i] = order_preserving_float_mask(value[i]);
+    }
+    return result;
+}
+
+float inverse_order_preserving_float_map(uint value)
+{
+    uint mask = ((value >> 31) - 1) | 0x80000000;
+    return asfloat(value ^ mask);
+}
+
+template<typename T, uint COUNT>
+T vec_inverse_order_preserving_float_map(T value)
+{
+    T result;
+    for (uint i = 0; i < COUNT; ++i)
+    {
+        result[i] = inverse_order_preserving_float_map(value[i]);
+    }
+    return result;
+}
+
+groupshared FFT_VECTOR_UINT_TYPE min_result;
+groupshared FFT_VECTOR_UINT_TYPE max_result;
+#endif
 
 void butterfly(uint tid, uint iter, out uint2 twiddle_indices, out FFT_VECTOR_2_TYPE twiddle_factor)
 {
@@ -75,5 +104,36 @@ void main(uint3 id : SV_DispatchThreadID)
         ping_pong = !ping_pong;
     }
 
-    rhi::uni::tex_store_arr(pc.image, texpos, id.z, FFT_VECTOR_LOAD_TYPE(ping_pong_buffer[ping_pong][id.x]));
+    FFT_VECTOR_TYPE result = ping_pong_buffer[ping_pong][id.x];
+    FFT_VECTOR_LOAD_TYPE result_fp32 = (FFT_VECTOR_LOAD_TYPE) result;
+
+    rhi::uni::tex_store_arr(pc.image, texpos, id.z, result_fp32);
+
+#if FFT_STORE_MINMAX
+#if FFT_FLOAT4
+#define ELEMENT_COUNT 4
+#else
+#define ELEMENT_COUNT 2
+#endif
+    vector<uint, ELEMENT_COUNT> values = vec_order_preserving_float_map<FFT_VECTOR_LOAD_TYPE, ELEMENT_COUNT>(result_fp32);
+    if (id.x == 0)
+    {
+        min_result = 0xffffffffu;
+        max_result = 0x00000000u;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    for (uint i = 0; i < ELEMENT_COUNT; ++i)
+    {
+        InterlockedMin(min_result[i], values[i]);
+        InterlockedMax(max_result[i], values[i]);
+    }
+    GroupMemoryBarrierWithGroupSync();
+    if (id.x == 0)
+    {
+        FFT_VECTOR_LOAD_TYPE min_results = vec_inverse_order_preserving_float_map<FFT_VECTOR_LOAD_TYPE, ELEMENT_COUNT>(min_result);
+        FFT_VECTOR_LOAD_TYPE max_results = vec_inverse_order_preserving_float_map<FFT_VECTOR_LOAD_TYPE, ELEMENT_COUNT>(max_result);
+        rhi::tex_store_arr(pc.min_max_tex, uint2(id.y, 0), id.z + pc.min_max_tex_store_offset, min_results);
+        rhi::tex_store_arr(pc.min_max_tex, uint2(id.y, 1), id.z + pc.min_max_tex_store_offset, max_results);
+    }
+#endif
 }

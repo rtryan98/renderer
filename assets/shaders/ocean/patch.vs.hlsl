@@ -28,28 +28,35 @@ VS_OUT_TYPE main(uint vertex_id : SV_VertexID)
     vertex_pos += float2(pc.offset_x, pc.offset_y);
 
     float2 uvs[4] = {
-        fmod(vertex_pos / pc.length_scales[0], 2.0),
-        fmod(vertex_pos / pc.length_scales[1], 2.0),
-        fmod(vertex_pos / pc.length_scales[2], 2.0),
-        fmod(vertex_pos / pc.length_scales[3], 2.0)
+        vertex_pos / pc.length_scales[0],
+        vertex_pos / pc.length_scales[1],
+        vertex_pos / pc.length_scales[2],
+        vertex_pos / pc.length_scales[3]
     };
 
-    float4 x_y_z_xdx = float4(0.,0.,0.,0.);
+    float3 displacement = 0.0;
 
     float4 weights = calculate_cascade_sampling_weights(
         distance(camera.position.xy, vertex_pos),
         0.25,
         5.0,
         pc.length_scales);
+        
+    Ocean_Min_Max_Values min_max_values = rhi::uni::buf_load<Ocean_Min_Max_Values>(pc.min_max_buffer);
 
     for (uint i = 0; i < 4; ++i)
     {
         if (weights[i] <= 0.0) continue;
 
-        x_y_z_xdx += weights[i] * rhi::uni::tex_sample_level_arr<float4>(pc.x_y_z_xdx_tex, REN_SAMPLER_LINEAR_WRAP, uvs[i], i, 0.);
+        float4 x_y_z_xdx_ranges = min_max_values.cascades[i].max_values - min_max_values.cascades[i].min_values;
+
+        float3 packed_displacement = rhi::uni::tex_sample_level_arr<float4>(pc.packed_displacement_tex, REN_SAMPLER_LINEAR_WRAP, uvs[i], i, 0.).xyz;
+        packed_displacement *= x_y_z_xdx_ranges.xyz;
+        packed_displacement += min_max_values.cascades[i].min_values.xyz;
+
+        displacement += weights[i] * packed_displacement;
     }
 
-    float3 displacement = float3(x_y_z_xdx.x, x_y_z_xdx.y, x_y_z_xdx.z);
     float4 pos_ws = float4(vertex_pos.x + displacement.x, vertex_pos.y + displacement.y, displacement.z, 1.);
 
     float4 pos = mul(camera.world_to_clip, pos_ws);

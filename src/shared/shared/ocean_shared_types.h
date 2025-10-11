@@ -64,8 +64,10 @@ struct SHADER_STRUCT_ALIGN Ocean_Render_Patch_Push_Constants
 {
     float4 length_scales;
     SHADER_HANDLE_TYPE camera;
-    SHADER_HANDLE_TYPE x_y_z_xdx_tex;
-    SHADER_HANDLE_TYPE ydx_zdx_ydy_zdy_tex;
+    SHADER_HANDLE_TYPE min_max_buffer;
+    SHADER_HANDLE_TYPE packed_displacement_tex;
+    SHADER_HANDLE_TYPE packed_derivatives_tex;
+    SHADER_HANDLE_TYPE packed_xdx_tex;
     float vertex_position_dist;
     uint field_size;
     float offset_x;
@@ -79,6 +81,26 @@ struct SHADER_STRUCT_ALIGN Ocean_Render_Composition_Push_Constants
     SHADER_HANDLE_TYPE geom_color_tex;
     SHADER_HANDLE_TYPE geom_depth_tex;
     SHADER_HANDLE_TYPE tex_sampler;
+};
+
+struct SHADER_STRUCT_ALIGN Ocean_Min_Max_Values
+{
+    struct Cascade
+    {
+        float4 min_values;
+        float4 max_values;
+    };
+    Cascade cascades[4];
+};
+
+struct SHADER_STRUCT_ALIGN Ocean_Reorder_Push_Constants
+{
+    SHADER_HANDLE_TYPE min_max_buffer;
+    SHADER_HANDLE_TYPE x_y_z_xdx_tex;
+    SHADER_HANDLE_TYPE ydx_zdx_ydy_zdy_tex;
+    SHADER_HANDLE_TYPE displacement_tex;
+    SHADER_HANDLE_TYPE derivatives_tex;
+    SHADER_HANDLE_TYPE foam_tex;
 };
 
 #endif

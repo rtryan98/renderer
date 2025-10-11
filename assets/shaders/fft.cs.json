@@ -15,14 +15,14 @@
             ]
         },
         {
-            "name": "fp16",
-            "type": "bool",
-            "define_name": "FFT_FP16"
-        },
-        {
             "name": "float4",
             "type": "bool",
             "define_name": "FFT_FLOAT4"
+        },
+        {
+            "name": "minmax",
+            "type": "bool",
+            "define_name": "FFT_STORE_MINMAX"
         }
     ]
 }

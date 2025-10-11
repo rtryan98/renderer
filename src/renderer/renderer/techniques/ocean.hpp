@@ -26,7 +26,13 @@ public:
     constexpr static auto DISPLACEMENT_X_Y_Z_XDX_TEXTURE_NAME = "ocean:displacement_x_y_z_xdx";
     constexpr static auto DISPLACEMENT_YDX_ZDX_YDY_ZDY_TEXTURE_NAME = "ocean:displacement_ydx_zdx_ydy_zdy_texture";
     constexpr static auto FORWARD_PASS_DEPTH_RENDER_TARGET_NAME = "ocean:forward_pass_depth_render_target";
-    constexpr static auto OCEAN_TILE_INDEX_BUFFER_NAME = "ocean:tile_index_buffer";
+    constexpr static auto TILE_INDEX_BUFFER_NAME = "ocean:tile_index_buffer";
+
+    constexpr static auto FFT_MIN_MAX_TEXTURE_NAME = "ocean:fft_min_max_texture";
+    constexpr static auto FFT_MINMAX_BUFFER_NAME = "ocean:fft_minmax_buffer";
+    constexpr static auto PACKED_DISPLACEMENT_TEXTURE_NAME = "ocean:packed_displacement_texture";
+    constexpr static auto FOAM_WEIGHT_TEXTURE_NAME = "ocean:foam_weight_texture";
+    constexpr static auto PACKED_DERIVATIVES_TEXTURE_NAME = "ocean:packed_derivatives_texture";
 
     Ocean(Asset_Repository& asset_repository,
         GPU_Transfer_Context& gpu_transfer_context,
@@ -76,12 +82,16 @@ private:
     Image m_forward_pass_depth_render_target;
     Buffer m_tile_index_buffer;
 
+    Image m_minmax_texture;
+    Buffer m_minmax_buffer;
+    Image m_packed_displacement_texture;
+    Image m_packed_derivatives_texture;
+    Image m_packed_xdx_texture;
+
     // TODO: Style? Should this be done via a function instead?
 public:
     struct Options
     {
-        bool use_fp16_textures = true;
-        bool use_fp16_maths = true;
         bool update_time = true;
         bool enabled = true;
         bool wireframe = false;
@@ -93,7 +103,7 @@ public:
 
         auto operator<=>(const Options& other) const = default;
 
-        [[nodiscard]] rhi::Image_Create_Info generate_create_info(bool four_components) const noexcept;
+        [[nodiscard]] rhi::Image_Create_Info generate_create_info(rhi::Image_Format format) const noexcept;
     } options;
 
     struct Simulation_Data
