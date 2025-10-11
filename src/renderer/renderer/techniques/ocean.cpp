@@ -14,6 +14,12 @@
 
 namespace ren::techniques
 {
+constexpr static auto FIELD_SIZE = 2048;
+constexpr static auto TILES_PER_AXIS = 16u;
+constexpr static auto TILE_VERTEX_COUNT = FIELD_SIZE / TILES_PER_AXIS;
+constexpr static auto VERTEX_DIST = 0.25f;
+constexpr static auto TILE_SIZE = static_cast<float>(TILE_VERTEX_COUNT - 1) * VERTEX_DIST;
+
 Ocean::Ocean(Asset_Repository& asset_repository, GPU_Transfer_Context& gpu_transfer_context,
     Render_Resource_Blackboard& render_resource_blackboard, uint32_t width, uint32_t height)
     : m_asset_repository(asset_repository)
@@ -47,22 +53,29 @@ Ocean::Ocean(Asset_Repository& asset_repository, GPU_Transfer_Context& gpu_trans
     m_forward_pass_depth_render_target = m_render_resource_blackboard.create_image(
         FORWARD_PASS_DEPTH_RENDER_TARGET_NAME, depth_stencil_create_info);
 
-    m_displacement_sampler = m_render_resource_blackboard.get_sampler({
-        .filter_min = rhi::Sampler_Filter::Linear,
-        .filter_mag = rhi::Sampler_Filter::Linear,
-        .filter_mip = rhi::Sampler_Filter::Linear,
-        .address_mode_u = rhi::Image_Sample_Address_Mode::Wrap,
-        .address_mode_v = rhi::Image_Sample_Address_Mode::Wrap,
-        .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
-        .mip_lod_bias = 0.f,
-        .max_anisotropy = 16,
-        .comparison_func = rhi::Comparison_Func::None,
-        .reduction = rhi::Sampler_Reduction_Type::Standard,
-        .border_color = {},
-        .min_lod = .0f,
-        .max_lod = .0f,
-        .anisotropy_enable = true
-    });
+    {
+        std::vector<uint16_t> index_buffer;
+        index_buffer.reserve(3 * 2 * (TILE_VERTEX_COUNT - 1) * (TILE_VERTEX_COUNT - 1));
+        for (auto i = 0; i < (TILE_VERTEX_COUNT - 1); ++i)
+        {
+            for (auto j = 0; j < (TILE_VERTEX_COUNT - 1); ++j)
+            {
+                index_buffer.push_back(i * TILE_VERTEX_COUNT + j);
+                index_buffer.push_back(i * TILE_VERTEX_COUNT + j + 1);
+                index_buffer.push_back(i * TILE_VERTEX_COUNT + j + TILE_VERTEX_COUNT);
+                index_buffer.push_back(i * TILE_VERTEX_COUNT + j + 1);
+                index_buffer.push_back(i * TILE_VERTEX_COUNT + j + 1 + TILE_VERTEX_COUNT);
+                index_buffer.push_back(i * TILE_VERTEX_COUNT + j + TILE_VERTEX_COUNT);
+            }
+        }
+        m_tile_index_buffer = m_render_resource_blackboard.create_buffer(
+            OCEAN_TILE_INDEX_BUFFER_NAME,
+            {
+                .size = sizeof(uint16_t) * index_buffer.size(),
+                .heap = rhi::Memory_Heap_Type::GPU
+            });
+        m_gpu_transfer_context.enqueue_immediate_upload(m_tile_index_buffer, index_buffer.data(), m_tile_index_buffer.size(), 0);
+    }
 }
 
 Ocean::~Ocean()
@@ -404,12 +417,6 @@ void Ocean::opaque_forward_pass(
 
 void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const Fly_Camera& cull_camera)
 {
-    constexpr static auto FIELD_SIZE = 2048;
-    constexpr static auto TILES_PER_AXIS = 16u;
-    constexpr static auto TILE_VERTEX_COUNT = FIELD_SIZE / TILES_PER_AXIS;
-    constexpr static auto VERTEX_DIST = 0.25f;
-    constexpr static auto TILE_SIZE = static_cast<float>(TILE_VERTEX_COUNT) * VERTEX_DIST;
-
     float starting_offset = 0.0f;
     for (uint32_t i = 0; i < TILES_PER_AXIS / 2; ++i)
     {
@@ -417,6 +424,7 @@ void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const F
     }
     starting_offset *= static_cast<float>(FIELD_SIZE) * VERTEX_DIST / 2.0f;
 
+    cmd->set_index_buffer(m_tile_index_buffer, rhi::Index_Type::U16);
     for (uint32_t i = 0; i < TILES_PER_AXIS; ++i)
     {
         for (uint32_t j = 0; j < TILES_PER_AXIS; ++j)
@@ -442,7 +450,8 @@ void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const F
                     .offset_x = offset.x,
                     .offset_y = offset.y
                     }, rhi::Pipeline_Bind_Point::Graphics);
-                cmd->draw(6 * TILE_VERTEX_COUNT * TILE_VERTEX_COUNT, 1, 0, 0);
+                cmd->draw_indexed(3 * 2 * (TILE_VERTEX_COUNT - 1) * (TILE_VERTEX_COUNT - 1), 1, 0, 0, 0);
+                // cmd->draw(6 * TILE_VERTEX_COUNT * TILE_VERTEX_COUNT, 1, 0, 0);
             }
         }
     }

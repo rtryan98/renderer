@@ -7,23 +7,14 @@
 
 DECLARE_PUSH_CONSTANTS(Ocean_Render_Patch_Push_Constants, pc);
 
-const static float2 OFFSETS[6] = {
-    float2(0.,0.),
-    float2(1.,0.),
-    float2(0.,1.),
-    float2(1.,0.),
-    float2(1.,1.),
-    float2(0.,1.)
-};
-
 VS_Out main(uint vertex_id : SV_VertexID)
 {
     GPU_Camera_Data camera = rhi::buf_load<GPU_Camera_Data>(pc.camera);
 
-    uint quad_index = vertex_id / 6;
-    uint triangle_vertex_index = vertex_id % 6;
+    uint row = vertex_id / (pc.field_size);
+    uint column = vertex_id % (pc.field_size);
     float2 vertex_pos = -pc.vertex_position_dist * float2(pc.field_size, pc.field_size) / 2.;
-    vertex_pos += pc.vertex_position_dist * (float2(quad_index / pc.field_size, quad_index % pc.field_size) + OFFSETS[triangle_vertex_index]);
+    vertex_pos += pc.vertex_position_dist * (float2(row, column));
     vertex_pos += float2(pc.offset_x, pc.offset_y);
 
     float2 uvs[4] = {

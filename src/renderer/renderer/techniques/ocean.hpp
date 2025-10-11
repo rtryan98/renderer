@@ -26,6 +26,7 @@ public:
     constexpr static auto DISPLACEMENT_X_Y_Z_XDX_TEXTURE_NAME = "ocean:displacement_x_y_z_xdx";
     constexpr static auto DISPLACEMENT_YDX_ZDX_YDY_ZDY_TEXTURE_NAME = "ocean:displacement_ydx_zdx_ydy_zdy_texture";
     constexpr static auto FORWARD_PASS_DEPTH_RENDER_TARGET_NAME = "ocean:forward_pass_depth_render_target";
+    constexpr static auto OCEAN_TILE_INDEX_BUFFER_NAME = "ocean:tile_index_buffer";
 
     Ocean(Asset_Repository& asset_repository,
         GPU_Transfer_Context& gpu_transfer_context,
@@ -73,7 +74,7 @@ private:
     Image m_displacement_x_y_z_xdx_texture;
     Image m_displacement_ydx_zdx_zdz_zdy_texture;
     Image m_forward_pass_depth_render_target;
-    Sampler m_displacement_sampler;
+    Buffer m_tile_index_buffer;
 
     // TODO: Style? Should this be done via a function instead?
 public:
