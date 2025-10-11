@@ -1,5 +1,6 @@
 #include "shared/ocean_shared_types.h"
 #include "shared/camera_shared_types.h"
+#include "shared/shared_resources.h"
 #include "shaders/ocean/ocean_patch_types.hlsli"
 #include "rhi/bindless.hlsli"
 #include "constants.hlsli"
@@ -26,8 +27,8 @@ float4 main(PS_In ps_in) : SV_Target
     {
         if (weights[i] <= 0.0) continue;
 
-        x_y_z_xdx += weights * rhi::uni::tex_sample_arr<float4>(pc.x_y_z_xdx_tex, pc.tex_sampler, ps_in.uvs[i], i);
-        ydx_zdx_ydy_zdy += weights * rhi::uni::tex_sample_arr<float4>(pc.ydx_zdx_ydy_zdy_tex, pc.tex_sampler, ps_in.uvs[i], i);
+        x_y_z_xdx += weights * rhi::uni::tex_sample_arr<float4>(pc.x_y_z_xdx_tex, REN_SAMPLER_LINEAR_WRAP, ps_in.uvs[i], i);
+        ydx_zdx_ydy_zdy += weights * rhi::uni::tex_sample_arr<float4>(pc.ydx_zdx_ydy_zdy_tex, REN_SAMPLER_LINEAR_WRAP, ps_in.uvs[i], i);
     }
 
     float x_dx = x_y_z_xdx[3];

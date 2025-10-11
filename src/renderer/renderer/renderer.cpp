@@ -96,23 +96,59 @@ void Renderer::process_gui()
 {
     m_ocean.process_gui();
     m_tone_map.process_gui();
+    debug_gui();
 }
 
 void Renderer::update(const Input_State& input_state, double t, double dt) noexcept
 {
-    if (!(ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard))
+    switch (m_benchmark_mode)
     {
-        // No input captured here from UI
-        m_fly_cam.process_inputs(input_state, static_cast<float>(dt));
+    case ren::Benchmark_Mode::None:
+    {
+        if (!(ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard))
+        {
+            // No input captured here from UI
+            m_fly_cam.process_inputs(input_state, static_cast<float>(dt));
+        }
+        m_ocean.update(static_cast<float>(dt));
+        break;
     }
+    case ren::Benchmark_Mode::Ocean:
+    {
+        {
+            auto ocean_options = m_ocean.options;
+            auto ocean_simulation_data = m_ocean.simulation_data;
+
+            m_ocean.options.update_time = false;
+            m_ocean.simulation_data.total_time = 0.0f;
+            m_ocean.simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].wind_speed = 7.5f;
+            m_ocean.simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].wind_speed = 15.0f;
+
+            m_ocean.update(static_cast<float>(dt));
+
+            m_ocean.options = ocean_options;
+            m_ocean.simulation_data = ocean_simulation_data;
+        }
+        {
+            m_fly_cam.position = glm::vec3(0.0f, -250.0f, 7.5f);
+            m_fly_cam.pitch = -9.75f;
+            m_fly_cam.yaw = 0.0f;
+        }
+
+        break;
+    }
+    default:
+        break;
+    }
+
     // set aspect ratio in case of resize
     m_fly_cam.aspect = calculate_aspect_ratio(m_swapchain);
     m_fly_cam.update();
-}
 
-void Renderer::setup_frame()
-{
-    m_swapchain_image = Image(m_swapchain);
+    if (!m_cull_cam_locked)
+    {
+        m_cull_cam = m_fly_cam;
+    }
 
     GPU_Camera_Data camera_data = {
         .world_to_camera = m_fly_cam.camera_data.world_to_camera,
@@ -128,6 +164,11 @@ void Renderer::setup_frame()
     m_gpu_transfer_context.enqueue_immediate_upload(m_camera_buffer, camera_data);
 }
 
+void Renderer::setup_frame()
+{
+    m_swapchain_image = Image(m_swapchain);
+}
+
 void Renderer::render(
     const Static_Scene_Data& scene,
     rhi::Command_List* cmd,
@@ -141,8 +182,7 @@ void Renderer::render(
         tracker);
     m_ocean.simulate(
         cmd,
-        tracker,
-        static_cast<float>(dt));
+        tracker);
     m_g_buffer.render_scene_cpu(
         cmd,
         tracker,
@@ -163,13 +203,15 @@ void Renderer::render(
         cmd,
         tracker,
         m_camera_buffer,
-        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
+        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME),
+        m_cull_cam);
     m_ocean.opaque_forward_pass(
         cmd,
         tracker,
         m_camera_buffer,
         m_shaded_geometry_render_target,
-        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
+        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME),
+        m_cull_cam);
     m_tone_map.render_debug(
         cmd,
         tracker,
@@ -205,5 +247,10 @@ void Renderer::set_hdr_state(const bool enabled, const float display_peak_lumina
 {
     m_enable_hdr = enabled;
     m_tone_map.set_hdr_state(m_enable_hdr, display_peak_luminance_nits);
+}
+
+void Renderer::debug_gui()
+{
+    ImGui::Checkbox("Lock cull camera", &m_cull_cam_locked);
 }
 }

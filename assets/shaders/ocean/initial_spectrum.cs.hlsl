@@ -140,8 +140,8 @@ void main(uint3 id : SV_DispatchThreadID)
     uint3 rng_state = id;
     float amplitude = random_gaussian(rng_state);
     float phase = ren::TWO_PI * random_uniform(rng_state);
-    float2 noise = float2(amplitude, cos(phase) - sin(phase));
-    float2 initial_spectral_state = rcp(sqrt(2)) * noise * spectrum * float(data.active_cascades[id.z]);
+    float2 variate = amplitude * float2(cos(phase), -sin(phase));
+    float2 initial_spectral_state = variate * spectrum * float(data.active_cascades[id.z]);
 
     float min_wavenumber = calculate_min_wavenumber(data.length_scales[id.z]);
     float max_wavenumber = calculate_max_wavenumber(data.length_scales[id.z], data.texture_size);

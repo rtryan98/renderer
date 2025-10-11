@@ -13,6 +13,7 @@ namespace ren
 class Asset_Repository;
 class GPU_Transfer_Context;
 class Resource_State_Tracker;
+struct Fly_Camera;
 
 namespace techniques
 {
@@ -37,16 +38,18 @@ public:
     Ocean(Ocean&&) = delete;
     Ocean& operator=(Ocean&&) = delete;
 
+    void update(float dt);
+
     void simulate(
         rhi::Command_List* cmd,
-        Resource_State_Tracker& tracker,
-        float dt);
+        Resource_State_Tracker& tracker);
 
     void depth_pre_pass(
         rhi::Command_List* cmd,
         Resource_State_Tracker& tracker,
         const Buffer& camera,
-        const Image& shaded_scene_depth_render_target);
+        const Image& shaded_scene_depth_render_target,
+        const Fly_Camera& cull_camera);
 
     // TODO: add proper translucent pass instead.
     void opaque_forward_pass(
@@ -54,7 +57,8 @@ public:
         Resource_State_Tracker& tracker,
         const Buffer& camera,
         const Image& shaded_scene_render_target,
-        const Image& shaded_scene_depth_render_target);
+        const Image& shaded_scene_depth_render_target,
+        const Fly_Camera& cull_camera);
 
     void process_gui();
 
@@ -71,6 +75,8 @@ private:
     Image m_forward_pass_depth_render_target;
     Sampler m_displacement_sampler;
 
+    // TODO: Style? Should this be done via a function instead?
+public:
     struct Options
     {
         bool use_fp16_textures = true;
@@ -81,10 +87,13 @@ private:
         uint32_t texture_size = 256;
         uint32_t cascade_count = 4;
 
+        float horizontal_cull_grace = 8.f;
+        float vertical_cull_grace = 8.f;
+
         auto operator<=>(const Options& other) const = default;
 
         [[nodiscard]] rhi::Image_Create_Info generate_create_info(bool four_components) const noexcept;
-    } m_options;
+    } options;
 
     struct Simulation_Data
     {
@@ -112,7 +121,11 @@ private:
         } full_spectrum_parameters;
 
         float total_time = 0.0f;
-    } m_simulation_data;
+    } simulation_data;
+
+private:
+
+    void draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const Fly_Camera& cull_camera);
 
     void process_gui_options();
     void process_gui_simulation_settings();

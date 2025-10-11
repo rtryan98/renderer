@@ -401,6 +401,18 @@ void Application::imgui_menubar() noexcept
         }
         if (ImGui::BeginMenu("Debug"))
         {
+            if (ImGui::BeginMenu("Benchmark Modes"))
+            {
+                if (ImGui::Button("None"))
+                {
+                    m_renderer.set_benchmark_mode(Benchmark_Mode::None);
+                }
+                if (ImGui::Button("Ocean Benchmark"))
+                {
+                    m_renderer.set_benchmark_mode(Benchmark_Mode::Ocean);
+                }
+                ImGui::EndMenu();
+            }
             imgui_menu_toggle_window("ImGui Demo Window", m_imgui_data.windows.demo);
             ImGui::EndMenu();
         }

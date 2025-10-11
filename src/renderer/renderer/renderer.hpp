@@ -24,6 +24,12 @@ struct Render_Attachment;
 class Render_Resource_Blackboard;
 class Static_Scene_Data;
 
+enum class Benchmark_Mode
+{
+    None,
+    Ocean
+};
+
 class Renderer
 {
 public:
@@ -40,6 +46,8 @@ public:
     void on_resize(uint32_t width, uint32_t height) noexcept;
 
     void set_hdr_state(bool enabled, float display_peak_luminance_nits) noexcept;
+    void set_benchmark_mode(Benchmark_Mode mode) noexcept { m_benchmark_mode = mode; }
+    void debug_gui();
 
 private:
     GPU_Transfer_Context& m_gpu_transfer_context;
@@ -48,8 +56,12 @@ private:
     Render_Resource_Blackboard& m_resource_blackboard;
 
     Fly_Camera m_fly_cam;
+    Fly_Camera m_cull_cam;
     Buffer m_camera_buffer;
 
+    Benchmark_Mode m_benchmark_mode = Benchmark_Mode::None;
+
+    bool m_cull_cam_locked = false;
     bool m_enable_hdr = false;
     float m_render_scale = 1.f;
     Image m_swapchain_image = {};
@@ -60,5 +72,8 @@ private:
     techniques::Imgui m_imgui;
     techniques::Ocean m_ocean;
     techniques::Tone_Map m_tone_map;
+
+private:
+    void apply_benchmark_mode();
 };
 }

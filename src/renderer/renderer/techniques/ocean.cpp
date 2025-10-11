@@ -4,6 +4,8 @@
 #include "renderer/gpu_transfer.hpp"
 #include "renderer/imgui/imgui_util.hpp"
 
+#include "renderer/scene/camera.hpp"
+
 #include <rhi/command_list.hpp>
 #include <shared/ocean_shared_types.h>
 #include <shared/fft_shared_types.h>
@@ -25,13 +27,13 @@ Ocean::Ocean(Asset_Repository& asset_repository, GPU_Transfer_Context& gpu_trans
             .heap = rhi::Memory_Heap_Type::GPU
         });
     m_spectrum_state_texture = m_render_resource_blackboard.create_image(
-        SPECTRUM_STATE_TEXTURE_NAME, m_options.generate_create_info(true));
+        SPECTRUM_STATE_TEXTURE_NAME, options.generate_create_info(true));
     m_spectrum_angular_frequency_texture = m_render_resource_blackboard.create_image(
-        SPECTRUM_ANGULAR_FREQUENCY_TEXTURE_NAME, m_options.generate_create_info(false));
+        SPECTRUM_ANGULAR_FREQUENCY_TEXTURE_NAME, options.generate_create_info(false));
     m_displacement_x_y_z_xdx_texture = m_render_resource_blackboard.create_image(
-        DISPLACEMENT_X_Y_Z_XDX_TEXTURE_NAME, m_options.generate_create_info(true));
+        DISPLACEMENT_X_Y_Z_XDX_TEXTURE_NAME, options.generate_create_info(true));
     m_displacement_ydx_zdx_zdz_zdy_texture = m_render_resource_blackboard.create_image(
-        DISPLACEMENT_YDX_ZDX_YDY_ZDY_TEXTURE_NAME, m_options.generate_create_info(true));
+        DISPLACEMENT_YDX_ZDX_YDY_ZDY_TEXTURE_NAME, options.generate_create_info(true));
     const rhi::Image_Create_Info depth_stencil_create_info = {
         .format = rhi::Image_Format::D32_SFLOAT,
         .width = width,
@@ -73,47 +75,50 @@ Ocean::~Ocean()
     m_render_resource_blackboard.destroy_image(m_forward_pass_depth_render_target);
 }
 
-void Ocean::simulate(
-    rhi::Command_List* cmd,
-    Resource_State_Tracker& tracker,
-    const float dt)
+void Ocean::update(float dt)
 {
-    if (!m_options.enabled) return;
+    if (options.update_time)
+        simulation_data.total_time += dt;
 
-    if (m_options.update_time)
-        m_simulation_data.total_time += dt;
-
-    cmd->begin_debug_region("ocean:simulation", 0.5f, 0.5f, 1.f);
     Ocean_Initial_Spectrum_Data gpu_spectrum_data = {
         .spectra = {
             {
-                .u = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].wind_speed,
-                .f = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].fetch,
-                .phillips_alpha = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].phillips_alpha,
-                .generalized_a = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].generalized_a,
-                .generalized_b = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].generalized_b,
-                .contribution = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].contribution,
-                .wind_direction = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].wind_direction
+                .u = simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].wind_speed,
+                .f = simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].fetch,
+                .phillips_alpha = simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].phillips_alpha,
+                .generalized_a = simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].generalized_a,
+                .generalized_b = simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].generalized_b,
+                .contribution = simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].contribution,
+                .wind_direction = simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].wind_direction
             },
             {
-                .u = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].wind_speed,
-                .f = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].fetch,
-                .phillips_alpha = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].phillips_alpha,
-                .generalized_a = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].generalized_a,
-                .generalized_b = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].generalized_b,
-                .contribution = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].contribution,
-                .wind_direction = m_simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].wind_direction
+                .u = simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].wind_speed,
+                .f = simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].fetch,
+                .phillips_alpha = simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].phillips_alpha,
+                .generalized_a = simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].generalized_a,
+                .generalized_b = simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].generalized_b,
+                .contribution = simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].contribution,
+                .wind_direction = simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].wind_direction
             }
         },
-        .active_cascades = m_simulation_data.full_spectrum_parameters.active_cascades,
-        .length_scales = m_simulation_data.full_spectrum_parameters.length_scales,
-        .spectrum = m_simulation_data.full_spectrum_parameters.oceanographic_spectrum,
-        .directional_spreading_function = m_simulation_data.full_spectrum_parameters.directional_spreading_function,
-        .texture_size = m_options.texture_size,
-        .g = m_simulation_data.full_spectrum_parameters.gravity,
-        .h = m_simulation_data.full_spectrum_parameters.depth
+        .active_cascades = simulation_data.full_spectrum_parameters.active_cascades,
+        .length_scales = simulation_data.full_spectrum_parameters.length_scales,
+        .spectrum = simulation_data.full_spectrum_parameters.oceanographic_spectrum,
+        .directional_spreading_function = simulation_data.full_spectrum_parameters.directional_spreading_function,
+        .texture_size = options.texture_size,
+        .g = simulation_data.full_spectrum_parameters.gravity,
+        .h = simulation_data.full_spectrum_parameters.depth
     };
     m_gpu_transfer_context.enqueue_immediate_upload(m_spectrum_parameters_buffer, gpu_spectrum_data);
+}
+
+void Ocean::simulate(
+    rhi::Command_List* cmd,
+    Resource_State_Tracker& tracker)
+{
+    if (!options.enabled) return;
+
+    cmd->begin_debug_region("ocean:simulation", 0.5f, 0.5f, 1.f);
 
     cmd->begin_debug_region("ocean:simulation:initial_spectrum", 0.25f, 0.0f, 1.0f);
     tracker.use_resource(m_spectrum_state_texture,
@@ -126,7 +131,7 @@ void Ocean::simulate(
         rhi::Barrier_Image_Layout::Unordered_Access);
     tracker.flush_barriers(cmd);
     auto initial_spectrum_pipeline = m_asset_repository.get_compute_pipeline("initial_spectrum");
-    uint32_t dispatch_group_count = m_options.texture_size / initial_spectrum_pipeline.get_group_size_x();
+    uint32_t dispatch_group_count = options.texture_size / initial_spectrum_pipeline.get_group_size_x();
     cmd->set_pipeline(initial_spectrum_pipeline);
     cmd->set_push_constants<Ocean_Initial_Spectrum_Push_Constants>({
         .data = m_spectrum_parameters_buffer,
@@ -136,7 +141,7 @@ void Ocean::simulate(
     cmd->dispatch(
         dispatch_group_count,
         dispatch_group_count,
-        m_options.cascade_count);
+        options.cascade_count);
     cmd->end_debug_region(); // ocean:simulation:initial_spectrum
 
     cmd->begin_debug_region("ocean:simulation:time_dependent_spectrum", 0.25f, 0.25f, 1.0f);
@@ -163,13 +168,13 @@ void Ocean::simulate(
         .angular_frequency_tex = m_spectrum_angular_frequency_texture,
         .x_y_z_xdx_tex = m_displacement_x_y_z_xdx_texture,
         .ydx_zdx_ydy_zdy_tex = m_displacement_ydx_zdx_zdz_zdy_texture,
-        .texture_size = m_options.texture_size,
-        .time = m_simulation_data.total_time},
+        .texture_size = options.texture_size,
+        .time = simulation_data.total_time},
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(
         dispatch_group_count,
         dispatch_group_count,
-        m_options.cascade_count);
+        options.cascade_count);
     cmd->end_debug_region(); // ocean:simulation:time_dependent_spectrum
 
     cmd->begin_debug_region("ocean:simulation:inverse_fft", 0.25f, 0.5f, 1.0f);
@@ -177,8 +182,8 @@ void Ocean::simulate(
     {
         std::stringstream ss;
         ss << "fft_";
-        ss << std::to_string(m_options.texture_size);
-        if (m_options.use_fp16_maths) ss << "_fp16";
+        ss << std::to_string(options.texture_size);
+        if (options.use_fp16_maths) ss << "_fp16";
         ss << "_float4";
         return ss.str();
     };
@@ -200,13 +205,13 @@ void Ocean::simulate(
             .vertical_or_horizontal = FFT_VERTICAL,
             .inverse = true },
         rhi::Pipeline_Bind_Point::Compute);
-    cmd->dispatch(1, m_options.texture_size, m_options.cascade_count);
+    cmd->dispatch(1, options.texture_size, options.cascade_count);
     cmd->set_push_constants<FFT_Push_Constants>({
             .image = m_displacement_ydx_zdx_zdz_zdy_texture,
             .vertical_or_horizontal = FFT_VERTICAL,
             .inverse = true },
         rhi::Pipeline_Bind_Point::Compute);
-    cmd->dispatch(1, m_options.texture_size, m_options.cascade_count);
+    cmd->dispatch(1, options.texture_size, options.cascade_count);
     tracker.set_resource_state(
         m_displacement_x_y_z_xdx_texture,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
@@ -236,13 +241,13 @@ void Ocean::simulate(
             .vertical_or_horizontal = FFT_HORIZONTAL,
             .inverse = true },
         rhi::Pipeline_Bind_Point::Compute);
-    cmd->dispatch(1, m_options.texture_size, m_options.cascade_count);
+    cmd->dispatch(1, options.texture_size, options.cascade_count);
     cmd->set_push_constants<FFT_Push_Constants>({
             .image = m_displacement_ydx_zdx_zdz_zdy_texture,
             .vertical_or_horizontal = FFT_HORIZONTAL,
             .inverse = true },
         rhi::Pipeline_Bind_Point::Compute);
-    cmd->dispatch(1, m_options.texture_size, m_options.cascade_count);
+    cmd->dispatch(1, options.texture_size, options.cascade_count);
     tracker.set_resource_state(
         m_displacement_x_y_z_xdx_texture,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
@@ -260,9 +265,9 @@ void Ocean::simulate(
 }
 
 void Ocean::depth_pre_pass(rhi::Command_List* cmd, Resource_State_Tracker& tracker, const Buffer& camera,
-    const Image& shaded_scene_depth_render_target)
+    const Image& shaded_scene_depth_render_target, const Fly_Camera& cull_camera)
 {
-    if (!m_options.enabled) return;
+    if (!options.enabled) return;
 
     cmd->begin_debug_region("ocean:render:depth_pre_pass", 0.25f, 0.0f, 1.0f);
 
@@ -322,20 +327,11 @@ void Ocean::depth_pre_pass(rhi::Command_List* cmd, Resource_State_Tracker& track
     cmd->set_scissor(0, 0, width, height);
 
     constexpr static auto SIZE = 2048;
-    if (m_options.wireframe)
+    if (options.wireframe)
         cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch_depth_prepass_wireframe"));
     else
         cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch_depth_prepass"));
-    cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
-        .length_scales = m_simulation_data.full_spectrum_parameters.length_scales,
-        .tex_sampler = m_displacement_sampler,
-        .camera = camera,
-        .x_y_z_xdx_tex = m_displacement_x_y_z_xdx_texture,
-        .ydx_zdx_ydy_zdy_tex = m_displacement_ydx_zdx_zdz_zdy_texture,
-        .vertex_position_dist = .25f,
-        .field_size = SIZE
-        }, rhi::Pipeline_Bind_Point::Graphics);
-    cmd->draw(6 * SIZE * SIZE, 1, 0, 0);
+    draw_all_tiles(cmd, camera, cull_camera);
     cmd->end_render_pass();
     cmd->end_debug_region(); // ocean:render:depth_pre_pass
 }
@@ -345,9 +341,10 @@ void Ocean::opaque_forward_pass(
         Resource_State_Tracker& tracker,
         const Buffer& camera,
         const Image& shaded_scene_render_target,
-        const Image& shaded_scene_depth_render_target)
+        const Image& shaded_scene_depth_render_target,
+        const Fly_Camera& cull_camera)
 {
-    if (!m_options.enabled) return;
+    if (!options.enabled) return;
 
     cmd->begin_debug_region("ocean:render:opaque_pass", 0.25f, 0.0f, 1.0f);
 
@@ -396,22 +393,59 @@ void Ocean::opaque_forward_pass(
     cmd->set_scissor(0, 0, width, height);
 
     constexpr static auto SIZE = 2048;
-    if (m_options.wireframe)
+    if (options.wireframe)
         cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch_wireframe"));
     else
         cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch"));
-    cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
-        .length_scales = m_simulation_data.full_spectrum_parameters.length_scales,
-        .tex_sampler = m_displacement_sampler,
-        .camera = camera,
-        .x_y_z_xdx_tex = m_displacement_x_y_z_xdx_texture,
-        .ydx_zdx_ydy_zdy_tex = m_displacement_ydx_zdx_zdz_zdy_texture,
-        .vertex_position_dist = .25f,
-        .field_size = SIZE
-        }, rhi::Pipeline_Bind_Point::Graphics);
-    cmd->draw(6 * SIZE * SIZE,1,0,0);
+    draw_all_tiles(cmd, camera, cull_camera);
     cmd->end_render_pass();
     cmd->end_debug_region(); // ocean:render:opaque_forward_pass
+}
+
+void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const Fly_Camera& cull_camera)
+{
+    constexpr static auto FIELD_SIZE = 2048;
+    constexpr static auto TILES_PER_AXIS = 16u;
+    constexpr static auto TILE_VERTEX_COUNT = FIELD_SIZE / TILES_PER_AXIS;
+    constexpr static auto VERTEX_DIST = 0.25f;
+    constexpr static auto TILE_SIZE = static_cast<float>(TILE_VERTEX_COUNT) * VERTEX_DIST;
+
+    float starting_offset = 0.0f;
+    for (uint32_t i = 0; i < TILES_PER_AXIS / 2; ++i)
+    {
+        starting_offset -= glm::pow(0.5f, i + 1);
+    }
+    starting_offset *= static_cast<float>(FIELD_SIZE) * VERTEX_DIST / 2.0f;
+
+    for (uint32_t i = 0; i < TILES_PER_AXIS; ++i)
+    {
+        for (uint32_t j = 0; j < TILES_PER_AXIS; ++j)
+        {
+            glm::vec2 offset = glm::vec2(starting_offset);
+            offset.x += static_cast<float>(i) * TILE_SIZE;
+            offset.y += static_cast<float>(j) * TILE_SIZE;
+
+            const float horizontal = TILE_SIZE / 2.f + options.horizontal_cull_grace;
+
+            glm::vec3 box_min = { offset.x - horizontal, offset.y - horizontal, -options.vertical_cull_grace };
+            glm::vec3 box_max = { offset.x + horizontal, offset.y + horizontal,  options.vertical_cull_grace };
+
+            if (cull_camera.box_in_frustum(box_min, box_max))
+            {
+                cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
+                    .length_scales = simulation_data.full_spectrum_parameters.length_scales,
+                    .camera = camera,
+                    .x_y_z_xdx_tex = m_displacement_x_y_z_xdx_texture,
+                    .ydx_zdx_ydy_zdy_tex = m_displacement_ydx_zdx_zdz_zdy_texture,
+                    .vertex_position_dist = VERTEX_DIST,
+                    .field_size = TILE_VERTEX_COUNT,
+                    .offset_x = offset.x,
+                    .offset_y = offset.y
+                    }, rhi::Pipeline_Bind_Point::Graphics);
+                cmd->draw(6 * TILE_VERTEX_COUNT * TILE_VERTEX_COUNT, 1, 0, 0);
+            }
+        }
+    }
 }
 
 rhi::Image_Create_Info Ocean::Options::generate_create_info(bool four_components) const noexcept
@@ -534,9 +568,11 @@ void Ocean::process_gui()
         process_gui_simulation_settings();
         ImGui::SeparatorText("Debug");
         {
-            ImGui::Checkbox("Update Time", &m_options.update_time);
-            ImGui::Checkbox("Enabled##Ocean", &m_options.enabled);
-            ImGui::Checkbox("Wireframe##Ocean", &m_options.wireframe);
+            ImGui::Checkbox("Update Time", &options.update_time);
+            ImGui::Checkbox("Enabled##Ocean", &options.enabled);
+            ImGui::Checkbox("Wireframe##Ocean", &options.wireframe);
+            ImGui::SliderFloat("Horizontal cull grace", &options.horizontal_cull_grace, 0.f, 64.f);
+            ImGui::SliderFloat("Vertical cull grace", &options.vertical_cull_grace, 0.f, 64.f);
         }
     }
 }
@@ -545,7 +581,7 @@ void Ocean::process_gui_options()
 {
     ImGui::SeparatorText("Options");
 
-    auto options = m_options;
+    auto options_tmp = options;
     {
         constexpr static auto size_values = std::to_array({ 64, 128, 256, 512, 1024 });
         constexpr static auto size_value_texts = std::to_array({ "64", "128", "256", "512", "1024" });
@@ -553,17 +589,17 @@ void Ocean::process_gui_options()
         auto size_text_idx = 0;
         for (auto i = 0; i < size_value_texts.size(); ++i)
         {
-            if (size_values[i] == options.texture_size) size_text_idx = i;
+            if (size_values[i] == options_tmp.texture_size) size_text_idx = i;
         }
         imutil::push_negative_padding();
         if (ImGui::BeginCombo("Size", size_value_texts[size_text_idx]))
         {
             for (auto i = 0; i < size_values.size(); ++i)
             {
-                bool selected = options.texture_size == size_values[i];
+                bool selected = options_tmp.texture_size == size_values[i];
                 if (ImGui::Selectable(size_value_texts[i], selected, ImGuiSelectableFlags_None))
                 {
-                    options.texture_size = size_values[i];
+                    options_tmp.texture_size = size_values[i];
                 }
             }
             ImGui::EndCombo();
@@ -577,17 +613,17 @@ void Ocean::process_gui_options()
         auto cascade_text_idx = 0;
         for (auto i = 0; i < cascade_value_texts.size(); ++i)
         {
-            if (cascade_values[i] == options.cascade_count) cascade_text_idx = i;
+            if (cascade_values[i] == options_tmp.cascade_count) cascade_text_idx = i;
         }
         imutil::push_negative_padding();
         if (ImGui::BeginCombo("Cascade count", cascade_value_texts[cascade_text_idx]))
         {
             for (auto i = 0; i < cascade_values.size(); ++i)
             {
-                bool selected = options.cascade_count == cascade_values[i];
+                bool selected = options_tmp.cascade_count == cascade_values[i];
                 if (ImGui::Selectable(cascade_value_texts[i], selected, ImGuiSelectableFlags_None))
                 {
-                    options.cascade_count = cascade_values[i];
+                    options_tmp.cascade_count = cascade_values[i];
                 }
             }
             ImGui::EndCombo();
@@ -595,26 +631,26 @@ void Ocean::process_gui_options()
         imutil::help_marker(OCEAN_HELP_TEXT_CASCADES);
     }
     {
-        ImGui::Checkbox("Use fp16 textures", &options.use_fp16_textures);
+        ImGui::Checkbox("Use fp16 textures", &options_tmp.use_fp16_textures);
         imutil::help_marker(OCEAN_HELP_TEXT_FP16_TEXTURES);
     }
     {
-        ImGui::Checkbox("Use fp16 maths", &options.use_fp16_maths);
+        ImGui::Checkbox("Use fp16 maths", &options_tmp.use_fp16_maths);
         imutil::help_marker(OCEAN_HELP_TEXT_FP16_MATH);
     }
 
     const bool recreate_textures =
-        m_options.texture_size != options.texture_size ||
-        m_options.use_fp16_textures != options.use_fp16_textures ||
-        m_options.cascade_count != options.cascade_count;
+        options_tmp.texture_size != options.texture_size ||
+        options_tmp.use_fp16_textures != options.use_fp16_textures ||
+        options_tmp.cascade_count != options.cascade_count;
     if (recreate_textures)
     {
 
         auto recreate_texture = [&](Image& image)
         {
             auto create_info = image.get_create_info();
-            create_info.width = options.texture_size;
-            create_info.height = options.texture_size;
+            create_info.width = options_tmp.texture_size;
+            create_info.height = options_tmp.texture_size;
             image.recreate(create_info);
         };
         recreate_texture(m_spectrum_state_texture);
@@ -622,7 +658,7 @@ void Ocean::process_gui_options()
         recreate_texture(m_displacement_x_y_z_xdx_texture);
         recreate_texture(m_displacement_ydx_zdx_zdz_zdy_texture);
     }
-    m_options = options;
+    options = options_tmp;
 }
 
 void Ocean::process_gui_simulation_settings()
@@ -630,14 +666,14 @@ void Ocean::process_gui_simulation_settings()
     ImGui::SeparatorText("Simulation Settings");
 
     imutil::push_negative_padding();
-    ImGui::SliderFloat("Gravity", &m_simulation_data.full_spectrum_parameters.gravity, .001f, 30.f);
+    ImGui::SliderFloat("Gravity", &simulation_data.full_spectrum_parameters.gravity, .001f, 30.f);
     imutil::help_marker(OCEAN_HELP_TEXT_GRAVITY);
 
     auto length_scales = std::to_array({
-        &m_simulation_data.full_spectrum_parameters.length_scales.x,
-        &m_simulation_data.full_spectrum_parameters.length_scales.y,
-        &m_simulation_data.full_spectrum_parameters.length_scales.z,
-        &m_simulation_data.full_spectrum_parameters.length_scales.w,
+        &simulation_data.full_spectrum_parameters.length_scales.x,
+        &simulation_data.full_spectrum_parameters.length_scales.y,
+        &simulation_data.full_spectrum_parameters.length_scales.z,
+        &simulation_data.full_spectrum_parameters.length_scales.w,
         });
     for (auto i = 0; i < 4; ++i)
     {
@@ -649,7 +685,7 @@ void Ocean::process_gui_simulation_settings()
 
     auto depth_str = std::string("Depth");
     imutil::push_negative_padding();
-    ImGui::SliderFloat(depth_str.c_str(), &m_simulation_data.full_spectrum_parameters.depth, 1.0f, 150.f);
+    ImGui::SliderFloat(depth_str.c_str(), &simulation_data.full_spectrum_parameters.depth, 1.0f, 150.f);
     imutil::help_marker(OCEAN_HELP_TEXT_DEPTH);
 
     constexpr static auto spectrum_values = std::to_array({
@@ -668,17 +704,17 @@ void Ocean::process_gui_simulation_settings()
     auto spectrum_text_idx = 0;
     for (auto i = 0; i < spectrum_value_texts.size(); ++i)
     {
-        if (uint32_t(spectrum_values[i]) == m_simulation_data.full_spectrum_parameters.oceanographic_spectrum) spectrum_text_idx = i;
+        if (uint32_t(spectrum_values[i]) == simulation_data.full_spectrum_parameters.oceanographic_spectrum) spectrum_text_idx = i;
     }
     imutil::push_negative_padding();
     if (ImGui::BeginCombo("Oceanographic Spectrum", spectrum_value_texts[spectrum_text_idx]))
     {
         for (auto i = 0; i < spectrum_values.size(); ++i)
         {
-            bool selected = m_simulation_data.full_spectrum_parameters.oceanographic_spectrum == uint32_t(spectrum_values[i]);
+            bool selected = simulation_data.full_spectrum_parameters.oceanographic_spectrum == uint32_t(spectrum_values[i]);
             if (ImGui::Selectable(spectrum_value_texts[i], selected, ImGuiSelectableFlags_None))
             {
-                m_simulation_data.full_spectrum_parameters.oceanographic_spectrum = uint32_t(spectrum_values[i]);
+                simulation_data.full_spectrum_parameters.oceanographic_spectrum = uint32_t(spectrum_values[i]);
             }
         }
         ImGui::EndCombo();
@@ -701,17 +737,17 @@ void Ocean::process_gui_simulation_settings()
     auto dirspread_text_idx = 0;
     for (auto i = 0; i < dirspread_value_texts.size(); ++i)
     {
-        if (uint32_t(dirspread_values[i]) == m_simulation_data.full_spectrum_parameters.directional_spreading_function) dirspread_text_idx = i;
+        if (uint32_t(dirspread_values[i]) == simulation_data.full_spectrum_parameters.directional_spreading_function) dirspread_text_idx = i;
     }
     imutil::push_negative_padding();
     if (ImGui::BeginCombo("Directional Spread", dirspread_value_texts[dirspread_text_idx]))
     {
         for (auto i = 0; i < dirspread_values.size(); ++i)
         {
-            bool selected = m_simulation_data.full_spectrum_parameters.directional_spreading_function == uint32_t(dirspread_values[i]);
+            bool selected = simulation_data.full_spectrum_parameters.directional_spreading_function == uint32_t(dirspread_values[i]);
             if (ImGui::Selectable(dirspread_value_texts[i], selected, ImGuiSelectableFlags_None))
             {
-                m_simulation_data.full_spectrum_parameters.directional_spreading_function = uint32_t(dirspread_values[i]);
+                simulation_data.full_spectrum_parameters.directional_spreading_function = uint32_t(dirspread_values[i]);
             }
         }
         ImGui::EndCombo();
@@ -719,7 +755,7 @@ void Ocean::process_gui_simulation_settings()
     imutil::help_marker(OCEAN_HELP_TEXT_DIRECTIONAL_SPREAD);
 
     uint32_t spectrum_count = 0;
-    for (auto& spectrum : m_simulation_data.full_spectrum_parameters.single_spectrum_parameters)
+    for (auto& spectrum : simulation_data.full_spectrum_parameters.single_spectrum_parameters)
     {
         if (spectrum_count == 0)
         {

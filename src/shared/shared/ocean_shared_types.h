@@ -63,12 +63,13 @@ struct SHADER_STRUCT_ALIGN Ocean_Time_Dependent_Spectrum_Push_Constants
 struct SHADER_STRUCT_ALIGN Ocean_Render_Patch_Push_Constants
 {
     float4 length_scales;
-    SHADER_HANDLE_TYPE tex_sampler;
     SHADER_HANDLE_TYPE camera;
     SHADER_HANDLE_TYPE x_y_z_xdx_tex;
     SHADER_HANDLE_TYPE ydx_zdx_ydy_zdy_tex;
     float vertex_position_dist;
     uint field_size;
+    float offset_x;
+    float offset_y;
 };
 
 struct SHADER_STRUCT_ALIGN Ocean_Render_Composition_Push_Constants

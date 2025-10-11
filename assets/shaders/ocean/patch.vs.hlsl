@@ -1,5 +1,6 @@
 #include "shared/ocean_shared_types.h"
 #include "shared/camera_shared_types.h"
+#include "shared/shared_resources.h"
 #include "rhi/bindless.hlsli"
 #include "shaders/ocean/ocean_patch_types.hlsli"
 #include "ocean/ocean_render_utils.hlsli"
@@ -23,6 +24,7 @@ VS_Out main(uint vertex_id : SV_VertexID)
     uint triangle_vertex_index = vertex_id % 6;
     float2 vertex_pos = -pc.vertex_position_dist * float2(pc.field_size, pc.field_size) / 2.;
     vertex_pos += pc.vertex_position_dist * (float2(quad_index / pc.field_size, quad_index % pc.field_size) + OFFSETS[triangle_vertex_index]);
+    vertex_pos += float2(pc.offset_x, pc.offset_y);
 
     float2 uvs[4] = {
         vertex_pos / pc.length_scales[0],
@@ -43,7 +45,7 @@ VS_Out main(uint vertex_id : SV_VertexID)
     {
         if (weights[i] <= 0.0) continue;
 
-        x_y_z_xdx += weights[i] * rhi::uni::tex_sample_level_arr<float4>(pc.x_y_z_xdx_tex, pc.tex_sampler, uvs[i], i, 0.);
+        x_y_z_xdx += weights[i] * rhi::uni::tex_sample_level_arr<float4>(pc.x_y_z_xdx_tex, REN_SAMPLER_LINEAR_WRAP, uvs[i], i, 0.);
     }
 
     float3 displacement = float3(x_y_z_xdx.x, x_y_z_xdx.y, x_y_z_xdx.z);

@@ -35,6 +35,35 @@ void Fly_Camera::process_inputs(const Input_State& input_state, const float dt)
     update_position(input_state, dt);
 }
 
+bool Fly_Camera::box_in_frustum(const glm::vec3& min, const glm::vec3& max) const
+{
+    auto wtc_t = glm::transpose(camera_data.world_to_clip);
+    auto planes = std::to_array({
+        (wtc_t[3] + wtc_t[0]), // left
+        (wtc_t[3] - wtc_t[0]), // right
+        (wtc_t[3] + wtc_t[1]), // bottom
+        (wtc_t[3] - wtc_t[1]), // top
+        (wtc_t[3] + wtc_t[2])  // near
+    });
+
+    for (const auto& p : planes)
+    {
+        if (glm::dot(p, glm::vec4(min.x, min.y, min.z, 1.0f)) < 0.0f &&
+            glm::dot(p, glm::vec4(max.x, min.y, min.z, 1.0f)) < 0.0f &&
+            glm::dot(p, glm::vec4(min.x, max.y, min.z, 1.0f)) < 0.0f &&
+            glm::dot(p, glm::vec4(max.x, max.y, min.z, 1.0f)) < 0.0f &&
+            glm::dot(p, glm::vec4(min.x, min.y, max.z, 1.0f)) < 0.0f &&
+            glm::dot(p, glm::vec4(max.x, min.y, max.z, 1.0f)) < 0.0f &&
+            glm::dot(p, glm::vec4(min.x, max.y, max.z, 1.0f)) < 0.0f &&
+            glm::dot(p, glm::vec4(max.x, max.y, max.z, 1.0f)) < 0.0f)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void Fly_Camera::update_rotation(const Input_State& input_state)
 {
     if (input_state.is_mouse_pressed(input_map.enable_rotate))

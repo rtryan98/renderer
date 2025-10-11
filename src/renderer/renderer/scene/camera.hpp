@@ -56,6 +56,8 @@ public:
     void update();
     void process_inputs(const Input_State& input_state, float dt);
 
+    [[nodiscard]] bool box_in_frustum(const glm::vec3& min, const glm::vec3& max) const;
+
 private:
     void update_rotation(const Input_State& input_state);
     void update_position(const Input_State& input_state, float dt);
