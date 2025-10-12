@@ -47,17 +47,17 @@ add_custom_command(
 )
 
 # Additional assets
-core_download_and_extract_zip(
+rhi_download_and_extract_zip(
     https://cdrdv2.intel.com/v1/dl/getContent/830833
     ${CMAKE_BINARY_DIR}/download
     intel_sponza
 )
-core_download_and_extract_zip(
+rhi_download_and_extract_zip(
     https://cdrdv2.intel.com/v1/dl/getContent/726650
     ${CMAKE_BINARY_DIR}/download
     intel_sponza_curtains
 )
-core_download_and_extract_zip(
+rhi_download_and_extract_zip(
     https://cdrdv2.intel.com/v1/dl/getContent/726656
     ${CMAKE_BINARY_DIR}/download
     intel_sponza_ivy
@@ -120,7 +120,9 @@ source_group(TREE ${CMAKE_CURRENT_LIST_DIR}/src/renderer PREFIX src FILES ${REND
 set_property(DIRECTORY ${CMAKE_CURRENT_LIST_DIR} PROPERTY VS_STARTUP_PROJECT renderer)
 
 rhi_symlink_shaders(${CMAKE_SOURCE_DIR}/assets/shaders)
-core_deploy_d3d12(D3D12)
+rhi_deploy_d3d12(D3D12)
 
 renderer_setup()
 renderer_symlink_assets()
+
+add_dependencies(renderer asset_baker)

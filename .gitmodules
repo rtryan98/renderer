@@ -44,3 +44,6 @@
 [submodule "thirdparty/RobotoMono"]
 	path = thirdparty/RobotoMono
 	url = https://github.com/googlefonts/RobotoMono
+[submodule "thirdparty/nlohmann_json"]
+	path = thirdparty/nlohmann_json
+	url = https://github.com/nlohmann/json

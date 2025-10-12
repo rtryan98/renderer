@@ -27,6 +27,7 @@ target_link_libraries(
 )
 
 add_subdirectory(fastgltf)
+add_subdirectory(nlohmann_json)
 add_subdirectory(unordered_dense)
 
 set(XXHASH_BUILD_XXHSUM OFF)
