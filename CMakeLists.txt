@@ -20,18 +20,22 @@ target_link_libraries(
     mikktspace
     enkiTS
     glm
+    spdlog
 )
 target_include_directories(
     asset_baker PUBLIC
     src/asset_baker
     src/shared
-    thirdparty/spdlog/include
     thirdparty/tclap/include
     thirdparty/stb
 )
 set_target_properties(
     asset_baker PROPERTIES
     CXX_STANDARD 23
+)
+target_compile_definitions(
+    asset_baker PUBLIC
+    SPDLOG_COMPILED_LIB
 )
 add_custom_command(
     TARGET asset_baker
@@ -91,12 +95,12 @@ target_link_libraries(
     offset_allocator
     glm
     SDL3::SDL3-static
+    spdlog
 )
 target_include_directories(
     renderer PUBLIC
     src/renderer
     src/shared
-    thirdparty/spdlog/include
     thirdparty/tclap/include
 )
 set_target_properties(
@@ -108,6 +112,7 @@ target_compile_definitions(
     REN_MAX_FRAMES_IN_FLIGHT=2
     GLM_FORCE_DEPTH_ZERO_TO_ONE
     GLM_FORCE_SWIZZLE
+    SPDLOG_COMPILED_LIB
 )
 
 add_subdirectory(src)
@@ -124,5 +129,3 @@ rhi_deploy_d3d12(D3D12)
 
 renderer_setup()
 renderer_symlink_assets()
-
-add_dependencies(renderer asset_baker)

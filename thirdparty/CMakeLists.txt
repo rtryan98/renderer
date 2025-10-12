@@ -49,6 +49,8 @@ set_target_properties(
     CXX_STANDARD 23
 )
 
+set(ENKITS_BUILD_C_INTERFACE OFF)
+set(ENKITS_BUILD_EXAMPLES OFF)
 add_subdirectory(enkiTS)
 
 add_library(offset_allocator)
@@ -67,7 +69,10 @@ set_target_properties(
 )
 
 add_subdirectory(glm)
+
+set(SDL_TEST_LIBRARY OFF)
 add_subdirectory(sdl)
+add_subdirectory(spdlog)
 
 file(
     COPY RobotoMono/fonts/ttf/RobotoMono-Regular.ttf
