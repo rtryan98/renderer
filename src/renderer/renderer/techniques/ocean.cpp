@@ -243,7 +243,6 @@ void Ocean::simulate(
             .inverse = true },
         rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(1, options.texture_size, options.cascade_count);
-    tracker.flush_barriers(cmd);
     cmd->set_push_constants<FFT_Push_Constants>({
             .image = m_displacement_ydx_zdx_zdz_zdy_texture,
             .vertical_or_horizontal = FFT_VERTICAL,
@@ -288,7 +287,6 @@ void Ocean::simulate(
             .min_max_tex_store_offset = 0},
             rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(1, options.texture_size, options.cascade_count);
-    tracker.flush_barriers(cmd);
     cmd->set_push_constants<FFT_Push_Constants>({
             .image = m_displacement_ydx_zdx_zdz_zdy_texture,
             .vertical_or_horizontal = FFT_HORIZONTAL,
@@ -359,17 +357,17 @@ void Ocean::simulate(
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Unordered_Access_Read);
     tracker.use_resource(
-        m_displacement_ydx_zdx_zdz_zdy_texture,
+        m_packed_displacement_texture,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Unordered_Access_Write,
         rhi::Barrier_Image_Layout::Unordered_Access);
     tracker.use_resource(
-        m_displacement_ydx_zdx_zdz_zdy_texture,
+        m_packed_derivatives_texture,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Unordered_Access_Write,
         rhi::Barrier_Image_Layout::Unordered_Access);
     tracker.use_resource(
-        m_displacement_ydx_zdx_zdz_zdy_texture,
+        m_packed_xdx_texture,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Unordered_Access_Write,
         rhi::Barrier_Image_Layout::Unordered_Access);
@@ -578,7 +576,7 @@ void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const F
     }
 }
 
-rhi::Image_Create_Info Ocean::Options::generate_create_info(rhi::Image_Format format) const noexcept
+rhi::Image_Create_Info Ocean::Options::generate_create_info(rhi::Image_Format format, uint16_t mip_levels) const noexcept
 {
     return {
         .format = format,
@@ -586,7 +584,7 @@ rhi::Image_Create_Info Ocean::Options::generate_create_info(rhi::Image_Format fo
         .height = texture_size,
         .depth = 1,
         .array_size = static_cast<uint16_t>(cascade_count),
-        .mip_levels = 1,
+        .mip_levels = mip_levels,
         .usage = rhi::Image_Usage::Unordered_Access | rhi::Image_Usage::Sampled,
         .primary_view_type = rhi::Image_View_Type::Texture_2D_Array
     };

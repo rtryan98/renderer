@@ -103,7 +103,7 @@ public:
 
         auto operator<=>(const Options& other) const = default;
 
-        [[nodiscard]] rhi::Image_Create_Info generate_create_info(rhi::Image_Format format) const noexcept;
+        [[nodiscard]] rhi::Image_Create_Info generate_create_info(rhi::Image_Format format, uint16_t mip_levels = 1) const noexcept;
     } options;
 
     struct Simulation_Data
