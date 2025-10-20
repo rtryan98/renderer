@@ -5,6 +5,8 @@
 
 namespace ren
 {
+constexpr static auto MIN_PER_FRAME_STAGING_BUFFER_SIZE = 1ull << 24; // 16 MiB
+
 GPU_Transfer_Context::GPU_Transfer_Context(rhi::Graphics_Device* graphics_device)
     : m_graphics_device(graphics_device)
 {}
@@ -12,11 +14,11 @@ GPU_Transfer_Context::GPU_Transfer_Context(rhi::Graphics_Device* graphics_device
 GPU_Transfer_Context::~GPU_Transfer_Context()
 {
     m_graphics_device->wait_idle();
-    for (auto& staging_buffer_vec : m_staging_buffers)
+    for (auto& staging_buffer_vec : m_coherent_staging_buffers)
     {
         for (auto staging_buffer : staging_buffer_vec)
         {
-            m_graphics_device->destroy_buffer(staging_buffer);
+            m_graphics_device->destroy_buffer(staging_buffer.buffer);
         }
     }
 }
@@ -32,20 +34,15 @@ void GPU_Transfer_Context::enqueue_immediate_upload(rhi::Buffer* dst, void* data
 {
     const auto frame_in_flight = m_current_frame % REN_MAX_FRAMES_IN_FLIGHT;
 
-    auto& staging_buffers = m_staging_buffers[frame_in_flight];
-    rhi::Buffer_Create_Info buffer_info = {
-        .size = size,
-        .heap = rhi::Memory_Heap_Type::CPU_Upload
-    };
-    auto staging_buffer = m_graphics_device->create_buffer(buffer_info).value_or(nullptr);
-    m_graphics_device->name_resource(staging_buffer, "gpu_transfer:immediate_upload:buffer:staging_buffer");
-    memcpy(staging_buffer->data, data, size);
+    auto staging_buffer = get_next_staging_buffer(size);
 
-    staging_buffers.push_back(staging_buffer);
+    memcpy(&static_cast<char*>(staging_buffer.buffer->data)[staging_buffer.offset], data, size);
+
     m_buffer_staging_infos[frame_in_flight].push_back({
-        .src = staging_buffer,
+        .src = staging_buffer.buffer,
+        .src_offset = staging_buffer.offset,
         .dst = dst,
-        .offset = dst_offset,
+        .dst_offset = dst_offset,
         .size = size });
 }
 
@@ -60,28 +57,22 @@ void GPU_Transfer_Context::enqueue_immediate_upload(rhi::Image* image, void** da
         size += byte_size * (image->width / (1 << i)) * (image->height / (1 << i));
     }
 
-    auto& staging_buffers = m_staging_buffers[frame_in_flight];
-    rhi::Buffer_Create_Info buffer_info = {
-        .size = std::max(4ull, size),
-        .heap = rhi::Memory_Heap_Type::CPU_Upload
-    };
-    auto staging_buffer = m_graphics_device->create_buffer(buffer_info).value_or(nullptr);
-    m_graphics_device->name_resource(staging_buffer, "gpu_transfer:immediate_upload:image:staging_buffer");
+    auto staging_buffer = get_next_staging_buffer(size);
+    auto mip_offset = 0ull;
 
-    std::size_t offset = 0;
     for (auto i = 0; i < image->mip_levels; ++i)
     {
         std::size_t current_size = byte_size * (image->width / (1 << i)) * (image->height / (1 << i));
         if (i > 0)
         {
-            offset += byte_size * (image->width / (1 << (i - 1))) * (image->height / (1 << (i - 1)));
+            mip_offset += byte_size * (image->width / (1 << (i - 1))) * (image->height / (1 << (i - 1)));
         }
-        memcpy(&static_cast<char*>(staging_buffer->data)[offset], data[i], current_size);
+        memcpy(&static_cast<char*>(staging_buffer.buffer->data)[staging_buffer.offset + mip_offset], data[i], current_size);
     }
 
-    staging_buffers.push_back(staging_buffer);
     m_image_staging_infos[frame_in_flight].push_back({
-        .src = staging_buffer,
+        .src = staging_buffer.buffer,
+        .src_offset = staging_buffer.offset,
         .dst = image });
 }
 
@@ -157,7 +148,7 @@ void GPU_Transfer_Context::process_immediate_uploads_on_graphics_queue(
             }
             cmd->copy_buffer_to_image(
                 image_staging_info.src,
-                offset,
+                image_staging_info.src_offset + offset,
                 image_staging_info.dst,
                 {},
                 {
@@ -174,9 +165,9 @@ void GPU_Transfer_Context::process_immediate_uploads_on_graphics_queue(
     {
         cmd->copy_buffer(
             buffer_staging_info.src,
-            0,
+            buffer_staging_info.src_offset,
             buffer_staging_info.dst,
-            buffer_staging_info.offset,
+            buffer_staging_info.dst_offset,
             buffer_staging_info.size);
     }
     rhi::Memory_Barrier_Info mem_barrier = {
@@ -203,10 +194,39 @@ void GPU_Transfer_Context::garbage_collect()
 
     m_buffer_staging_infos[frame_in_flight].clear();
     m_image_staging_infos[frame_in_flight].clear();
-    for (const auto staging_buffer : m_staging_buffers[frame_in_flight])
+    for (auto& staging_buffer : m_coherent_staging_buffers[frame_in_flight])
     {
-        m_graphics_device->destroy_buffer(staging_buffer);
+        staging_buffer.offset = 0;
     }
-    m_staging_buffers[frame_in_flight].clear();
+}
+
+GPU_Transfer_Context::Staging_Buffer GPU_Transfer_Context::get_next_staging_buffer(std::size_t size)
+{
+    const auto frame_in_flight = m_current_frame % REN_MAX_FRAMES_IN_FLIGHT;
+
+    Staging_Buffer result = {};
+    for (auto& staging_buffer : m_coherent_staging_buffers[frame_in_flight])
+    {
+        if (staging_buffer.offset + size <= staging_buffer.buffer->size)
+        {
+            result = staging_buffer;
+            staging_buffer.offset += size;
+            return result;
+        }
+    }
+    auto& new_staging_buffer = m_coherent_staging_buffers[frame_in_flight].emplace_back();
+    rhi::Buffer_Create_Info staging_buffer_create_info = {
+        .size = std::max(MIN_PER_FRAME_STAGING_BUFFER_SIZE, size),
+        .heap = rhi::Memory_Heap_Type::CPU_Upload,
+        .acceleration_structure_memory = false
+    };
+    new_staging_buffer.buffer = m_graphics_device->create_buffer(staging_buffer_create_info).value_or(nullptr);
+    std::string buffer_name = "gpu_transfer:staging_buffer:frame" + std::to_string(frame_in_flight) + ":buffer" + std::to_string(m_coherent_staging_buffers[frame_in_flight].size() - 1);
+    m_graphics_device->name_resource(new_staging_buffer.buffer, buffer_name.c_str());
+
+    result = new_staging_buffer;
+    new_staging_buffer.offset += size;
+
+    return result;
 }
 }

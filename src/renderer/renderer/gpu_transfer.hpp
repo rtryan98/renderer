@@ -56,22 +56,33 @@ private:
     struct Buffer_Staging_Info
     {
         rhi::Buffer* src;
+        std::size_t src_offset;
         rhi::Buffer* dst;
-        uint64_t offset;
-        uint64_t size;
+        std::size_t dst_offset;
+        std::size_t size;
     };
 
     struct Image_Staging_Info
     {
         rhi::Buffer* src;
+        std::size_t src_offset;
         rhi::Image* dst;
     };
 
+    struct Staging_Buffer
+    {
+        rhi::Buffer* buffer;
+        std::size_t offset;
+    };
+
     rhi::Graphics_Device* m_graphics_device;
-    std::array<std::vector<rhi::Buffer*>, REN_MAX_FRAMES_IN_FLIGHT> m_staging_buffers;
+    std::array<std::vector<Staging_Buffer>, REN_MAX_FRAMES_IN_FLIGHT> m_coherent_staging_buffers;
     std::array<std::vector<Buffer_Staging_Info>, REN_MAX_FRAMES_IN_FLIGHT> m_buffer_staging_infos;
     std::array<std::vector<Image_Staging_Info>, REN_MAX_FRAMES_IN_FLIGHT> m_image_staging_infos;
 
     std::size_t m_current_frame = 0;
+
+private:
+    Staging_Buffer get_next_staging_buffer(std::size_t size);
 };
 }
