@@ -19,6 +19,7 @@ constexpr static auto TILES_PER_AXIS = 16u;
 constexpr static auto TILE_VERTEX_COUNT = FIELD_SIZE / TILES_PER_AXIS + 1;
 constexpr static auto VERTEX_DIST = 0.25f;
 constexpr static auto TILE_SIZE = static_cast<float>(TILE_VERTEX_COUNT - 1) * VERTEX_DIST;
+constexpr static auto MAX_TILE_SIZE = static_cast<float>(FIELD_SIZE) * VERTEX_DIST;
 
 Ocean::Ocean(Asset_Repository& asset_repository, GPU_Transfer_Context& gpu_transfer_context,
     Render_Resource_Blackboard& render_resource_blackboard, uint32_t width, uint32_t height)
@@ -535,44 +536,118 @@ void Ocean::opaque_forward_pass(
 
 void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const Fly_Camera& cull_camera)
 {
-    float starting_offset = 0.0f;
-    for (uint32_t i = 0; i < TILES_PER_AXIS / 2; ++i)
-    {
-        starting_offset -= glm::pow(0.5f, i + 1);
-    }
-    starting_offset *= static_cast<float>(FIELD_SIZE) * VERTEX_DIST / 2.0f;
+    Surface_Quad_Tree quad_tree;
+    quad_tree.grids = {
+        Surface_Quad_Tree::Grid({},   1, 128),
+        Surface_Quad_Tree::Grid({},   2,  64),
+        Surface_Quad_Tree::Grid({},   4,  32),
+        Surface_Quad_Tree::Grid({},   8,  16),
+        Surface_Quad_Tree::Grid({},  16,   8),
+        Surface_Quad_Tree::Grid({},  32,   4),
+        Surface_Quad_Tree::Grid({},  64,   2),
+        Surface_Quad_Tree::Grid({}, 128,   1),
+    };
 
-    cmd->set_index_buffer(m_tile_index_buffer, rhi::Index_Type::U16);
-    for (uint32_t i = 0; i < TILES_PER_AXIS; ++i)
+    struct Cell
     {
-        for (uint32_t j = 0; j < TILES_PER_AXIS; ++j)
+        glm::uvec2 position;
+        uint32_t level;
+    };
+
+    std::vector<Cell> cells_to_process{ { { 0, 0 }, 0 } };
+    std::vector<Cell> cells_to_render;
+
+    while (cells_to_process.size() > 0)
+    {
+        auto cell = cells_to_process.back();
+        cells_to_process.pop_back();
+
+        bool should_subdivide = false;
+
+        auto tile_size = MAX_TILE_SIZE / static_cast<float>(1u << cell.level);
+
+        auto cell_center = quad_tree.get_tile_position(cell.position.x, cell.position.y, cell.level);
+        auto cell_distance = glm::max(glm::distance(cull_camera.position, { cell_center.x, cell_center.y, 0.f }) - tile_size * options.lod_factor, 0.f);
+
+        if (cell_distance <= 1.f &&
+            cell.level < 7)
         {
-            glm::vec2 offset = glm::vec2(starting_offset);
-            offset.x += static_cast<float>(i) * TILE_SIZE;
-            offset.y += static_cast<float>(j) * TILE_SIZE;
+            should_subdivide = true;
+        }
 
-            const float horizontal = TILE_SIZE / 2.f + options.horizontal_cull_grace;
+        if (should_subdivide)
+        {
+            auto child_position = glm::uvec2 { 2 * cell.position.x, 2 * cell.position.y };
+            auto child_level = cell.level + 1;
+            cells_to_process.push_back({ { child_position.x    , child_position.y     }, child_level });
+            cells_to_process.push_back({ { child_position.x + 1, child_position.y     }, child_level });
+            cells_to_process.push_back({ { child_position.x    , child_position.y + 1 }, child_level });
+            cells_to_process.push_back({ { child_position.x + 1, child_position.y + 1 }, child_level });
+        }
+        else
+        {
+            quad_tree.propagate_cell_value(cell.position.x, cell.position.y, cell.level, quad_tree.grids[cell.level].cells[cell.position.x][cell.position.y]);
 
-            glm::vec3 box_min = { offset.x - horizontal, offset.y - horizontal, -options.vertical_cull_grace };
-            glm::vec3 box_max = { offset.x + horizontal, offset.y + horizontal,  options.vertical_cull_grace };
+            const float horizontal = tile_size / 2.f + options.horizontal_cull_grace;
+
+            glm::vec3 box_min = { cell_center.x - horizontal, cell_center.y - horizontal, -options.vertical_cull_grace };
+            glm::vec3 box_max = { cell_center.x + horizontal, cell_center.y + horizontal,  options.vertical_cull_grace };
 
             if (cull_camera.box_in_frustum(box_min, box_max))
             {
-                cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
-                    .length_scales = simulation_data.full_spectrum_parameters.length_scales,
-                    .camera = camera,
-                    .min_max_buffer = m_minmax_buffer,
-                    .packed_displacement_tex = m_packed_displacement_texture,
-                    .packed_derivatives_tex = m_packed_derivatives_texture,
-                    .packed_xdx_tex = m_packed_xdx_texture,
-                    .vertex_position_dist = VERTEX_DIST,
-                    .field_size = TILE_VERTEX_COUNT,
-                    .offset_x = offset.x,
-                    .offset_y = offset.y
-                    }, rhi::Pipeline_Bind_Point::Graphics);
-                cmd->draw_indexed(3 * 2 * (TILE_VERTEX_COUNT - 1) * (TILE_VERTEX_COUNT - 1), 1, 0, 0, 0);
+                cells_to_render.push_back(cell);
             }
         }
+    }
+
+    cmd->set_index_buffer(m_tile_index_buffer, rhi::Index_Type::U16);
+    for (const auto& cell : cells_to_render)
+    {
+        auto cell_center = quad_tree.get_tile_position(cell.position.x, cell.position.y, cell.level);
+        auto tile_size = MAX_TILE_SIZE / static_cast<float>(1u << cell.level);
+
+        int32_t cell_lod_value = static_cast<int32_t>(quad_tree.grids[cell.level].cells[cell.position.x][cell.position.y]);
+        int32_t cell_lod_left = cell_lod_value;
+        if (cell.position.x > 0)
+        {
+            cell_lod_left = quad_tree.grids[cell.level].cells[cell.position.x - 1][cell.position.y];
+        }
+        int32_t cell_lod_top = cell_lod_value;
+        if (cell.position.y > 0)
+        {
+            cell_lod_top = quad_tree.grids[cell.level].cells[cell.position.x][cell.position.y - 1];
+        }
+        int32_t cell_lod_right = cell_lod_value;
+        if (cell.position.x < quad_tree.grids[cell.level].cells.size() - 1)
+        {
+            cell_lod_right = quad_tree.grids[cell.level].cells[cell.position.x + 1][cell.position.y];
+        }
+        int32_t cell_lod_bottom = cell_lod_value;
+        if (cell.position.y < quad_tree.grids[cell.level].cells.size() - 1)
+        {
+            cell_lod_bottom = quad_tree.grids[cell.level].cells[cell.position.x][cell.position.y + 1];
+        }
+        glm::u8vec4 cell_lod_differences = {
+            static_cast<uint8_t>(cell_lod_top    / cell_lod_value),
+            static_cast<uint8_t>(cell_lod_left / cell_lod_value),
+            static_cast<uint8_t>(cell_lod_bottom / cell_lod_value),
+            static_cast<uint8_t>(cell_lod_right / cell_lod_value),
+        };
+
+        cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
+            .length_scales = simulation_data.full_spectrum_parameters.length_scales,
+            .camera = camera,
+            .min_max_buffer = m_minmax_buffer,
+            .packed_displacement_tex = m_packed_displacement_texture,
+            .packed_derivatives_tex = m_packed_derivatives_texture,
+            .packed_xdx_tex = m_packed_xdx_texture,
+            .cell_size = tile_size,
+            .vertices_per_axis = TILE_VERTEX_COUNT,
+            .offset_x = cell_center.x,
+            .offset_y = cell_center.y,
+            .lod_differences = std::bit_cast<uint32_t>(cell_lod_differences)
+            }, rhi::Pipeline_Bind_Point::Graphics);
+        cmd->draw_indexed(3 * 2 * (TILE_VERTEX_COUNT - 1) * (TILE_VERTEX_COUNT - 1), 1, 0, 0, 0);
     }
 }
 
@@ -592,7 +667,7 @@ rhi::Image_Create_Info Ocean::Options::generate_create_info(rhi::Image_Format fo
 
 Ocean::Simulation_Data::Full_Spectrum_Parameters::Full_Spectrum_Parameters()
     : single_spectrum_parameters({
-          {
+          Single_Spectrum_Parameters {
               .wind_speed = 2.5f,
               .fetch = 3.5f,
               .phillips_alpha = 0.000125f,
@@ -601,7 +676,7 @@ Ocean::Simulation_Data::Full_Spectrum_Parameters::Full_Spectrum_Parameters()
               .contribution = 1.0f,
               .wind_direction = 110.f
           },
-          {
+          Single_Spectrum_Parameters {
               .wind_speed = 10.5f,
               .fetch = 70.0f,
               .phillips_alpha = 0.00025f,
@@ -686,6 +761,7 @@ void Ocean::process_gui()
             ImGui::Checkbox("Wireframe##Ocean", &options.wireframe);
             ImGui::SliderFloat("Horizontal cull grace", &options.horizontal_cull_grace, 0.f, 64.f);
             ImGui::SliderFloat("Vertical cull grace", &options.vertical_cull_grace, 0.f, 64.f);
+            ImGui::SliderFloat("LOD factor", &options.lod_factor, 0.01f, 4.f);
         }
     }
 }
@@ -906,4 +982,38 @@ void Ocean::process_gui_simulation_settings()
         ++spectrum_count;
     }
 }
+
+void Ocean::Surface_Quad_Tree::propagate_cell_value(uint32_t x, uint32_t y, uint32_t level, uint32_t value)
+{
+    grids[level].cells[x][y] = value;
+    if (level < grids.size() - 1)
+    {
+        level += 1;
+        x *= 2;
+        y *= 2;
+
+        propagate_cell_value(x    , y    , level, value);
+        propagate_cell_value(x + 1, y    , level, value);
+        propagate_cell_value(x    , y + 1, level, value);
+        propagate_cell_value(x + 1, y + 1, level, value);
+    }
+}
+
+glm::vec2 Ocean::Surface_Quad_Tree::get_tile_position(uint32_t x, uint32_t y, uint32_t level) const
+{
+    float tile_size = MAX_TILE_SIZE;
+    float starting_offset = 0.0f;
+    for (uint32_t i = 0; i < level; ++i)
+    {
+        tile_size *= 0.5f;
+        starting_offset -= tile_size / 2.f;
+    }
+
+    return glm::vec2(starting_offset, starting_offset) + glm::vec2(static_cast<float>(x), static_cast<float>(y)) * tile_size + grids[level].center;
+}
+
+Ocean::Surface_Quad_Tree::Grid::Grid(const glm::vec2& center, uint32_t size, uint8_t value)
+    : center(center)
+    , cells(size, std::vector<uint8_t>(size, value))
+{}
 }

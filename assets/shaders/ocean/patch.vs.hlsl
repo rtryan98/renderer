@@ -21,11 +21,51 @@ VS_OUT_TYPE main(uint vertex_id : SV_VertexID)
 {
     GPU_Camera_Data camera = rhi::buf_load<GPU_Camera_Data>(pc.camera);
 
-    uint row = vertex_id / pc.field_size;
-    uint column = vertex_id % pc.field_size;
-    float2 vertex_pos = -pc.vertex_position_dist * float2(pc.field_size, pc.field_size) / 2.;
-    vertex_pos += pc.vertex_position_dist * (float2(row, column));
-    vertex_pos += float2(pc.offset_x, pc.offset_y);
+    uint row = vertex_id / pc.vertices_per_axis;
+    uint column = vertex_id % pc.vertices_per_axis;
+    float2 vertex_pos = float2(pc.offset_x, pc.offset_y) - float2(pc.cell_size, pc.cell_size) / 2.;
+    float vertex_delta = rcp(pc.vertices_per_axis - 1) * pc.cell_size;
+    vertex_pos += vertex_delta * (float2(row, column));
+
+    // vertex merging
+
+    uint4 lod_differences = {
+        (pc.lod_differences & 0xFF000000) >> 24,
+        (pc.lod_differences & 0x00FF0000) >> 16,
+        (pc.lod_differences & 0x0000FF00) >>  8,
+        (pc.lod_differences & 0x000000FF) >>  0,
+    };
+    bool4 is_side = {
+        row == pc.vertices_per_axis - 1,
+        column == pc.vertices_per_axis - 1,
+        row == 0,
+        column == 0,
+    };
+
+    if (is_side[0] &&
+        lod_differences[0] > 1)
+    {
+        uint shift = (lod_differences[0] - column) % lod_differences[0];
+        vertex_pos.y += shift * vertex_delta;
+    }
+    if (is_side[1] &&
+        lod_differences[1] > 1)
+    {
+        uint shift = (lod_differences[1] - row) % lod_differences[1];
+        vertex_pos.x += shift * vertex_delta;
+    }
+    if (is_side[2] &&
+        lod_differences[2] > 1)
+    {
+        uint shift = column % lod_differences[2];
+        vertex_pos.y -= shift * vertex_delta;
+    }
+    if (is_side[3] &&
+        lod_differences[3] > 1)
+    {
+        uint shift = row % lod_differences[3];
+        vertex_pos.x -= shift * vertex_delta;
+    }
 
     float2 uvs[4] = {
         vertex_pos / pc.length_scales[0],

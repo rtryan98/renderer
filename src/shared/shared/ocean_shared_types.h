@@ -68,10 +68,11 @@ struct SHADER_STRUCT_ALIGN Ocean_Render_Patch_Push_Constants
     SHADER_HANDLE_TYPE packed_displacement_tex;
     SHADER_HANDLE_TYPE packed_derivatives_tex;
     SHADER_HANDLE_TYPE packed_xdx_tex;
-    float vertex_position_dist;
-    uint field_size;
+    float cell_size;
+    uint vertices_per_axis;
     float offset_x;
     float offset_y;
+    uint lod_differences;
 };
 
 struct SHADER_STRUCT_ALIGN Ocean_Render_Composition_Push_Constants

@@ -88,6 +88,32 @@ private:
     Image m_packed_derivatives_texture;
     Image m_packed_xdx_texture;
 
+    struct Surface_Quad_Tree
+    {
+        struct Grid
+        {
+            Grid() = default;
+            Grid(const glm::vec2& center, uint32_t size, uint8_t value);
+
+            glm::vec2 center;
+            std::vector<std::vector<uint8_t>> cells;
+        };
+
+        std::vector<Grid> grids;
+
+        void propagate_cell_value(uint32_t x, uint32_t y, uint32_t level, uint32_t value);
+        glm::vec2 get_tile_position(uint32_t x, uint32_t y, uint32_t level) const;
+    };
+
+    struct Drawable_Tile
+    {
+        glm::vec2 position;
+        float size;
+        glm::u8vec4 lod_differences;
+    };
+
+    std::vector<Drawable_Tile> m_drawable_tiles;
+
     // TODO: Style? Should this be done via a function instead?
 public:
     struct Options
@@ -100,6 +126,7 @@ public:
 
         float horizontal_cull_grace = 8.f;
         float vertical_cull_grace = 8.f;
+        float lod_factor = 1.f;
 
         auto operator<=>(const Options& other) const = default;
 
