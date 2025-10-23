@@ -28,6 +28,7 @@ Windows 10 and older Visual Studio versions are not tested and may not work. Bui
 - Inverse Fast-Fourier-Transform (IFFT) based ocean surface simulation:
     - Utilizes oceanographic spectra presented in C. Horvath's [*'Empirical directional wave spectra for computer graphics'*](https://dl.acm.org/doi/10.1145/2791261.2791267).
     - The synthesized spectra are packed together to halve the amount of IFFTs required and thus double the performance of the simulation.
+    - Quad-Tree LOD with vertex merging.
 - Physically based rendering:
     - Implemented microfacet BRDFs:
         - Cook-Torrance.
