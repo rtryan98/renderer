@@ -1,6 +1,8 @@
 # Renderer
 Research / Toy Renderer
 
+![Ocean Rendering and LOD](https://raw.githubusercontent.com/rtryan98/renderer/refs/heads/main/docs/assets/renderer_ocean.png)
+
 ## Table of Contents
 - [Building](#building)
     - [Requirements](#requirements)
