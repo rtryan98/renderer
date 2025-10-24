@@ -96,6 +96,12 @@ Ocean::Ocean(Asset_Repository& asset_repository, GPU_Transfer_Context& gpu_trans
             .size = sizeof(glm::vec4) * 2 * 2 * 4,
             .heap = rhi::Memory_Heap_Type::GPU
         });
+    m_minmax_readback_buffer = m_render_resource_blackboard.create_buffer(
+        FFT_MINMAX_READBACK_BUFFER_NAME,
+        {
+            .size = REN_MAX_FRAMES_IN_FLIGHT * sizeof(glm::vec4) * 2 * 4,
+            .heap = rhi::Memory_Heap_Type::CPU_Readback
+        });
     m_packed_displacement_texture = m_render_resource_blackboard.create_image(
         PACKED_DISPLACEMENT_TEXTURE_NAME, options.generate_create_info(rhi::Image_Format::A2R10G10B10_UNORM_PACK32));
     m_packed_derivatives_texture = m_render_resource_blackboard.create_image(
@@ -107,15 +113,41 @@ Ocean::Ocean(Asset_Repository& asset_repository, GPU_Transfer_Context& gpu_trans
 Ocean::~Ocean()
 {
     m_render_resource_blackboard.destroy_buffer(m_spectrum_parameters_buffer);
+    m_render_resource_blackboard.destroy_buffer(m_minmax_buffer);
+    m_render_resource_blackboard.destroy_buffer(m_minmax_readback_buffer);
     m_render_resource_blackboard.destroy_image(m_spectrum_state_texture);
     m_render_resource_blackboard.destroy_image(m_spectrum_angular_frequency_texture);
     m_render_resource_blackboard.destroy_image(m_displacement_x_y_z_xdx_texture);
     m_render_resource_blackboard.destroy_image(m_displacement_ydx_zdx_zdz_zdy_texture);
+    m_render_resource_blackboard.destroy_image(m_minmax_texture);
+    m_render_resource_blackboard.destroy_image(m_packed_displacement_texture);
+    m_render_resource_blackboard.destroy_image(m_packed_xdx_texture);
+    m_render_resource_blackboard.destroy_image(m_packed_derivatives_texture);
     m_render_resource_blackboard.destroy_image(m_forward_pass_depth_render_target);
 }
 
-void Ocean::update(float dt)
+void Ocean::update(float dt, const Fly_Camera& cull_camera)
 {
+    if (!options.enabled) return;
+
+    static uint64_t frame = 0;
+
+    if (frame > REN_MAX_FRAMES_IN_FLIGHT)
+    {
+        const auto& index = frame % REN_MAX_FRAMES_IN_FLIGHT;
+        const auto& min_max_values = static_cast<Ocean_Min_Max_Values*>(static_cast<void*>(m_minmax_readback_buffer))[index];
+
+        m_min_displacement = {};
+        m_max_displacement = {};
+        for (uint32_t i = 0; i < 4; ++i)
+        {
+            m_min_displacement += min_max_values.cascades[i].min_values.xyz();
+            m_max_displacement += min_max_values.cascades[i].max_values.xyz();
+        }
+    }
+
+    frame += 1;
+
     if (options.update_time)
         simulation_data.total_time += dt;
 
@@ -149,6 +181,8 @@ void Ocean::update(float dt)
         .h = simulation_data.full_spectrum_parameters.depth
     };
     m_gpu_transfer_context.enqueue_immediate_upload(m_spectrum_parameters_buffer, gpu_spectrum_data);
+
+    generate_drawable_cells(cull_camera);
 }
 
 void Ocean::simulate(
@@ -317,6 +351,7 @@ void Ocean::simulate(
         m_minmax_buffer,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Unordered_Access_Write);
+    tracker.flush_barriers(cmd);
     auto select_fft_min_max_resolve_variant = [&]()
         {
             std::stringstream ss;
@@ -388,11 +423,34 @@ void Ocean::simulate(
 
     cmd->end_debug_region(); // ocean:simulation:reorder_textures
 
+    // min/max copy
+    {
+        cmd->add_debug_marker("ocean:simulation:readback_min_max_values", 0.25f, 0.75f, 1.0f);
+
+        static uint64_t frame = 0;
+
+        tracker.use_resource(m_minmax_buffer, rhi::Barrier_Pipeline_Stage::Copy, rhi::Barrier_Access::Transfer_Read);
+        tracker.use_resource(m_minmax_readback_buffer, rhi::Barrier_Pipeline_Stage::Copy, rhi::Barrier_Access::Transfer_Write);
+        tracker.flush_barriers(cmd);
+
+        const auto& index = frame % REN_MAX_FRAMES_IN_FLIGHT;
+
+        cmd->copy_buffer(
+            m_minmax_buffer,
+            0,
+            m_minmax_readback_buffer,
+            index * sizeof(Ocean_Min_Max_Values),
+            sizeof(Ocean_Min_Max_Values)
+        );
+
+        frame += 1;
+    }
+
     cmd->end_debug_region(); // ocean:simulation
 }
 
 void Ocean::depth_pre_pass(rhi::Command_List* cmd, Resource_State_Tracker& tracker, const Buffer& camera,
-    const Image& shaded_scene_depth_render_target, const Fly_Camera& cull_camera)
+    const Image& shaded_scene_depth_render_target)
 {
     if (!options.enabled) return;
 
@@ -463,7 +521,7 @@ void Ocean::depth_pre_pass(rhi::Command_List* cmd, Resource_State_Tracker& track
         cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch_depth_prepass_wireframe"));
     else
         cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch_depth_prepass"));
-    draw_all_tiles(cmd, camera, cull_camera);
+    draw_all_tiles(cmd, camera);
     cmd->end_render_pass();
     cmd->end_debug_region(); // ocean:render:depth_pre_pass
 }
@@ -473,8 +531,7 @@ void Ocean::opaque_forward_pass(
         Resource_State_Tracker& tracker,
         const Buffer& camera,
         const Image& shaded_scene_render_target,
-        const Image& shaded_scene_depth_render_target,
-        const Fly_Camera& cull_camera)
+        const Image& shaded_scene_depth_render_target)
 {
     if (!options.enabled) return;
 
@@ -529,12 +586,12 @@ void Ocean::opaque_forward_pass(
         cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch_wireframe"));
     else
         cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("ocean_render_patch"));
-    draw_all_tiles(cmd, camera, cull_camera);
+    draw_all_tiles(cmd, camera);
     cmd->end_render_pass();
     cmd->end_debug_region(); // ocean:render:opaque_forward_pass
 }
 
-void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const Fly_Camera& cull_camera)
+void Ocean::generate_drawable_cells(const Fly_Camera& cull_camera)
 {
     Surface_Quad_Tree quad_tree;
     quad_tree.grids = {
@@ -567,7 +624,11 @@ void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const F
         auto tile_size = MAX_TILE_SIZE / static_cast<float>(1u << cell.level);
 
         auto cell_center = quad_tree.get_tile_position(cell.position.x, cell.position.y, cell.level);
-        auto cell_distance = glm::max(glm::distance(cull_camera.position, { cell_center.x, cell_center.y, 0.f }) - tile_size * options.lod_factor, 0.f);
+        cell_center = {
+            cell_center.x + (m_min_displacement.x + m_max_displacement.x) / 2.f,
+            cell_center.y + (m_min_displacement.y + m_max_displacement.y) / 2.f,
+        };
+        auto cell_distance = glm::max(glm::distance(cull_camera.position.xy(), {cell_center.x, cell_center.y}) - tile_size * options.lod_factor, 0.f);
 
         if (cell_distance <= 1.f &&
             cell.level < 7)
@@ -577,7 +638,7 @@ void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const F
 
         if (should_subdivide)
         {
-            auto child_position = glm::uvec2 { 2 * cell.position.x, 2 * cell.position.y };
+            auto child_position = glm::uvec2{ 2 * cell.position.x, 2 * cell.position.y };
             auto child_level = cell.level + 1;
             cells_to_process.push_back({ { child_position.x    , child_position.y     }, child_level });
             cells_to_process.push_back({ { child_position.x + 1, child_position.y     }, child_level });
@@ -588,10 +649,10 @@ void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const F
         {
             quad_tree.propagate_cell_value(cell.position.x, cell.position.y, cell.level, quad_tree.grids[cell.level].cells[cell.position.x][cell.position.y]);
 
-            const float horizontal = tile_size / 2.f + options.horizontal_cull_grace;
+            float box_scale = tile_size / 2.f;
 
-            glm::vec3 box_min = { cell_center.x - horizontal, cell_center.y - horizontal, -options.vertical_cull_grace };
-            glm::vec3 box_max = { cell_center.x + horizontal, cell_center.y + horizontal,  options.vertical_cull_grace };
+            glm::vec3 box_min = { cell_center.x - box_scale + m_min_displacement.x, cell_center.y - box_scale + m_min_displacement.y, m_min_displacement.z };
+            glm::vec3 box_max = { cell_center.x + box_scale + m_max_displacement.x, cell_center.y + box_scale + m_max_displacement.y, m_max_displacement.z };
 
             if (cull_camera.box_in_frustum(box_min, box_max))
             {
@@ -600,7 +661,8 @@ void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const F
         }
     }
 
-    cmd->set_index_buffer(m_tile_index_buffer, rhi::Index_Type::U16);
+    m_drawable_tiles.clear();
+    m_drawable_tiles.reserve(cells_to_render.size());
     for (const auto& cell : cells_to_render)
     {
         auto cell_center = quad_tree.get_tile_position(cell.position.x, cell.position.y, cell.level);
@@ -628,12 +690,26 @@ void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const F
             cell_lod_bottom = quad_tree.grids[cell.level].cells[cell.position.x][cell.position.y + 1];
         }
         glm::u8vec4 cell_lod_differences = {
-            static_cast<uint8_t>(cell_lod_top    / cell_lod_value),
+            static_cast<uint8_t>(cell_lod_top / cell_lod_value),
             static_cast<uint8_t>(cell_lod_left / cell_lod_value),
             static_cast<uint8_t>(cell_lod_bottom / cell_lod_value),
             static_cast<uint8_t>(cell_lod_right / cell_lod_value),
         };
 
+        m_drawable_tiles.push_back(
+            {
+                .position = cell_center,
+                .size = tile_size,
+                .lod_differences = cell_lod_differences
+            });
+    }
+}
+
+void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera)
+{
+    cmd->set_index_buffer(m_tile_index_buffer, rhi::Index_Type::U16);
+    for (const auto& tile : m_drawable_tiles)
+    {
         cmd->set_push_constants<Ocean_Render_Patch_Push_Constants>({
             .length_scales = simulation_data.full_spectrum_parameters.length_scales,
             .camera = camera,
@@ -641,11 +717,11 @@ void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const F
             .packed_displacement_tex = m_packed_displacement_texture,
             .packed_derivatives_tex = m_packed_derivatives_texture,
             .packed_xdx_tex = m_packed_xdx_texture,
-            .cell_size = tile_size,
+            .cell_size = tile.size,
             .vertices_per_axis = TILE_VERTEX_COUNT,
-            .offset_x = cell_center.x,
-            .offset_y = cell_center.y,
-            .lod_differences = std::bit_cast<uint32_t>(cell_lod_differences)
+            .offset_x = tile.position.x,
+            .offset_y = tile.position.y,
+            .lod_differences = std::bit_cast<uint32_t>(tile.lod_differences)
             }, rhi::Pipeline_Bind_Point::Graphics);
         cmd->draw_indexed(3 * 2 * (TILE_VERTEX_COUNT - 1) * (TILE_VERTEX_COUNT - 1), 1, 0, 0, 0);
     }
@@ -759,8 +835,6 @@ void Ocean::process_gui()
             ImGui::Checkbox("Update Time", &options.update_time);
             ImGui::Checkbox("Enabled##Ocean", &options.enabled);
             ImGui::Checkbox("Wireframe##Ocean", &options.wireframe);
-            ImGui::SliderFloat("Horizontal cull grace", &options.horizontal_cull_grace, 0.f, 64.f);
-            ImGui::SliderFloat("Vertical cull grace", &options.vertical_cull_grace, 0.f, 64.f);
             ImGui::SliderFloat("LOD factor", &options.lod_factor, 0.01f, 4.f);
         }
     }

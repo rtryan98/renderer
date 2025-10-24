@@ -30,6 +30,7 @@ public:
 
     constexpr static auto FFT_MIN_MAX_TEXTURE_NAME = "ocean:fft_min_max_texture";
     constexpr static auto FFT_MINMAX_BUFFER_NAME = "ocean:fft_minmax_buffer";
+    constexpr static auto FFT_MINMAX_READBACK_BUFFER_NAME = "ocean:fft_minmax_readback_buffer";
     constexpr static auto PACKED_DISPLACEMENT_TEXTURE_NAME = "ocean:packed_displacement_texture";
     constexpr static auto FOAM_WEIGHT_TEXTURE_NAME = "ocean:foam_weight_texture";
     constexpr static auto PACKED_DERIVATIVES_TEXTURE_NAME = "ocean:packed_derivatives_texture";
@@ -45,7 +46,7 @@ public:
     Ocean(Ocean&&) = delete;
     Ocean& operator=(Ocean&&) = delete;
 
-    void update(float dt);
+    void update(float dt, const Fly_Camera& cull_camera);
 
     void simulate(
         rhi::Command_List* cmd,
@@ -55,8 +56,7 @@ public:
         rhi::Command_List* cmd,
         Resource_State_Tracker& tracker,
         const Buffer& camera,
-        const Image& shaded_scene_depth_render_target,
-        const Fly_Camera& cull_camera);
+        const Image& shaded_scene_depth_render_target);
 
     // TODO: add proper translucent pass instead.
     void opaque_forward_pass(
@@ -64,8 +64,7 @@ public:
         Resource_State_Tracker& tracker,
         const Buffer& camera,
         const Image& shaded_scene_render_target,
-        const Image& shaded_scene_depth_render_target,
-        const Fly_Camera& cull_camera);
+        const Image& shaded_scene_depth_render_target);
 
     void process_gui();
 
@@ -84,6 +83,7 @@ private:
 
     Image m_minmax_texture;
     Buffer m_minmax_buffer;
+    Buffer m_minmax_readback_buffer;
     Image m_packed_displacement_texture;
     Image m_packed_derivatives_texture;
     Image m_packed_xdx_texture;
@@ -114,6 +114,9 @@ private:
 
     std::vector<Drawable_Tile> m_drawable_tiles;
 
+    glm::vec3 m_min_displacement = { -64.f, -64.f, -64.f };
+    glm::vec3 m_max_displacement = {  64.f,  64.f,  64.f };
+
     // TODO: Style? Should this be done via a function instead?
 public:
     struct Options
@@ -124,8 +127,6 @@ public:
         uint32_t texture_size = 256;
         uint32_t cascade_count = 4;
 
-        float horizontal_cull_grace = 8.f;
-        float vertical_cull_grace = 8.f;
         float lod_factor = 1.f;
 
         auto operator<=>(const Options& other) const = default;
@@ -163,7 +164,8 @@ public:
 
 private:
 
-    void draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera, const Fly_Camera& cull_camera);
+    void generate_drawable_cells(const Fly_Camera& cull_camera);
+    void draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera);
 
     void process_gui_options();
     void process_gui_simulation_settings();

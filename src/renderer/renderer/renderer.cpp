@@ -101,6 +101,15 @@ void Renderer::process_gui()
 
 void Renderer::update(const Input_State& input_state, double t, double dt) noexcept
 {
+    // set aspect ratio in case of resize
+    m_fly_cam.aspect = calculate_aspect_ratio(m_swapchain);
+    m_fly_cam.update();
+
+    if (!m_cull_cam_locked)
+    {
+        m_cull_cam = m_fly_cam;
+    }
+
     switch (m_benchmark_mode)
     {
     case ren::Benchmark_Mode::None:
@@ -110,7 +119,7 @@ void Renderer::update(const Input_State& input_state, double t, double dt) noexc
             // No input captured here from UI
             m_fly_cam.process_inputs(input_state, static_cast<float>(dt));
         }
-        m_ocean.update(static_cast<float>(dt));
+        m_ocean.update(static_cast<float>(dt), m_cull_cam);
         break;
     }
     case ren::Benchmark_Mode::Ocean:
@@ -124,7 +133,7 @@ void Renderer::update(const Input_State& input_state, double t, double dt) noexc
             m_ocean.simulation_data.full_spectrum_parameters.single_spectrum_parameters[0].wind_speed = 7.5f;
             m_ocean.simulation_data.full_spectrum_parameters.single_spectrum_parameters[1].wind_speed = 15.0f;
 
-            m_ocean.update(static_cast<float>(dt));
+            m_ocean.update(static_cast<float>(dt), m_cull_cam);
 
             m_ocean.options = ocean_options;
             m_ocean.simulation_data = ocean_simulation_data;
@@ -141,15 +150,7 @@ void Renderer::update(const Input_State& input_state, double t, double dt) noexc
         break;
     }
 
-    // set aspect ratio in case of resize
-    m_fly_cam.aspect = calculate_aspect_ratio(m_swapchain);
-    m_fly_cam.update();
-
-    if (!m_cull_cam_locked)
-    {
-        m_cull_cam = m_fly_cam;
-    }
-
+    // upload camera data at the end, in case a benchmark changes it
     GPU_Camera_Data camera_data = {
         .world_to_camera = m_fly_cam.camera_data.world_to_camera,
         .camera_to_clip = m_fly_cam.camera_data.camera_to_clip,
@@ -203,15 +204,13 @@ void Renderer::render(
         cmd,
         tracker,
         m_camera_buffer,
-        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME),
-        m_cull_cam);
+        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
     m_ocean.opaque_forward_pass(
         cmd,
         tracker,
         m_camera_buffer,
         m_shaded_geometry_render_target,
-        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME),
-        m_cull_cam);
+        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
     m_tone_map.render_debug(
         cmd,
         tracker,
