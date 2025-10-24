@@ -19,7 +19,7 @@ Image_Based_Lighting::Image_Based_Lighting(
     , m_gpu_transfer_context(gpu_transfer_context)
     , m_render_resource_blackboard(render_resource_blackboard)
 {
-    auto* hdri_texture = static_cast<serialization::Image_Data_00*>(m_asset_repository.get_texture("qwantani_noon_puresky_4k.rentex")->data);
+    auto* hdri_texture = static_cast<serialization::Image_Data_00*>(m_asset_repository.get_texture("lonely_road_afternoon_puresky_4k.rentex")->data);
     const rhi::Image_Create_Info hdri_create_info = {
         .format = hdri_texture->format,
         .width = hdri_texture->mips[0].width,

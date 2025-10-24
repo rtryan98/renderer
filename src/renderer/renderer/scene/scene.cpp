@@ -671,7 +671,7 @@ Static_Scene_Data::Static_Scene_Data(
         .disabled = false,
         .type = static_cast<uint32_t>(Light_Type::Directional),
         .color = glm::packUnorm4x8(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)) >> 8,
-        .intensity = 2.5f,
+        .intensity = 0.025f,
         .position = glm::vec3(0.0f, 0.0f, 0.0f),
         .direction = glm::normalize(glm::vec3(-0.456f, -0.334f, -0.825f)),
         .arguments = glm::vec2(0.0f, 0.0f),
