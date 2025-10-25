@@ -281,8 +281,6 @@ void Asset_Repository::compile_shader_library(
             permutation_value_indices.emplace_back(0);
         }
 
-        m_logger->debug("Generating shader permutations.");
-
         for (auto i = 0; i < permutation_count; ++i)
         {
             auto& [permutation_name, defines] = define_lists.emplace_back();
@@ -339,8 +337,11 @@ void Asset_Repository::compile_shader_library(
             m_logger->debug("Created shader variant: '{}'", permutation_name);
             for (const auto& define : defines)
             {
-                auto define_chars = std::string(define.begin(), define.end());
-                m_logger->debug("Defined: '{}'", define_chars.c_str());
+                std::string str(define.size(), '\0');
+                std::transform(define.begin(), define.end(), str.begin(), [](wchar_t wc) {
+                    return static_cast<char>(wc);
+                    });
+                m_logger->debug("Defined: '{}'", str.c_str());
             };
         }
     }
