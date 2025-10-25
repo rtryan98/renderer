@@ -7,7 +7,6 @@ struct Imgui_Push_Constants
 {
     uint vertex_buffer_idx;
     uint texture_idx;
-    uint sampler_idx;
     float left;
     float top;
     float right;

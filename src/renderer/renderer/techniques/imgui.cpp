@@ -57,22 +57,6 @@ Imgui::Imgui(Asset_Repository& asset_repository,
     m_font_texture = m_render_resource_blackboard.create_image(FONT_TEXTURE_NAME, font_image_create_info);
     m_gpu_transfer_context.enqueue_immediate_upload(m_font_texture, &data);
     io.Fonts->SetTexID(m_font_texture);
-
-    m_texture_sampler = m_render_resource_blackboard.get_sampler({
-        .filter_min = rhi::Sampler_Filter::Linear,
-        .filter_mag = rhi::Sampler_Filter::Linear,
-        .filter_mip = rhi::Sampler_Filter::Linear,
-        .address_mode_u = rhi::Image_Sample_Address_Mode::Wrap,
-        .address_mode_v = rhi::Image_Sample_Address_Mode::Wrap,
-        .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
-        .mip_lod_bias = 0.0f,
-        .max_anisotropy = 0,
-        .comparison_func = rhi::Comparison_Func::None,
-        .reduction = rhi::Sampler_Reduction_Type::Standard,
-        .border_color = {},
-        .min_lod = 0.0f,
-        .max_lod = 0.0f,
-        .anisotropy_enable = false});
 }
 
 Imgui::~Imgui()
@@ -112,7 +96,6 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
     {
         uint32_t vertex_buffer;
         uint32_t texture;
-        uint32_t sampler;
         float left;
         float top;
         float right;
@@ -147,7 +130,6 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
     Imgui_Push_Constants push_consts = {
         .vertex_buffer = m_vertex_buffer,
         .texture = static_cast<uint32_t>(draw_data->CmdLists[0]->CmdBuffer[0].GetTexID()),
-        .sampler = m_texture_sampler,
         .left = left,
         .top = top,
         .right = right,
@@ -172,7 +154,6 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
                     push_consts = {
                         .vertex_buffer = m_vertex_buffer,
                         .texture = static_cast<uint32_t>(imgui_cmd.GetTexID()),
-                        .sampler = m_texture_sampler,
                         .left = left,
                         .top = top,
                         .right = right,

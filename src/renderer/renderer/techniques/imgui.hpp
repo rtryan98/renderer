@@ -42,7 +42,6 @@ private:
     Buffer m_vertex_buffer;
     Buffer m_index_buffer;
     Image m_font_texture;
-    Sampler m_texture_sampler;
 
 private:
     void setup_render_state(rhi::Command_List* cmd, const Image& image) const;
