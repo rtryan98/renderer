@@ -1,5 +1,0 @@
-{
-    "name": "ibl_prefilter_specular",
-    "shader_type": "cs",
-    "entry_point": "main"
-}

@@ -1,3 +1,8 @@
+// SHADER DEF imgui
+// ENTRYPOINT main
+// TYPE ps
+// SHADER END DEF
+
 #include "shaders/imgui/imgui.hlsli"
 #include "shared/shared_resources.h"
 

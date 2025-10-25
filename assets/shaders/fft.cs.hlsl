@@ -1,3 +1,15 @@
+// SHADER DEF fft
+// ENTRYPOINT main
+// TYPE cs
+// DEFINE GROUP size
+// DEFINE VALUES FFT_SIZE 64 128 256 512 1024
+// DEFINE VALUES FFT_LOG_SIZE 6 7 8 9 10
+// DEFINE GROUP float4
+// DEFINE BOOL FFT_FLOAT4
+// DEFINE GROUP minmax
+// DEFINE BOOL FFT_STORE_MINMAX
+// SHADER END DEF
+
 #include "rhi/bindless.hlsli"
 #include "shared/fft_shared_types.h"
 #include "shaders/complex.hlsli"

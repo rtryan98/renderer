@@ -1,5 +1,0 @@
-{
-    "name": "ibl_prefilter_diffuse",
-    "shader_type": "cs",
-    "entry_point": "main"
-}

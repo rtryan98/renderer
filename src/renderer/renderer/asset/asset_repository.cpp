@@ -7,6 +7,9 @@
 #include "renderer/filesystem/mapped_file.hpp"
 #include "renderer/filesystem/file_util.hpp"
 
+#include <string_view>
+#include <ranges>
+
 #include "rhi/graphics_device.hpp"
 
 namespace ren
@@ -153,121 +156,121 @@ rhi::dxc::Shader_Type shader_type_from_string(std::string_view type)
     std::unreachable();
 }
 
+std::vector<std::string> split_string_into_lines(const std::string_view text)
+{
+    return text | std::ranges::views::split('\n')
+                | std::ranges::to<std::vector<std::string>>();
+}
+
 void Asset_Repository::compile_shader_library(
     std::string_view hlsl_path,
-    std::string_view json_path,
     const std::vector<std::wstring>& include_dirs)
 {
-    // parse the json file
-    auto shader_json = nlohmann::json::parse(std::ifstream(std::string(json_path)));
-
-    if (!shader_json.contains("name"))
-    {
-        m_logger->warn("Shader metadata '{}' does not contain mandatory 'name' field.", json_path);
-        return;
-    }
-    if (!shader_json.contains("shader_type"))
-    {
-        m_logger->warn("Shader metadata '{}' does not contain mandatory 'shader_type' field.", json_path);
-        return;
-    }
-    if (!shader_json.contains("entry_point"))
-    {
-        m_logger->warn("Shader metadata '{}' does not contain mandatory 'entry_point' field.", json_path);
-        return;
-    }
-
-    m_logger->debug("Parsing shader library '{}'", json_path);
-
-    auto name = shader_json["name"].get<std::string>();
-    auto shader_type_string = shader_json["shader_type"].get<std::string>();
-    auto shader_type = shader_type_from_string(shader_type_string);
-    auto entry_point = shader_json["entry_point"].get<std::string>();
+    auto shader_text = load_file_as_string_unsafe(std::string(hlsl_path).c_str());
+    auto shader_text_lines = split_string_into_lines(shader_text);
 
     struct Shader_Permutation_Group
     {
         std::string name;
         std::vector<std::string> define_names;
         std::vector<std::vector<std::string>> define_values;
-        bool is_bool;
+        bool is_bool = false;
     };
+
+    std::string name = "";
+    std::string entry_point = "";
+    std::string shader_type_string = "";
+    rhi::dxc::Shader_Type shader_type = {};
+
+    std::vector<Shader_Permutation_Group> permutation_groups;
+    Shader_Permutation_Group* current_permutation_group = nullptr;
+
+    for (const auto& line : shader_text_lines)
+    {
+        auto get_simple_token_pos = [&]()
+        {
+            return line.find_last_of(' ') + 1;
+        };
+
+        auto extract_simple_token = [&]()
+        {
+            const auto token_start_pos = get_simple_token_pos();
+            return line.substr(token_start_pos, line.size() - token_start_pos);
+        };
+
+        if (line.contains("SHADER DEF"))
+        {
+            name = extract_simple_token();
+            continue;
+        }
+        if (line.contains("ENTRYPOINT"))
+        {
+            entry_point = extract_simple_token();
+            continue;
+        }
+        if (line.contains("TYPE"))
+        {
+            shader_type_string = extract_simple_token();
+            shader_type = shader_type_from_string(shader_type_string);
+            continue;
+        }
+        if (line.contains("DEFINE GROUP"))
+        {
+            current_permutation_group = &permutation_groups.emplace_back();
+            current_permutation_group->name = extract_simple_token();
+            continue;
+        }
+        if (line.contains("DEFINE BOOL"))
+        {
+            current_permutation_group->define_names.push_back(extract_simple_token());
+            current_permutation_group->define_values.push_back({
+                "0", "1"
+                });
+            current_permutation_group->is_bool = true;
+            continue;
+        }
+        if (line.contains("DEFINE VALUES"))
+        {
+            auto tokens_str = line;
+            tokens_str.erase(0, tokens_str.find("DEFINE VALUES") + 14);
+            current_permutation_group->define_names.push_back(tokens_str.substr(0, tokens_str.find(" ")));
+            tokens_str.erase(0, tokens_str.find(" ") + 1);
+            std::size_t pos = 0ull;
+            auto& define_values = current_permutation_group->define_values.emplace_back();
+            while ((pos = tokens_str.find(" ")) != std::string::npos)
+            {
+                auto token = tokens_str.substr(0, pos);
+                define_values.push_back(token);
+                tokens_str.erase(0, pos + 1);
+            }
+            // add the last value
+            define_values.push_back(tokens_str);
+
+            continue;
+        }
+        if (line.contains("SHADER END DEF"))
+        {
+            break;
+        }
+    }
+
+    if (name.empty())
+    {
+        m_logger->error("Shader '{}': No name.", std::string(hlsl_path).c_str());
+    }
+    if (entry_point.empty())
+    {
+        m_logger->error("Shader '{}': No entrypoint.", std::string(hlsl_path).c_str());
+    }
+    if (shader_type_string.empty())
+    {
+        m_logger->error("Shader '{}': No type.", std::string(hlsl_path).c_str());
+    }
 
     std::vector<std::pair<std::string, std::vector<std::wstring>>> define_lists;
 
     // Process permutations if they exist
     {
-        std::vector<Shader_Permutation_Group> permutation_groups;
-
-        if (shader_json.contains("permutation_groups"))
-        {
-            m_logger->debug("Parsing shader permutations.");
-
-            permutation_groups.reserve(shader_json["permutation_groups"].size());
-
-            for (const auto& permutation_group_json : shader_json["permutation_groups"])
-            {
-                auto& permutation_group = permutation_groups.emplace_back();
-                // TODO: remove "swizzle_define_values" as just removing the name should be enough
-                if (permutation_group_json.contains("name") && !permutation_group_json.contains("swizzle_define_values"))
-                {
-                    permutation_group.name = permutation_group_json["name"].get<std::string>();
-                }
-                if (permutation_group_json.contains("define_names"))
-                {
-                    permutation_group.define_names.reserve(permutation_group_json["define_names"].size());
-                    for (const auto& define_name_json : permutation_group_json["define_names"])
-                    {
-                        permutation_group.define_names.push_back(define_name_json.get<std::string>());
-                    }
-                }
-                else if (permutation_group_json.contains("define_name"))
-                {
-                    permutation_group.define_names.emplace_back(permutation_group_json["define_name"].get<std::string>());
-                }
-                if (permutation_group_json.contains("type"))
-                {
-                    if (permutation_group_json["type"].get<std::string>() == "bool")
-                    {
-                        permutation_group.is_bool = true;
-                    }
-                }
-                if (permutation_group_json.contains("define_values"))
-                {
-                    permutation_group.define_values.reserve(permutation_group_json["define_values"].size());
-                    for (const auto& define_values_list_json : permutation_group_json["define_values"])
-                    {
-                        auto& define_values = permutation_group.define_values.emplace_back();
-                        define_values.reserve(permutation_group_json.size());
-                        for (const auto& define_value_json : define_values_list_json)
-                        {
-                            switch (define_value_json.type())
-                            {
-                            case nlohmann::detail::value_t::boolean:
-                                define_values.push_back(std::to_string(define_value_json.get<bool>()));
-                                break;
-                            case nlohmann::detail::value_t::number_integer:
-                                define_values.push_back(std::to_string(define_value_json.get<int64_t>()));
-                                break;
-                            case nlohmann::detail::value_t::number_unsigned:
-                                define_values.push_back(std::to_string(define_value_json.get<uint64_t>()));
-                                break;
-                            case nlohmann::detail::value_t::number_float:
-                                define_values.push_back(std::to_string(define_value_json.get<double>()));
-                                break;
-                            default:
-                                break;
-                            }
-                        }
-                    }
-                }
-                else // default assume bool
-                {
-                    permutation_group.define_values.emplace_back(std::vector<std::string>({"0", "1"}));
-                }
-            }
-        }
-
-        m_logger->debug("Enumerating shader permutations.");
         std::vector<std::size_t> permutation_value_indices;
         permutation_value_indices.reserve(permutation_groups.size());
         auto permutation_count = 1ull;
@@ -314,27 +317,19 @@ void Asset_Repository::compile_shader_library(
                     defines.emplace_back(define_str.begin(), define_str.end());
                 }
 
-                // Construct the permutation nape postfix for the given permutation group
-                if (permutation_group.name.empty())
+                // Construct the permutation name postfix for the given permutation group
+                if (permutation_group.is_bool)
                 {
-                    postfix.append("_");
-                    postfix.append(permutation_group.define_values[0][index]);
-                }
-                else
-                {
-                    if (permutation_group.is_bool)
-                    {
-                        if (index > 0)
-                        {
-                            postfix.append("_");
-                            postfix.append(permutation_group.name);
-                        }
-                    }
-                    else
+                    if (index > 0)
                     {
                         postfix.append("_");
                         postfix.append(permutation_group.name);
                     }
+                }
+                else
+                {
+                    postfix.append("_");
+                    postfix.append(permutation_group.define_values[0][index]);
                 }
             }
 
@@ -397,7 +392,6 @@ void Asset_Repository::compile_shader_library(
     auto* shader_library = m_shader_library_ptrs[shader_library_lookup_name];
     shader_library->shaders = std::move(named_shaders);
     shader_library->hlsl_path = hlsl_path;
-    shader_library->json_path = json_path;
     m_logger->debug("Successfully created shader library '{}'", shader_library_lookup_name);
 
     if (shader_type == rhi::dxc::Shader_Type::Compute)
@@ -735,7 +729,7 @@ void Asset_Repository::create_shader_and_compute_libraries()
     {
         const auto& path = shader_path.path();
         auto extension = path.extension();
-        if (extension == ".hlsl" || extension == ".json")
+        if (extension == ".hlsl")
         {
             auto full_path = (path.parent_path() / path.stem()).string();
             shader_set.insert(full_path);
@@ -745,13 +739,12 @@ void Asset_Repository::create_shader_and_compute_libraries()
     {
         m_logger->debug("Processing shader {}", shader);
         auto hlsl_path = std::string(shader) + ".hlsl";
-        auto json_path = std::string(shader) + ".json";
 
-        if (!std::filesystem::exists(hlsl_path) || !std::filesystem::exists(json_path))
+        if (!std::filesystem::exists(hlsl_path))
         {
             continue;
         }
-        compile_shader_library(hlsl_path, json_path, shader_include_dirs);
+        compile_shader_library(hlsl_path, shader_include_dirs);
     }
 }
 

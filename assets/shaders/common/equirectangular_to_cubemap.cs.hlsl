@@ -1,3 +1,8 @@
+// SHADER DEF equirectangular_to_cubemap
+// ENTRYPOINT main
+// TYPE cs
+// SHADER END DEF
+
 #include "shared/ibl_shared_types.h"
 #include "rhi/bindless.hlsli"
 #include "constants.hlsli"

@@ -1,3 +1,8 @@
+// SHADER DEF basic_draw
+// ENTRYPOINT main
+// TYPE ps
+// SHADER END DEF
+
 #include "draw/basic_draw.hlsli"
 #include "shared/draw_shared_types.h"
 #include "shared/shared_resources.h"

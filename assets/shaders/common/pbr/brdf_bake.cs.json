@@ -1,5 +1,0 @@
-{
-    "name": "brdf_bake",
-    "shader_type": "cs",
-    "entry_point": "main"
-}

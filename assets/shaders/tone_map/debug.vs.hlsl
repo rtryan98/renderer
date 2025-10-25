@@ -1,3 +1,8 @@
+// SHADER DEF tone_map_debug
+// ENTRYPOINT main
+// TYPE vs
+// SHADER END DEF
+
 #include "rhi/bindless.hlsli"
 #include "shared/camera_shared_types.h"
 #include "shared/tone_map_shared_types.h"

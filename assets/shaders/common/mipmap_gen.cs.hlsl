@@ -1,3 +1,8 @@
+// SHADER DEF mipmap_gen
+// ENTRYPOINT main
+// TYPE cs
+// SHADER END DEF
+
 #include "rhi/bindless.hlsli"
 #include "shared/mipmap_gen_shared_types.h"
 

@@ -1,3 +1,8 @@
+// SHADER DEF time_dependent_spectrum
+// ENTRYPOINT main
+// TYPE cs
+// SHADER END DEF
+
 #include "shaders/ocean/oceanography.hlsli"
 #include "shared/ocean_shared_types.h"
 #include "rhi/bindless.hlsli"

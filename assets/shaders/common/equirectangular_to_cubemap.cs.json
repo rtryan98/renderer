@@ -1,5 +1,0 @@
-{
-    "name": "equirectangular_to_cubemap",
-    "shader_type": "cs",
-    "entry_point": "main"
-}

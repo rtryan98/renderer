@@ -1,5 +1,0 @@
-{
-    "name": "fullscreen_triangle",
-    "shader_type": "vs",
-    "entry_point": "main"
-}

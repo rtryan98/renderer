@@ -1,3 +1,8 @@
+// SHADER DEF ibl_prefilter_specular
+// ENTRYPOINT main
+// TYPE cs
+// SHADER END DEF
+
 #include "rhi/bindless.hlsli"
 
 #include "common/sampling.hlsli"

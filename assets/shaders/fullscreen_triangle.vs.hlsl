@@ -1,3 +1,8 @@
+// SHADER DEF fullscreen_triangle
+// ENTRYPOINT main
+// TYPE vs
+// SHADER END DEF
+
 struct VS_Out
 {
     float4 position : SV_Position;

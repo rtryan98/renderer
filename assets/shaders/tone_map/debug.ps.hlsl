@@ -1,3 +1,8 @@
+// SHADER DEF tone_map_debug
+// ENTRYPOINT main
+// TYPE ps
+// SHADER END DEF
+
 #include "rhi/bindless.hlsli"
 #include "shared/tone_map_shared_types.h"
 

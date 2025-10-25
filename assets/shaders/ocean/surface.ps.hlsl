@@ -1,3 +1,8 @@
+// SHADER DEF surface_render_ocean
+// ENTRYPOINT main
+// TYPE ps
+// SHADER END DEF
+
 #include "shared/ocean_shared_types.h"
 #include "shared/camera_shared_types.h"
 #include "shared/shared_resources.h"

@@ -1,3 +1,8 @@
+// SHADER DEF imgui
+// ENTRYPOINT main
+// TYPE vs
+// SHADER END DEF
+
 #include "shaders/imgui/imgui.hlsli"
 #include "shaders/util.hlsli"
 

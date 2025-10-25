@@ -1,3 +1,10 @@
+// SHADER DEF fft_min_max_resolve
+// ENTRYPOINT main
+// TYPE cs
+// DEFINE GROUP size
+// DEFINE VALUES FFT_MIN_MAX_RESOLVE_SIZE 64 128 256 512 1024
+// SHADER END DEF
+
 #include "rhi/bindless.hlsli"
 #include "shared/fft_shared_types.h"
 

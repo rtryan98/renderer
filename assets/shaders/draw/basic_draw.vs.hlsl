@@ -1,3 +1,8 @@
+// SHADER DEF basic_draw
+// ENTRYPOINT main
+// TYPE vs
+// SHADER END DEF
+
 #include "shared/camera_shared_types.h"
 #include "shared/draw_shared_types.h"
 #include "shared/shared_resources.h"

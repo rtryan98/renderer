@@ -1,3 +1,8 @@
+// SHADER DEF ocean_texture_reorder
+// ENTRYPOINT main
+// TYPE cs
+// SHADER END DEF
+
 #include "shared/ocean_shared_types.h"
 #include "rhi/bindless.hlsli"
 

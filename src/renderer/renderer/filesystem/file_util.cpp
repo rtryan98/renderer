@@ -1,6 +1,8 @@
 #include "renderer/filesystem/file_util.hpp"
 
+#include <filesystem>
 #include <fstream>
+#include <sstream>
 
 namespace ren
 {
@@ -17,6 +19,16 @@ std::vector<uint8_t> load_file_binary_unsafe(const char* path)
         result.begin(),
         std::istream_iterator<uint8_t>(file),
         std::istream_iterator<uint8_t>());
+    file.close();
+    return result;
+}
+
+std::string load_file_as_string_unsafe(const char* path)
+{
+    auto text_length = std::filesystem::file_size(path);
+    std::string result(text_length, '\0');
+    std::ifstream file(path);
+    file.read(&result[0], text_length);
     file.close();
     return result;
 }

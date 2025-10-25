@@ -1,5 +1,0 @@
-{
-    "name": "skybox",
-    "shader_type": "cs",
-    "entry_point": "main"
-}

@@ -1,3 +1,8 @@
+// SHADER DEF skybox
+// ENTRYPOINT main
+// TYPE cs
+// SHADER END DEF
+
 #include "shared/ibl_shared_types.h"
 #include "shared/camera_shared_types.h"
 #include "rhi/bindless.hlsli"

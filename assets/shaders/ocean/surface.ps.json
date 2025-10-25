@@ -1,5 +1,0 @@
-{
-    "name": "surface_render_ocean",
-    "shader_type": "ps",
-    "entry_point": "main"
-}

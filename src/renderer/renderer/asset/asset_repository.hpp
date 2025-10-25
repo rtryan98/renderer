@@ -48,7 +48,6 @@ public:
 private:
     void compile_shader_library(
         std::string_view hlsl_path,
-        std::string_view json_path,
         const std::vector<std::wstring>& include_dirs);
 
     void compile_graphics_pipeline_library(const std::string_view& json_path);

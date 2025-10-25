@@ -1,3 +1,10 @@
+// SHADER DEF surface_patch_render_ocean
+// ENTRYPOINT main
+// TYPE vs
+// DEFINE GROUP prepass
+// DEFINE BOOL OCEAN_PATCH_PREPASS
+// SHADER END DEF
+
 #include "shared/ocean_shared_types.h"
 #include "shared/camera_shared_types.h"
 #include "shared/shared_resources.h"

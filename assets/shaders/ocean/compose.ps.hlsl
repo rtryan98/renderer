@@ -1,3 +1,8 @@
+// SHADER DEF compose_ocean
+// ENTRYPOINT main
+// TYPE ps
+// SHADER END DEF
+
 #include "shared/ocean_shared_types.h"
 #include "shared/camera_shared_types.h"
 #include "rhi/bindless.hlsli"
