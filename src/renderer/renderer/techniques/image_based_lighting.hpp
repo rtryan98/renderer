@@ -54,7 +54,6 @@ private:
     Image m_environment_cubemap = {};
     Image m_prefiltered_diffuse_irradiance_cubemap = {};
     Image m_prefiltered_specular_irradiance_cubemap = {};
-    Image m_brdf_lut = {};
     std::vector<Image_View> m_environment_cubemap_views = {};
     std::array<Image_View, 5> m_prefiltered_specular_irradiance_cubemap_views = {};
 
@@ -70,10 +69,6 @@ private:
         Resource_State_Tracker& tracker);
 
     void prefilter_specular_irradiance(
-        rhi::Command_List* cmd,
-        Resource_State_Tracker& tracker);
-
-    void bake_brdf_lut(
         rhi::Command_List* cmd,
         Resource_State_Tracker& tracker);
 };

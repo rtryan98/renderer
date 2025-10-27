@@ -3,6 +3,7 @@
 #include "renderer/scene/camera.hpp"
 #include "renderer/render_resource_blackboard.hpp"
 
+#include "renderer/techniques/brdf_bake.hpp"
 #include "renderer/techniques/g_buffer.hpp"
 #include "renderer/techniques/hosek_wilkie_sky.hpp"
 #include "renderer/techniques/image_based_lighting.hpp"
@@ -68,6 +69,7 @@ private:
     Image m_swapchain_image = {};
     Image m_shaded_geometry_render_target = {};
 
+    techniques::BRDF_LUT m_brdf_lut;
     techniques::G_Buffer m_g_buffer;
     techniques::Hosek_Wilkie_Sky m_hosek_wilkie_sky;
     techniques::Image_Based_Lighting m_image_based_lighting;

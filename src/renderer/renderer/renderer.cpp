@@ -44,6 +44,9 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         .size = sizeof(GPU_Camera_Data),
         .heap = rhi::Memory_Heap_Type::GPU
         }))
+    , m_brdf_lut(
+        m_asset_repository,
+        m_resource_blackboard)
     , m_g_buffer(
         m_asset_repository,
         m_resource_blackboard,
@@ -185,6 +188,9 @@ void Renderer::render(
 {
     Resource_State_Tracker tracker;
 
+    m_brdf_lut.bake_brdf_lut(
+        cmd,
+        tracker);
     m_image_based_lighting.bake(
         cmd,
         tracker);

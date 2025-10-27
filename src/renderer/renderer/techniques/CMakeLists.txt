@@ -1,5 +1,7 @@
 target_sources(
     renderer PRIVATE
+    brdf_bake.cpp
+    brdf_bake.hpp
     g_buffer.cpp
     g_buffer.hpp
     hosek_wilkie_sky.cpp
