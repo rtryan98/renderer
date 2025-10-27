@@ -26,6 +26,13 @@ void main(uint3 id : SV_DispatchThreadID)
     direction = normalize(direction.xzy);
     float depth = rhi::uni::tex_load<float>(pc.depth_buffer, id.xy);
     float4 color = rhi::uni::tex_sample_level_cube<float4>(pc.cubemap, REN_SAMPLER_ANISO_WRAP, direction.xyz, 0.0);
+    float sun_theta = saturate(dot(-pc.sun_direction.xzy, direction));
+    static const float SUN_RADIUS_FROM_EARTH = 0.99999009614;
+    static const float SUN_BUILTIN_BLOOM = 0.00001;
+    float sun_value = smoothstep(SUN_RADIUS_FROM_EARTH - SUN_BUILTIN_BLOOM, SUN_RADIUS_FROM_EARTH, sun_theta);
+    color += 10. * sun_value;
+    color = clamp(color, 0., 10.);
+
     if (depth == 1.0)
     {
         rhi::uni::tex_store(pc.target_image, id.xy, color);

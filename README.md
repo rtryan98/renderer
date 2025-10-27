@@ -30,9 +30,11 @@ Windows 10 and older Visual Studio versions are not tested and may not work. Bui
     - The synthesized spectra are packed together to halve the amount of IFFTs required and thus double the performance of the simulation.
     - Quad-Tree LOD with vertex merging.
 - Physically based rendering:
+    - Hosek-Wilkie Atmosphere simulation
+        - Real-time diffuse and specular cubemap prefiltering.
+    - ~~Image based lighting (IBL).~~ (defunct)
     - Implemented microfacet BRDFs:
         - Cook-Torrance.
-    - Image based lighting (IBL).
 - Tone mapping:
     - Implementation of GT7 tone mapping operator as presented in [*'Driving Toward Reality: Physically Based Tone Mapping and Perceptual Fidelity in Gran Turismo 7'*](https://blog.selfshadow.com/publications/s2025-shading-course/pdi/s2025_pbs_pdi_slides.pdf).
 ### General and Architectural Features

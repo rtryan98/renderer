@@ -178,22 +178,8 @@ void Image_Based_Lighting::prefilter_diffuse_irradiance(rhi::Command_List* cmd, 
     cmd->set_push_constants<Prefilter_Diffuse_Irradiance_Push_Constants>({
         .image_size = { cube_size, cube_size },
         .source_cubemap = m_environment_cubemap,
-        .cubemap_sampler = m_render_resource_blackboard.get_sampler({
-            .filter_min = rhi::Sampler_Filter::Linear,
-            .filter_mag = rhi::Sampler_Filter::Linear,
-            .filter_mip = rhi::Sampler_Filter::Linear,
-            .address_mode_u = rhi::Image_Sample_Address_Mode::Wrap,
-            .address_mode_v = rhi::Image_Sample_Address_Mode::Wrap,
-            .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
-            .mip_lod_bias = 0.0f,
-            .max_anisotropy = 0,
-            .comparison_func = rhi::Comparison_Func::None,
-            .reduction = rhi::Sampler_Reduction_Type::Standard,
-            .min_lod = 0.0,
-            .max_lod = 16.0,
-            .anisotropy_enable = false
-        }),
         .target_cubemap = m_prefiltered_diffuse_irradiance_cubemap,
+        .samples = 4096
     }, rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(cube_size / pipeline.get_group_size_x(), cube_size / pipeline.get_group_size_y(), 6);
     tracker.use_resource(m_prefiltered_diffuse_irradiance_cubemap,
@@ -223,23 +209,9 @@ void Image_Based_Lighting::prefilter_specular_irradiance(rhi::Command_List* cmd,
         cmd->set_push_constants<Prefilter_Specular_Irradiance_Push_Constants>({
             .image_size = { cube_size >> i, cube_size >> i },
             .source_cubemap = m_environment_cubemap,
-            .cubemap_sampler = m_render_resource_blackboard.get_sampler({
-                .filter_min = rhi::Sampler_Filter::Linear,
-                .filter_mag = rhi::Sampler_Filter::Linear,
-                .filter_mip = rhi::Sampler_Filter::Linear,
-                .address_mode_u = rhi::Image_Sample_Address_Mode::Wrap,
-                .address_mode_v = rhi::Image_Sample_Address_Mode::Wrap,
-                .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
-                .mip_lod_bias = 0.0f,
-                .max_anisotropy = 0,
-                .comparison_func = rhi::Comparison_Func::None,
-                .reduction = rhi::Sampler_Reduction_Type::Standard,
-                .min_lod = 0.0,
-                .max_lod = 16.0,
-                .anisotropy_enable = false
-            }),
             .target_cubemap = m_prefiltered_specular_irradiance_cubemap_views[i],
-            .roughness = static_cast<float>(i) / static_cast<float>(mip_count - 1)
+            .roughness = static_cast<float>(i) / static_cast<float>(mip_count - 1),
+            .samples = 4096
         }, rhi::Pipeline_Bind_Point::Compute);
         cmd->dispatch((cube_size >> i) / pipeline.get_group_size_x(), (cube_size >> i) / pipeline.get_group_size_y(), 6);
     }
@@ -303,21 +275,6 @@ void Image_Based_Lighting::skybox_render(
         .depth_buffer = geometry_depth_buffer,
         .target_image = shaded_geometry_render_target,
         .cubemap = m_environment_cubemap,
-        .cubemap_sampler = m_render_resource_blackboard.get_sampler({
-            .filter_min = rhi::Sampler_Filter::Linear,
-            .filter_mag = rhi::Sampler_Filter::Linear,
-            .filter_mip = rhi::Sampler_Filter::Linear,
-            .address_mode_u = rhi::Image_Sample_Address_Mode::Wrap,
-            .address_mode_v = rhi::Image_Sample_Address_Mode::Wrap,
-            .address_mode_w = rhi::Image_Sample_Address_Mode::Wrap,
-            .mip_lod_bias = 0.0f,
-            .max_anisotropy = 0,
-            .comparison_func = rhi::Comparison_Func::None,
-            .reduction = rhi::Sampler_Reduction_Type::Standard,
-            .min_lod = 0.0,
-            .max_lod = 0.0,
-            .anisotropy_enable = false
-        }),
         .camera_buffer = camera
     }, rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(width / pipeline.get_group_size_x(), height / pipeline.get_group_size_y(), 1);

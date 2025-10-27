@@ -6,7 +6,6 @@
 #include "renderer/techniques/brdf_bake.hpp"
 #include "renderer/techniques/g_buffer.hpp"
 #include "renderer/techniques/hosek_wilkie_sky.hpp"
-#include "renderer/techniques/image_based_lighting.hpp"
 #include "renderer/techniques/imgui.hpp"
 #include "renderer/techniques/ocean.hpp"
 #include "renderer/techniques/tone_map.hpp"
@@ -72,7 +71,6 @@ private:
     techniques::BRDF_LUT m_brdf_lut;
     techniques::G_Buffer m_g_buffer;
     techniques::Hosek_Wilkie_Sky m_hosek_wilkie_sky;
-    techniques::Image_Based_Lighting m_image_based_lighting;
     techniques::Imgui m_imgui;
     techniques::Ocean m_ocean;
     techniques::Tone_Map m_tone_map;

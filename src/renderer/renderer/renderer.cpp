@@ -30,7 +30,7 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
     , m_asset_repository(asset_repository)
     , m_resource_blackboard(resource_blackboard)
     , m_fly_cam{
-        .fov_y = 75.f,
+        .fov_y = 60.f,
         .aspect = calculate_aspect_ratio(m_swapchain),
         .near_plane = .01f,
         .far_plane = 500.f,
@@ -53,10 +53,6 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         m_swapchain.get_width(),
         m_swapchain.get_height())
     , m_hosek_wilkie_sky(
-        m_asset_repository,
-        m_gpu_transfer_context,
-        m_resource_blackboard)
-    , m_image_based_lighting(
         m_asset_repository,
         m_gpu_transfer_context,
         m_resource_blackboard)
@@ -191,10 +187,13 @@ void Renderer::render(
     m_brdf_lut.bake_brdf_lut(
         cmd,
         tracker);
-    m_image_based_lighting.bake(
+    // m_image_based_lighting.bake(
+    //     cmd,
+    //     tracker);
+    m_hosek_wilkie_sky.generate_cubemap(
         cmd,
         tracker);
-    m_hosek_wilkie_sky.generate_cubemap(
+    m_hosek_wilkie_sky.prefilter(
         cmd,
         tracker);
     m_ocean.simulate(

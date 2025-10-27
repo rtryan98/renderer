@@ -21,8 +21,10 @@ namespace techniques
 class Hosek_Wilkie_Sky
 {
 public:
-    constexpr static auto PARAMETERS_BUFFER_NAME = "hosek_wilkie:parameters";
+    constexpr static auto PARAMETERS_BUFFER_NAME = "hosek_wilkie:parameters_buffer";
     constexpr static auto SKY_CUBEMAP_TEXTURE_NAME = "hosek_wilkie:sky_cubemap_texture";
+    constexpr static auto PREFILTERED_DIFFUSE_IRRADIANCE_CUBEMAP_TEXTURE_NAME = "hosek_wilkie:prefiltered_diffuse_irradiance_cubemap_texture";
+    constexpr static auto PREFILTERED_SPECULAR_IRRADIANCE_CUBEMAP_TEXTURE_NAME = "hosek_wilkie:prefiltered_specular_irradiance_cubemap_texture";
 
     Hosek_Wilkie_Sky(
         Asset_Repository& asset_repository,
@@ -38,6 +40,10 @@ public:
     void update(const glm::vec3& sun_direction);
 
     void generate_cubemap(
+        rhi::Command_List* cmd,
+        Resource_State_Tracker& tracker) const;
+
+    void prefilter(
         rhi::Command_List* cmd,
         Resource_State_Tracker& tracker) const;
 
@@ -57,11 +63,24 @@ private:
 
     Buffer m_parameters;
     Image m_cubemap;
+    Image m_prefiltered_diffuse_irradiance_cubemap = {};
+    Image m_prefiltered_specular_irradiance_cubemap = {};
+    std::vector<Image_View> m_cubemap_views = {};
+    std::array<Image_View, 5> m_prefiltered_specular_irradiance_cubemap_views = {};
 
     float m_turbidity = 5.f;
     glm::vec3 m_albedo = { 0.12f, 0.12f, 0.5f };
     glm::vec3 m_sun_direction = {};
     bool m_use_xyz = true;
+
+private:
+    void prefilter_diffuse_irradiance(
+        rhi::Command_List* cmd,
+        Resource_State_Tracker& tracker) const;
+
+    void prefilter_specular_irradiance(
+        rhi::Command_List* cmd,
+        Resource_State_Tracker& tracker) const;
 };
 }
 }
