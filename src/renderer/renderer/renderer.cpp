@@ -49,6 +49,10 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         m_resource_blackboard,
         m_swapchain.get_width(),
         m_swapchain.get_height())
+    , m_hosek_wilkie_sky(
+        m_asset_repository,
+        m_gpu_transfer_context,
+        m_resource_blackboard)
     , m_image_based_lighting(
         m_asset_repository,
         m_gpu_transfer_context,
@@ -96,10 +100,11 @@ void Renderer::process_gui()
 {
     m_ocean.process_gui();
     m_tone_map.process_gui();
+    m_hosek_wilkie_sky.process_gui();
     debug_gui();
 }
 
-void Renderer::update(const Input_State& input_state, double t, double dt) noexcept
+void Renderer::update(const Input_State& input_state, const Static_Scene_Data& scene, double t, double dt) noexcept
 {
     // set aspect ratio in case of resize
     m_fly_cam.aspect = calculate_aspect_ratio(m_swapchain);
@@ -109,6 +114,8 @@ void Renderer::update(const Input_State& input_state, double t, double dt) noexc
     {
         m_cull_cam = m_fly_cam;
     }
+
+    m_hosek_wilkie_sky.update(scene.get_sun_direction());
 
     switch (m_benchmark_mode)
     {
@@ -181,6 +188,9 @@ void Renderer::render(
     m_image_based_lighting.bake(
         cmd,
         tracker);
+    m_hosek_wilkie_sky.generate_cubemap(
+        cmd,
+        tracker);
     m_ocean.simulate(
         cmd,
         tracker);
@@ -194,7 +204,7 @@ void Renderer::render(
         tracker,
         m_camera_buffer,
         m_shaded_geometry_render_target);
-    m_image_based_lighting.skybox_render(
+    m_hosek_wilkie_sky.skybox_render(
         cmd,
         tracker,
         m_camera_buffer,

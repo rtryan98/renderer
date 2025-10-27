@@ -309,7 +309,7 @@ void Application::process_gui() noexcept
 void Application::update(double t, double dt) noexcept
 {
     m_static_scene_data->upload_scene_info();
-    m_renderer.update(*m_input_state, t, dt);
+    m_renderer.update(*m_input_state, *m_static_scene_data, t, dt);
 }
 
 void Application::imgui_close_all_windows() noexcept

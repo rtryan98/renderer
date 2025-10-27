@@ -2,6 +2,9 @@ target_sources(
     renderer PRIVATE
     g_buffer.cpp
     g_buffer.hpp
+    hosek_wilkie_sky.cpp
+    hosek_wilkie_sky.hpp
+    hosek_wilkie_sky_data.hpp
     image_based_lighting.cpp
     image_based_lighting.hpp
     imgui.cpp

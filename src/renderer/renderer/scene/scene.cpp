@@ -380,6 +380,12 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
     }
 }
 
+glm::vec3 Static_Scene_Data::get_sun_direction() const noexcept
+{
+    // TODO: this really needs to go somewhere else
+    return m_punctual_lights[0].direction;
+}
+
 void Static_Scene_Data::upload_scene_info()
 {
     m_gpu_transfer_context.enqueue_immediate_upload(m_light_buffer, m_punctual_lights.data(), sizeof(Punctual_Light), 0);
@@ -671,7 +677,7 @@ Static_Scene_Data::Static_Scene_Data(
         .disabled = false,
         .type = static_cast<uint32_t>(Light_Type::Directional),
         .color = glm::packUnorm4x8(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)) >> 8,
-        .intensity = 0.025f,
+        .intensity = 1.025f,
         .position = glm::vec3(0.0f, 0.0f, 0.0f),
         .direction = glm::normalize(glm::vec3(-0.456f, -0.334f, -0.825f)),
         .arguments = glm::vec2(0.0f, 0.0f),

@@ -4,6 +4,7 @@
 #include "renderer/render_resource_blackboard.hpp"
 
 #include "renderer/techniques/g_buffer.hpp"
+#include "renderer/techniques/hosek_wilkie_sky.hpp"
 #include "renderer/techniques/image_based_lighting.hpp"
 #include "renderer/techniques/imgui.hpp"
 #include "renderer/techniques/ocean.hpp"
@@ -40,7 +41,7 @@ public:
     ~Renderer();
 
     void process_gui();
-    void update(const Input_State& input_state, double t, double dt) noexcept;
+    void update(const Input_State& input_state, const Static_Scene_Data& scene, double t, double dt) noexcept;
     void setup_frame();
     void render(const Static_Scene_Data& scene, rhi::Command_List* cmd, double t, double dt) noexcept;
     void on_resize(uint32_t width, uint32_t height) noexcept;
@@ -68,6 +69,7 @@ private:
     Image m_shaded_geometry_render_target = {};
 
     techniques::G_Buffer m_g_buffer;
+    techniques::Hosek_Wilkie_Sky m_hosek_wilkie_sky;
     techniques::Image_Based_Lighting m_image_based_lighting;
     techniques::Imgui m_imgui;
     techniques::Ocean m_ocean;
