@@ -210,5 +210,8 @@ private:
     rhi::Image* m_default_metallic_roughness_tex = nullptr;
     rhi::Image* m_default_emissive_tex = nullptr;
     Material m_default_material = {};
+
+    glm::vec3 m_sun_direction = glm::normalize(glm::vec3(-0.456f, -0.334f, -0.825f));
+    float m_sun_intensity = 10.f;
 };
 }

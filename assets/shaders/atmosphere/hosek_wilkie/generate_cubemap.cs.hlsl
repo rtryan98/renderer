@@ -37,9 +37,9 @@ void main(uint3 id : SV_DispatchThreadID)
     uv = 2. * float2(uv.x, 1.0 - uv.y) - 1.0;
     float3 direction = ren::cubemap_utils::direction_from_uv_thread_id(uv, id);
 
-    float3 sun_direction = -pc.sun_direction.xzy;
+    float3 sun_direction = -pc.sun_direction.xyz;
 
-    float cos_theta = saturate(direction.y);
+    float cos_theta = saturate(direction.z);
     float cos_gamma = saturate(dot(direction, sun_direction));
     float gamma = acos(cos_gamma);
     float3 color = hosek_wilkie(cos_theta, gamma, cos_gamma);

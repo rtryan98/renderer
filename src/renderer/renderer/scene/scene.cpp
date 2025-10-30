@@ -382,17 +382,19 @@ void Static_Scene_Data::add_model(const Model_Descriptor& model_descriptor)
 
 glm::vec3 Static_Scene_Data::get_sun_direction() const noexcept
 {
-    // TODO: this really needs to go somewhere else
-    return m_punctual_lights[0].direction;
+    return m_sun_direction;
 }
 
 void Static_Scene_Data::upload_scene_info()
 {
-    m_gpu_transfer_context.enqueue_immediate_upload(m_light_buffer, m_punctual_lights.data(), sizeof(Punctual_Light), 0);
+    if (m_punctual_lights.size())
+        m_gpu_transfer_context.enqueue_immediate_upload(m_light_buffer, m_punctual_lights.data(), sizeof(Punctual_Light), 0);
 
     Scene_Info scene_info = {
         .light_count = static_cast<uint32_t>(m_punctual_lights.size()),
-        .tlas = m_tlas->bindless_index
+        .tlas = m_tlas->bindless_index,
+        .sun_direction = m_sun_direction,
+        .sun_intensity = m_sun_intensity
     };
 
     m_gpu_transfer_context.enqueue_immediate_upload(m_scene_info_buffer, &scene_info, sizeof(Scene_Info), 0);
@@ -457,22 +459,21 @@ void Static_Scene_Data::update_tlas()
 
 void Static_Scene_Data::gui()
 {
-    if (ImGui::Begin("Scene Lights"))
+    ImGui::SeparatorText("Sun");
     {
-        auto& direction = m_punctual_lights[0].direction;
-        float pitch = glm::asin(direction.z);
-        float yaw = glm::atan(direction.x, direction.y);
+        float pitch = glm::asin(m_sun_direction.z);
+        float yaw = glm::atan(m_sun_direction.x, m_sun_direction.y);
         ImGui::SliderFloat("pitch", &pitch, -glm::half_pi<float>() + 0.001f, glm::half_pi<float>() - 0.001f);
         ImGui::SliderFloat("yaw", &yaw, -glm::pi<float>(), glm::pi<float>());
-        direction = glm::normalize(
+        m_sun_direction = glm::normalize(
             glm::vec3(
                 glm::sin(yaw) * glm::cos(pitch),
                 glm::cos(yaw) * glm::cos(pitch),
                 glm::sin(pitch)
             ));
-        ImGui::Text("Direction: %.3f, %.3f, %.3f", direction.x, direction.y, direction.z);
+        ImGui::Text("Direction: %.3f, %.3f, %.3f", m_sun_direction.x, m_sun_direction.y, m_sun_direction.z);
+        ImGui::SliderFloat("intensity", &m_sun_intensity, 0.f, 100.f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
     }
-    ImGui::End();
 }
 
 uint32_t Static_Scene_Data::acquire_instance_index()
@@ -671,17 +672,6 @@ Static_Scene_Data::Static_Scene_Data(
     {
         tlas_instance_buffer = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
     }
-
-    m_punctual_lights.resize(1);
-    m_punctual_lights[0] = {
-        .disabled = false,
-        .type = static_cast<uint32_t>(Light_Type::Directional),
-        .color = glm::packUnorm4x8(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)) >> 8,
-        .intensity = 1.025f,
-        .position = glm::vec3(0.0f, 0.0f, 0.0f),
-        .direction = glm::normalize(glm::vec3(-0.456f, -0.334f, -0.825f)),
-        .arguments = glm::vec2(0.0f, 0.0f),
-    };
 }
 
 Static_Scene_Data::~Static_Scene_Data()

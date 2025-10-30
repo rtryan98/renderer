@@ -49,7 +49,7 @@ void main(uint3 id : SV_DispatchThreadID)
 {
     float2 uv = float2(id.xy) / float2(pc.image_size);
     uv = 2.0 * float2(uv.x, 1.0 - uv.y) - 1.0;
-    float3 R = ren::cubemap_utils::direction_from_uv_thread_id(uv, id).xzy;
+    float3 R = ren::cubemap_utils::direction_from_uv_thread_id(uv, id);
     float3 irradiance = prefilter_irradiance(R);
     rhi::uni::tex_store_arr(pc.target_cubemap, id.xy, id.z, float4(irradiance, 1.0));
 }

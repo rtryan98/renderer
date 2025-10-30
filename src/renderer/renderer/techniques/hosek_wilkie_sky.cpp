@@ -307,7 +307,6 @@ void Hosek_Wilkie_Sky::skybox_render(
     cmd->set_pipeline(pipeline);
     cmd->set_push_constants<Skybox_Push_Constants>({
         .image_size = { width, height },
-        .sun_direction = m_sun_direction,
         .depth_buffer = geometry_depth_buffer,
         .target_image = shaded_geometry_render_target,
         .cubemap = m_cubemap,

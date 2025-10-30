@@ -36,7 +36,6 @@ struct BRDF_LUT_Bake_Push_Constants
 struct Skybox_Push_Constants
 {
     uint2 image_size;
-    SHADER_STRUCT_ALIGN float3 sun_direction;
     SHADER_HANDLE_TYPE depth_buffer;
     SHADER_HANDLE_TYPE target_image;
     SHADER_HANDLE_TYPE cubemap;

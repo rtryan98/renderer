@@ -32,8 +32,10 @@ struct Punctual_Light
 struct Scene_Info
 {
     uint light_count;
-
     SHADER_HANDLE_TYPE tlas;
+
+    float3 sun_direction;
+    float sun_intensity;
 };
 
 #endif
