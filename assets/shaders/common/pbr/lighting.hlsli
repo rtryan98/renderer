@@ -109,6 +109,35 @@ float3 evaluate_punctual_lights(float3 V, Surface surface, float3 F0)
     return color;
 }
 
+float3 evaluate_sunlight(float3 V, Surface surface, float3 F0)
+{
+    Scene_Info scene_info = rhi::uni::buf_load<Scene_Info>(REN_GLOBAL_SCENE_INFORMATION_BUFFER);
+
+    float3 D = -scene_info.sun_direction;
+    float3 R = normalize(reflect(V, surface.normal));
+
+    static const float sun_angular_radius = radians(0.266);
+    float r = sin(sun_angular_radius);
+    float d = cos(sun_angular_radius);
+
+    float DdotR = saturate(dot(D, R));
+    float3 S = R - DdotR * D;
+    float3 L = DdotR < d ? normalize(d * D + normalize(S) * r) : R;
+
+    float3 H = normalize(L + V);
+
+    float NdotL = saturate(dot(surface.normal, L));
+    float NdotV = saturate(dot(surface.normal, V));
+    float NdotH = saturate(dot(surface.normal, H));
+    float VdotH = saturate(dot(V, H));
+
+    float3 kd = lerp(1.0 - F_SphericalGaussian(VdotH, F0), 0., surface.metallic);
+    float3 diffuse = kd * BRDF_Diffuse_Lambert(surface.albedo);
+    float3 specular = BRDF_Specular_CookTorrance(NdotL, NdotV, NdotH, VdotH, surface.roughness, F0);
+
+    return NdotL > 0.0 ? (diffuse + specular) * NdotL * scene_info.sun_intensity : 0.0;
+}
+
 float3 evaluate_skylight_ibl(float3 V, Surface surface, float3 F0)
 {
     float3 color = 0.0;
@@ -138,6 +167,8 @@ float3 evaluate_lights(float3 V, Surface surface)
     float3 color = 0.0;
 
     color += evaluate_punctual_lights(V, surface, F0);
+
+    color += evaluate_sunlight(V, surface, F0);
 
     color += evaluate_skylight_ibl(V, surface, F0);
 
