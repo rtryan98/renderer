@@ -36,12 +36,13 @@ float3 evaluate_point_light(float3 V, Surface surface, float3 F0, Punctual_Light
     float3 H = normalize(L + V);
 
     float NdotL = saturate(dot(surface.normal, L));
-    float NdotV = saturate(dot(surface.normal, V));
+    float NdotV = clamp(dot(surface.normal, V), 1e-5, 1.);
     float NdotH = saturate(dot(surface.normal, H));
     float VdotH = saturate(dot(V, H));
+    float LdotH = saturate(dot(L, H));
 
     float3 kd = lerp(1.0 - F_SphericalGaussian(VdotH, F0), 0.0, surface.metallic);
-    float3 diffuse = kd * BRDF_Diffuse_Lambert(surface.albedo);
+    float3 diffuse = surface.albedo * kd * BRDF_Diffuse_Disney(NdotL, NdotV, LdotH, surface.roughness);
     float3 specular = BRDF_Specular_CookTorrance(NdotL, NdotV, NdotH, VdotH, surface.roughness, F0);
 
     float attenuation = 1.0 / (distance2 * 2.0 * ren::TWO_PI);
@@ -63,13 +64,14 @@ float3 evaluate_directional_light(float3 V, Surface surface, float3 F0, Punctual
     float3 H = normalize(L + V);
 
     float NdotL = saturate(dot(surface.normal, L));
-    float NdotV = saturate(dot(surface.normal, V));
+    float NdotV = clamp(dot(surface.normal, V), 1e-5, 1.);
     float NdotH = saturate(dot(surface.normal, H));
     float VdotH = saturate(dot(V, H));
+    float LdotH = saturate(dot(L, H));
 
     float3 ks = lerp(F_SphericalGaussian(VdotH, F0), 0.0, surface.metallic);
     float3 kd = 1.0 - ks;
-    float3 diffuse = kd * BRDF_Diffuse_Lambert(surface.albedo);
+    float3 diffuse = surface.albedo * kd * BRDF_Diffuse_Disney(NdotL, NdotV, LdotH, surface.roughness);
     float3 specular = ks * BRDF_Specular_CookTorrance(NdotL, NdotV, NdotH, VdotH, surface.roughness, F0);
 
     return NdotL > 0.0 ? (diffuse + specular) * NdotL * light_color * light.intensity : 0.0;
@@ -114,7 +116,7 @@ float3 evaluate_sunlight(float3 V, Surface surface, float3 F0)
     Scene_Info scene_info = rhi::uni::buf_load<Scene_Info>(REN_GLOBAL_SCENE_INFORMATION_BUFFER);
 
     float3 D = -scene_info.sun_direction;
-    float3 R = normalize(reflect(V, surface.normal));
+    float3 R = normalize(reflect(-V, surface.normal));
 
     static const float sun_angular_radius = radians(0.266);
     float r = sin(sun_angular_radius);
@@ -127,25 +129,36 @@ float3 evaluate_sunlight(float3 V, Surface surface, float3 F0)
     float3 H = normalize(L + V);
 
     float NdotL = saturate(dot(surface.normal, L));
-    float NdotV = saturate(dot(surface.normal, V));
+    float NdotV = clamp(dot(surface.normal, V), 1e-5, 1.);
     float NdotH = saturate(dot(surface.normal, H));
     float VdotH = saturate(dot(V, H));
+    float LdotH = saturate(dot(L, H));
+    float LdotR = saturate(dot(L, R));
 
-    float3 kd = lerp(1.0 - F_SphericalGaussian(VdotH, F0), 0., surface.metallic);
-    float3 diffuse = kd * BRDF_Diffuse_Lambert(surface.albedo);
-    float3 specular = BRDF_Specular_CookTorrance(NdotL, NdotV, NdotH, VdotH, surface.roughness, F0);
-
-    return NdotL > 0.0 ? (diffuse + specular) * NdotL * scene_info.sun_intensity : 0.0;
+    // Sun is a disk, and surfaces with no roughness cannot be resolved with GGX, so this needs special casing
+    if (surface.roughness > .01)
+    {
+        float3 kd = lerp(1.0 - F_SphericalGaussian(VdotH, F0), 0., surface.metallic);
+        float3 diffuse = surface.albedo * kd * BRDF_Diffuse_Disney(NdotL, NdotV, LdotH, surface.roughness);
+        float3 specular = BRDF_Specular_CookTorrance(NdotL, NdotV, NdotH, VdotH, surface.roughness, F0);
+        return NdotL > 0.0 ? (diffuse + specular) * NdotL * scene_info.sun_intensity : 0.0;
+    }
+    else
+    {
+        float3 kd = lerp(1.0 - F_SphericalGaussian(VdotH, F0), 0., surface.metallic);
+        float3 diffuse = surface.albedo * kd * BRDF_Diffuse_Disney(NdotL, NdotV, LdotH, surface.roughness);
+        float3 specular = BRDF_Specular_Mirror(LdotR, F0);
+        return NdotL > 0.0 ? (specular + NdotL * diffuse) * scene_info.sun_intensity : 0.0;
+    }
 }
 
 float3 evaluate_skylight_ibl(float3 V, Surface surface, float3 F0)
 {
     float3 color = 0.0;
 
-    float NdotV = saturate(dot(surface.normal, V));
+    float NdotV = clamp(dot(surface.normal, V), 1e-5, 1.);
 
-    float3 ks = lerp(F_SphericalGaussian(NdotV, F0), 0.0, surface.metallic);
-    float3 kd = 1.0 - ks;
+    float3 kd = lerp(1.0 - F_SphericalGaussian(NdotV, F0), 0., surface.metallic);
     float3 diffuse_irradiance = rhi::uni::tex_sample_level_cube<float4>(REN_LIGHTING_DIFFUSE_IRRADIANCE_CUBEMAP, REN_SAMPLER_LINEAR_WRAP, surface.normal, 0.0).xyz;
     float3 diffuse = kd * diffuse_irradiance * surface.albedo;
 
