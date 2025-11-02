@@ -25,6 +25,9 @@ public:
 
     uint64_t size() const noexcept;
 
+    void map(std::size_t offset, std::size_t size) noexcept;
+    void unmap() noexcept;
+
     operator uint32_t() const; //NOLINT
     operator rhi::Buffer*() const; //NOLINT
     operator void*() const; //NOLINT

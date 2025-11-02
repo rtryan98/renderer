@@ -99,7 +99,7 @@ Ocean::Ocean(Asset_Repository& asset_repository, GPU_Transfer_Context& gpu_trans
     m_minmax_readback_buffer = m_render_resource_blackboard.create_buffer(
         FFT_MINMAX_READBACK_BUFFER_NAME,
         {
-            .size = REN_MAX_FRAMES_IN_FLIGHT * sizeof(glm::vec4) * 2 * 4,
+            .size = REN_MAX_FRAMES_IN_FLIGHT * sizeof(Ocean_Min_Max_Values),
             .heap = rhi::Memory_Heap_Type::CPU_Readback
         });
     m_packed_displacement_texture = m_render_resource_blackboard.create_image(
@@ -135,6 +135,7 @@ void Ocean::update(float dt, const Fly_Camera& cull_camera)
     if (frame > REN_MAX_FRAMES_IN_FLIGHT)
     {
         const auto& index = frame % REN_MAX_FRAMES_IN_FLIGHT;
+        m_minmax_readback_buffer.map(index * sizeof(Ocean_Min_Max_Values), sizeof(Ocean_Min_Max_Values));
         const auto& min_max_values = static_cast<Ocean_Min_Max_Values*>(static_cast<void*>(m_minmax_readback_buffer))[index];
 
         m_min_displacement = {};
@@ -144,6 +145,7 @@ void Ocean::update(float dt, const Fly_Camera& cull_camera)
             m_min_displacement += min_max_values.cascades[i].min_values.xyz();
             m_max_displacement += min_max_values.cascades[i].max_values.xyz();
         }
+        m_minmax_readback_buffer.unmap();
     }
 
     frame += 1;
@@ -426,13 +428,16 @@ void Ocean::simulate(
     // min/max copy
     {
         cmd->add_debug_marker("ocean:simulation:readback_min_max_values", 0.25f, 0.75f, 1.0f);
-
+    
         static uint64_t frame = 0;
 
+        if (frame > 0)
+            tracker.set_resource_state(m_minmax_readback_buffer, rhi::Barrier_Pipeline_Stage::Copy, rhi::Barrier_Access::Transfer_Write);
+    
         tracker.use_resource(m_minmax_buffer, rhi::Barrier_Pipeline_Stage::Copy, rhi::Barrier_Access::Transfer_Read);
         tracker.use_resource(m_minmax_readback_buffer, rhi::Barrier_Pipeline_Stage::Copy, rhi::Barrier_Access::Transfer_Write);
         tracker.flush_barriers(cmd);
-
+    
         const auto& index = frame % REN_MAX_FRAMES_IN_FLIGHT;
 
         cmd->copy_buffer(
@@ -442,7 +447,7 @@ void Ocean::simulate(
             index * sizeof(Ocean_Min_Max_Values),
             sizeof(Ocean_Min_Max_Values)
         );
-
+    
         frame += 1;
     }
 

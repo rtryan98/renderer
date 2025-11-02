@@ -37,6 +37,20 @@ uint64_t Buffer::size() const noexcept
     return (*m_buffer)->size;
 }
 
+void Buffer::map(std::size_t offset, std::size_t size) noexcept
+{
+    if (!m_buffer) return;
+
+    m_blackboard->get_graphics_device()->map_buffer(*m_buffer, offset, size);
+}
+
+void Buffer::unmap() noexcept
+{
+    if (!m_buffer) return;
+
+    m_blackboard->get_graphics_device()->unmap_buffer(*m_buffer);
+}
+
 Buffer::operator unsigned int() const
 {
     if (!m_buffer) return 0u;
