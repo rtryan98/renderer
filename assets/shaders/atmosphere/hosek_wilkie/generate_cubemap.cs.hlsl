@@ -26,7 +26,9 @@ float3 hosek_wilkie(float cos_theta, float gamma, float cos_gamma)
             cfg.values[7].xyz * zenith);
     result *= cfg.radiance.xyz;
 
-    return result / 100.;
+    // 1.0 = 100 nits
+    // Assume 100% efficiency for radiance -> luminance, using 683Lm/W
+    return result / 100. * 6.83;
 }
 
 [shader("compute")]

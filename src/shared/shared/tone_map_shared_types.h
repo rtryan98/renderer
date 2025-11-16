@@ -7,6 +7,7 @@ struct Tone_Map_Push_Constants
     SHADER_HANDLE_TYPE source_texture;
     SHADER_HANDLE_TYPE texture_sampler;
     SHADER_HANDLE_TYPE tone_map_parameters_buffer;
+    uint is_enabled;
 };
 
 struct GT7_Tone_Mapping_Data

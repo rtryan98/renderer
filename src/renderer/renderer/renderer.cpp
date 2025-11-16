@@ -47,6 +47,10 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
     , m_brdf_lut(
         m_asset_repository,
         m_resource_blackboard)
+    , m_exposure(
+        m_asset_repository,
+        m_gpu_transfer_context,
+        m_resource_blackboard)
     , m_g_buffer(
         m_asset_repository,
         m_resource_blackboard,
@@ -97,6 +101,7 @@ Renderer::~Renderer()
 
 void Renderer::process_gui()
 {
+    m_exposure.process_gui();
     m_ocean.process_gui();
     m_tone_map.process_gui();
     m_hosek_wilkie_sky.process_gui();
@@ -187,9 +192,6 @@ void Renderer::render(
     m_brdf_lut.bake_brdf_lut(
         cmd,
         tracker);
-    // m_image_based_lighting.bake(
-    //     cmd,
-    //     tracker);
     m_hosek_wilkie_sky.generate_cubemap(
         cmd,
         tracker);
@@ -231,6 +233,10 @@ void Renderer::render(
         tracker,
         m_shaded_geometry_render_target,
         m_camera_buffer);
+    m_exposure.apply_exposure(
+        cmd,
+        tracker,
+        m_shaded_geometry_render_target);
     m_tone_map.blit_apply(
         cmd,
         tracker,

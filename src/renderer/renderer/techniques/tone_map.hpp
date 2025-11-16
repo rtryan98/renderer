@@ -55,6 +55,7 @@ private:
 
     bool m_is_hdr;
     bool m_render_debug = false;
+    bool m_is_enabled = true;
 
     float m_sdr_paper_white = SDR_DEFAULT_PAPER_WHITE;
 

@@ -96,7 +96,8 @@ void Tone_Map::blit_apply(
                 .min_lod = .0f,
                 .max_lod = .0f,
                 .anisotropy_enable = false}),
-        .tone_map_parameters_buffer = m_tone_map_parameters_buffer
+        .tone_map_parameters_buffer = m_tone_map_parameters_buffer,
+        .is_enabled = static_cast<uint32_t>(m_is_enabled)
         }, rhi::Pipeline_Bind_Point::Graphics);
     cmd->draw(3, 1, 0, 0);
 
@@ -202,6 +203,7 @@ void Tone_Map::process_gui()
     if (ImGui::CollapsingHeader("Tone Mapping"))
     {
         ImGui::SeparatorText("General##TM");
+        ImGui::Checkbox("Enabled", &m_is_enabled);
         ImGui::SliderFloat("SDR paper white", &m_sdr_paper_white, 0.0f, 500.0f);
         ImGui::SeparatorText("Curve##TM");
         ImGui::SliderFloat("Alpha", &m_alpha, 0.f, 1.f);
