@@ -22,14 +22,10 @@ float ev100_from_luminance(float average_luminance)
     return log2(average_luminance * EXPOSURE_SENSOR_SENSITIVITY / EXPOSURE_CALIBRATION_CONSTANT);
 }
 
-float sensor_saturation(float ev100)
-{
-    return EXPOSURE_SATURATION_FACTOR * pow(2.0, ev100);
-}
-
 float exposure_from_ev100(float ev100)
 {
-    return rcp(sensor_saturation(ev100));
+    float max_luminance = EXPOSURE_SATURATION_FACTOR * pow(2.0, ev100);
+    return 1.0 / max_luminance;
 }
 
 float exposure_from_camera(float aperture, float shutter, float iso)

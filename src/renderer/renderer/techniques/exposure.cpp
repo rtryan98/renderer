@@ -29,6 +29,62 @@ Exposure::~Exposure()
     m_render_resource_blackboard.destroy_buffer(m_luminance_histogram_buffer);
 }
 
+void Exposure::compute_luminance_histogram(rhi::Command_List* cmd, Resource_State_Tracker& tracker, const Image& target, float dt) const
+{
+    cmd->begin_debug_region("exposure:compute_luminance_histogram", 0.25f, 0.25f, 0.6f);
+    tracker.use_resource(
+        target,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Read,
+        rhi::Barrier_Image_Layout::Unordered_Access);
+    tracker.use_resource(
+        m_luminance_histogram_buffer,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Read);
+    tracker.flush_barriers(cmd);
+
+    auto compute_luminance_histogram_pipeline = m_asset_repository.get_compute_pipeline("compute_luminance_histogram");
+    cmd->set_pipeline(compute_luminance_histogram_pipeline);
+    cmd->set_push_constants<Calculate_Luminance_Histogram_Push_Constants>({
+        .image_width = target.get_create_info().width,
+        .image_height = target.get_create_info().height,
+        .source_image = target,
+        .luminance_histogram_buffer = m_luminance_histogram_buffer,
+        .min_log_luminance = m_auto_exposure_min_log2_luminance,
+        .log_luminance_range = m_auto_exposure_log2_luminance_range,
+        .log_luminance_cutoff_low = m_auto_exposure_log2_luminance_cutoff_low,
+        .log_luminance_cutoff_high = m_auto_exposure_log2_luminance_cutoff_high }, rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(
+        target.get_create_info().width / compute_luminance_histogram_pipeline.get_group_size_x(),
+        target.get_create_info().height / compute_luminance_histogram_pipeline.get_group_size_y(),
+        1);
+
+    tracker.use_resource(
+        m_luminance_histogram_buffer,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Read);
+    tracker.flush_barriers(cmd);
+
+    auto compute_average_luminance_pipeline = m_asset_repository.get_compute_pipeline("compute_luminance_histogram_average");
+    cmd->set_pipeline(compute_average_luminance_pipeline);
+    cmd->set_push_constants<Calculate_Average_Luminance_Push_Constants>({
+        .luminance_histogram_buffer = m_luminance_histogram_buffer,
+        .pixel_count = target.get_create_info().width * target.get_create_info().height,
+        .delta_time = dt,
+        .tau = m_auto_exposure_adaption_rate,
+        .min_log_luminance = m_auto_exposure_min_log2_luminance,
+        .log_luminance_range = m_auto_exposure_log2_luminance_range }, rhi::Pipeline_Bind_Point::Compute);
+    cmd->dispatch(1, 1, 1);
+
+    tracker.use_resource(
+        m_luminance_histogram_buffer,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Unordered_Access_Read);
+    tracker.flush_barriers(cmd);
+
+    cmd->end_debug_region();
+}
+
 void Exposure::apply_exposure(rhi::Command_List* cmd, Resource_State_Tracker& tracker, const Image& target) const
 {
     cmd->begin_debug_region("exposure:apply", 0.25f, 0.25f, 0.5f);

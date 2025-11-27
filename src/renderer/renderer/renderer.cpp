@@ -233,6 +233,11 @@ void Renderer::render(
         tracker,
         m_shaded_geometry_render_target,
         m_camera_buffer);
+    m_exposure.compute_luminance_histogram(
+        cmd,
+        tracker,
+        m_shaded_geometry_render_target,
+        dt);
     m_exposure.apply_exposure(
         cmd,
         tracker,

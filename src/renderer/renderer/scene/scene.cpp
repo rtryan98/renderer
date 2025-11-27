@@ -472,7 +472,7 @@ void Static_Scene_Data::gui()
                 glm::sin(pitch)
             ));
         ImGui::Text("Direction: %.3f, %.3f, %.3f", m_sun_direction.x, m_sun_direction.y, m_sun_direction.z);
-        ImGui::SliderFloat("intensity", &m_sun_intensity, 0.f, 100.f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::SliderFloat("intensity", &m_sun_intensity, 0.f, 10000.f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
     }
 }
 

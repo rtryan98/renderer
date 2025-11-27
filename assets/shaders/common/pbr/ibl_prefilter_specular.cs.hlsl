@@ -52,7 +52,7 @@ float3 prefilter_irradiance(float3 R, float roughness)
             float3 cube_sample = rhi::uni::tex_sample_level_cube<float4>(pc.source_cubemap, REN_SAMPLER_LINEAR_WRAP, L, mip_level).xyz;
 
             // Hack: clamping sample value in case sun is in environment map.
-            irradiance += NdotL * clamp(cube_sample, 0.0, 100.0);
+            irradiance += NdotL * clamp(cube_sample, 0.0, 250.0);
             weight += NdotL;
         }
     }

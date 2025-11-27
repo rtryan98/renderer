@@ -37,7 +37,7 @@ float3 prefilter_irradiance(float3 R)
         // Hack: clamping sample value in case sun is in environment map.
         // Assuming 1.0 = 1 nit here, so anything above 10000 nits is irrelevant for current displays.
         // For diffuse, this is clamped to a much lower value, as high nits mostly generally correspond to specular reflections.
-        irradiance += NdotL * clamp(cube_sample, 0.0, 100.0);
+        irradiance += NdotL * clamp(cube_sample, 0.0, 250.0);
     }
 
     return irradiance / (float) (pc.samples);

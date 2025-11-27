@@ -33,7 +33,6 @@ void main(uint3 id : SV_DispatchThreadID)
     static const float SUN_BUILTIN_BLOOM = 0.00001;
     float sun_value = smoothstep(SUN_RADIUS_FROM_EARTH - SUN_BUILTIN_BLOOM, SUN_RADIUS_FROM_EARTH, sun_theta);
     color += scene_info.sun_intensity * sun_value;
-    color = clamp(color, 0., 10.);
 
     if (depth == 1.0)
     {

@@ -25,7 +25,7 @@ public:
         Render_Resource_Blackboard& render_resource_blackboard);
     ~Exposure();
 
-    void compute_luminance_histogram(rhi::Command_List* cmd, Resource_State_Tracker& tracker, const Image& target) const;
+    void compute_luminance_histogram(rhi::Command_List* cmd, Resource_State_Tracker& tracker, const Image& target, float dt) const;
     void apply_exposure(rhi::Command_List* cmd, Resource_State_Tracker& tracker, const Image& target) const;
 
     void process_gui();
@@ -37,10 +37,16 @@ private:
 
     Buffer m_luminance_histogram_buffer;
 
-    bool m_use_camera_exposure = true;
+    bool m_use_camera_exposure = false;
     float m_aperture = 16.f; // F-stop
     float m_shutter = 100.f;
     float m_iso = 100.f;
+
+    float m_auto_exposure_min_log2_luminance = -10.f;
+    float m_auto_exposure_log2_luminance_range = 30.f;
+    float m_auto_exposure_adaption_rate = 1.5f;
+    float m_auto_exposure_log2_luminance_cutoff_low = 0.f;
+    float m_auto_exposure_log2_luminance_cutoff_high = 15.f;
 };
 }
 }
