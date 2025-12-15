@@ -6,14 +6,14 @@
 #include "rhi/bindless.hlsli"
 #include "common/color/color_spaces.hlsli"
 #include "shared/exposure_shared_types.h"
+#include "common/pbr/light_units.hlsli"
 
 DECLARE_PUSH_CONSTANTS(Calculate_Luminance_Histogram_Push_Constants, pc);
 
 groupshared uint histogram[256];
 
-uint rec2020_to_bin(float3 color_rec2020, float min_log_luminance, float log_luminance_range)
+uint luminance_to_bin(float luminance, float min_log_luminance, float log_luminance_range)
 {
-    float luminance = ren::color::spaces::Rec2020_XYZ(color_rec2020).y;
 
     // don't count black pixels
     if (luminance < 0.001)
@@ -42,8 +42,15 @@ void main(uint2 id : SV_DispatchThreadID, uint idx : SV_GroupIndex)
 
     if (id.x < pc.image_width && id.y < pc.image_height)
     {
-        float3 color_rec2020 = rhi::tex_load<float3>(pc.source_image, id).xyz;
-        InterlockedAdd(histogram[rec2020_to_bin(color_rec2020, pc.min_log_luminance, pc.log_luminance_range)], 1);
+        // The luminance is calculated from a pre-exposed Rec.2020 color.
+        // Thus, the pre-exposure must be reverted before the color is transformed to CIE XYZ.
+        float3 color_rec2020 = ren::framebuffer_referred_to_luminance(rhi::tex_load<float3>(pc.source_image, id).xyz);
+        float luminance = ren::color::spaces::Rec2020_XYZ(color_rec2020).y;
+        InterlockedAdd(histogram[luminance_to_bin(
+                luminance,
+                pc.min_log_luminance,
+                pc.log_luminance_range)],
+            1);
     }
 
     GroupMemoryBarrierWithGroupSync();

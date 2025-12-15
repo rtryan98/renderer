@@ -39,6 +39,7 @@ struct Apply_Exposure_Push_Constants
     float aperture;
     float shutter;
     float iso;
+    float auto_exposure_compensation;
 };
 
 #endif

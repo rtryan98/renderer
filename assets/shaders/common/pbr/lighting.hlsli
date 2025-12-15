@@ -7,6 +7,7 @@
 
 #include "util.hlsli"
 #include "common/pbr/pbr.hlsli"
+#include "common/pbr/light_units.hlsli"
 
 namespace ren
 {
@@ -45,7 +46,7 @@ float3 evaluate_point_light(float3 V, Surface surface, float3 F0, Punctual_Light
     float3 diffuse = surface.albedo * kd * BRDF_Diffuse_Disney(NdotL, NdotV, LdotH, surface.roughness);
     float3 specular = BRDF_Specular_CookTorrance(NdotL, NdotV, NdotH, VdotH, surface.roughness, F0);
 
-    float attenuation = 1.0 / (distance2 * 2.0 * ren::TWO_PI);
+    float attenuation = attenuation_point_light(distance2);
 
     return NdotL > 0.0 ? (diffuse + specular) * NdotL * light_color * light.intensity * attenuation : 0.0;
 }
@@ -135,21 +136,25 @@ float3 evaluate_sunlight(float3 V, Surface surface, float3 F0)
     float LdotH = saturate(dot(L, H));
     float LdotR = saturate(dot(L, R));
 
+    float3 illuminance = NdotL * scene_info.sun_intensity;
+    float3 luminance = 0.;
+
+    float3 kd = lerp(1.0 - F_SphericalGaussian(VdotH, F0), 0., surface.metallic);
+    float3 diffuse = surface.albedo * kd * BRDF_Diffuse_Disney(NdotL, NdotV, LdotH, surface.roughness);
+
     // Sun is a disk, and surfaces with no roughness cannot be resolved with GGX, so this needs special casing
     if (surface.roughness > .01)
     {
-        float3 kd = lerp(1.0 - F_SphericalGaussian(VdotH, F0), 0., surface.metallic);
-        float3 diffuse = surface.albedo * kd * BRDF_Diffuse_Disney(NdotL, NdotV, LdotH, surface.roughness);
         float3 specular = BRDF_Specular_CookTorrance(NdotL, NdotV, NdotH, VdotH, surface.roughness, F0);
-        return NdotL > 0.0 ? (diffuse + specular) * NdotL * scene_info.sun_intensity : 0.0;
+        luminance = illuminance * (diffuse + specular);
     }
     else
     {
-        float3 kd = lerp(1.0 - F_SphericalGaussian(VdotH, F0), 0., surface.metallic);
-        float3 diffuse = surface.albedo * kd * BRDF_Diffuse_Disney(NdotL, NdotV, LdotH, surface.roughness);
         float3 specular = BRDF_Specular_Mirror(LdotR, F0);
-        return NdotL > 0.0 ? (specular + NdotL * diffuse) * scene_info.sun_intensity : 0.0;
+        luminance = illuminance * (diffuse + specular);
     }
+
+    return NdotL > 0. ? luminance : 0.;
 }
 
 float3 evaluate_skylight_ibl(float3 V, Surface surface, float3 F0)
@@ -159,13 +164,13 @@ float3 evaluate_skylight_ibl(float3 V, Surface surface, float3 F0)
     float NdotV = clamp(dot(surface.normal, V), 1e-5, 1.);
 
     float3 kd = lerp(1.0 - F_SphericalGaussian(NdotV, F0), 0., surface.metallic);
-    float3 diffuse_irradiance = rhi::uni::tex_sample_level_cube<float4>(REN_LIGHTING_DIFFUSE_IRRADIANCE_CUBEMAP, REN_SAMPLER_LINEAR_WRAP, surface.normal, 0.0).xyz;
+    float3 diffuse_irradiance = framebuffer_referred_to_luminance(rhi::uni::tex_sample_level_cube<float4>(REN_LIGHTING_DIFFUSE_IRRADIANCE_CUBEMAP, REN_SAMPLER_LINEAR_WRAP, surface.normal, 0.0).xyz);
     float3 diffuse = kd * diffuse_irradiance * surface.albedo;
 
     color += diffuse;
 
     float specular_sample_mip = 5.0 * surface.roughness;
-    float3 specular_irradiance = rhi::uni::tex_sample_level_cube<float4>(REN_LIGHTING_SPECULAR_IRRADIANCE_CUBEMAP, REN_SAMPLER_LINEAR_WRAP, surface.normal, specular_sample_mip).xyz;
+    float3 specular_irradiance = framebuffer_referred_to_luminance(rhi::uni::tex_sample_level_cube<float4>(REN_LIGHTING_SPECULAR_IRRADIANCE_CUBEMAP, REN_SAMPLER_LINEAR_WRAP, surface.normal, specular_sample_mip).xyz);
     float2 specular_brdf_lut = rhi::uni::tex_sample_level<float2>(REN_LIGHTING_BRDF_LUT_TEXTURE, REN_SAMPLER_LINEAR_CLAMP, float2(NdotV, surface.roughness), 0.0);
     float3 specular = (F0 * specular_brdf_lut.x + specular_brdf_lut.y) * specular_irradiance;
 
@@ -185,7 +190,7 @@ float3 evaluate_lights(float3 V, Surface surface)
 
     color += evaluate_skylight_ibl(V, surface, F0);
 
-    return color;
+    return luminance_to_framebuffer_referred(color);
 }
 }
 }

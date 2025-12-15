@@ -44,12 +44,11 @@ void main(uint3 id : SV_DispatchThreadID)
     float3 color = ren::pbr::evaluate_lights(V, surface);
 
     Scene_Info scene_info = rhi::uni::buf_load<Scene_Info>(REN_GLOBAL_SCENE_INFORMATION_BUFFER);
-    Punctual_Light light = rhi::uni::buf_load_arr<Punctual_Light>(REN_GLOBAL_LIGHT_LIST_BUFFER, 0);
 
     RayDesc ray = {
-        surface.position + 0.005 * surface.normal,
+        surface.position + 0.05 * surface.normal,
         0.05,
-        -light.direction,
+        -scene_info.sun_direction,
         500.0
     };
 
@@ -64,7 +63,7 @@ void main(uint3 id : SV_DispatchThreadID)
     q.Proceed();
     if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
-        color *= 0.125;
+        color *= 0.;
     }
 
     float4 result = float4(color, 1.0);

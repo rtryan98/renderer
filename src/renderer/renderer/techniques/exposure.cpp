@@ -104,7 +104,8 @@ void Exposure::apply_exposure(rhi::Command_List* cmd, Resource_State_Tracker& tr
         .use_camera_exposure = static_cast<uint32_t>(m_use_camera_exposure),
         .aperture = m_aperture,
         .shutter = m_shutter,
-        .iso = m_iso }, rhi::Pipeline_Bind_Point::Compute);
+        .iso = m_iso,
+        .auto_exposure_compensation = m_auto_exposure_exposure_compensation }, rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(
         target.get_create_info().width / apply_exposure_pipeline.get_group_size_x(),
         target.get_create_info().height / apply_exposure_pipeline.get_group_size_y(),
@@ -120,6 +121,9 @@ void Exposure::process_gui()
         ImGui::InputFloat("Aperture", &m_aperture);
         ImGui::InputFloat("Shutter", &m_shutter);
         ImGui::InputFloat("ISO", &m_iso);
+        ImGui::InputFloat("Auto exposure log2 cutoff low", &m_auto_exposure_log2_luminance_cutoff_low);
+        ImGui::InputFloat("Auto exposure log2 cutoff high", &m_auto_exposure_log2_luminance_cutoff_high);
+        ImGui::InputFloat("Auto exposure compensation", &m_auto_exposure_exposure_compensation);
     }
 }
 }
