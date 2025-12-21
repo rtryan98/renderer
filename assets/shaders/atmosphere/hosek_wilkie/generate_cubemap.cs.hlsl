@@ -28,7 +28,7 @@ float3 hosek_wilkie(float cos_theta, float gamma, float cos_gamma)
 
     // 1.0 = 100 nits
     // Assume 100% efficiency for radiance -> luminance, using 683Lm/W
-    return result * 6.83;
+    return result;
 }
 
 [shader("compute")]

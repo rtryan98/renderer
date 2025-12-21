@@ -43,11 +43,9 @@ private:
     float m_iso = 100.f;
 
     float m_auto_exposure_min_log2_luminance = -10.f;
-    float m_auto_exposure_log2_luminance_range = 30.f;
+    float m_auto_exposure_log2_luminance_range = 12.f;
     float m_auto_exposure_adaption_rate = 1.5f;
-    float m_auto_exposure_log2_luminance_cutoff_low = 1.f;
-    float m_auto_exposure_log2_luminance_cutoff_high = 13.f;
-    float m_auto_exposure_exposure_compensation = 2.f;
+    float m_auto_exposure_exposure_compensation = 0.f;
 };
 }
 }

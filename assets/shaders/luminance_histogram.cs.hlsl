@@ -14,19 +14,11 @@ groupshared uint histogram[256];
 
 uint luminance_to_bin(float luminance, float min_log_luminance, float log_luminance_range)
 {
-
-    // don't count black pixels
-    if (luminance < 0.001)
+    // don't count pixels under minimum
+    if (luminance < ren::EV_to_luminance(min_log_luminance))
         return 0;
 
     float log2_luminance = log2(luminance);
-
-    // don't count pixels beyond cutoff
-    if (log2_luminance < pc.log_luminance_cutoff_low ||
-        log2_luminance > pc.log_luminance_cutoff_high)
-    {
-        return 0;
-    }
 
     log2_luminance = saturate(rcp(log_luminance_range) * (log2_luminance - min_log_luminance));
 

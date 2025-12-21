@@ -16,8 +16,6 @@ struct Calculate_Luminance_Histogram_Push_Constants
     SHADER_HANDLE_TYPE luminance_histogram_buffer;
     float min_log_luminance;
     float log_luminance_range;
-    float log_luminance_cutoff_low;
-    float log_luminance_cutoff_high;
 };
 
 struct Calculate_Average_Luminance_Push_Constants

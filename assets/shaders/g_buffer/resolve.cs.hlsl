@@ -63,7 +63,7 @@ void main(uint3 id : SV_DispatchThreadID)
     q.Proceed();
     if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
-        color *= 0.;
+        color *= 0.00125;
     }
 
     float4 result = float4(color, 1.0);

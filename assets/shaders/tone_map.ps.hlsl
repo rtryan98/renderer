@@ -50,7 +50,7 @@ float4 main(PS_In ps_in) : SV_Target
     GT7_Tone_Mapping_Data tone_map_parameters = rhi::uni::buf_load<GT7_Tone_Mapping_Data>(pc.tone_map_parameters_buffer);
     float4 color = max(rhi::uni::tex_sample<float4>(pc.source_texture, pc.texture_sampler, ps_in.uv), 0.0);
 
-    color = ren::framebuffer_referred_to_luminance(color);
+    // color = ren::framebuffer_referred_to_luminance(color);
 
     if (pc.is_enabled)
     {

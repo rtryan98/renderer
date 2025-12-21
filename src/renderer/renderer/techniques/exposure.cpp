@@ -51,9 +51,7 @@ void Exposure::compute_luminance_histogram(rhi::Command_List* cmd, Resource_Stat
         .source_image = target,
         .luminance_histogram_buffer = m_luminance_histogram_buffer,
         .min_log_luminance = m_auto_exposure_min_log2_luminance,
-        .log_luminance_range = m_auto_exposure_log2_luminance_range,
-        .log_luminance_cutoff_low = m_auto_exposure_log2_luminance_cutoff_low,
-        .log_luminance_cutoff_high = m_auto_exposure_log2_luminance_cutoff_high }, rhi::Pipeline_Bind_Point::Compute);
+        .log_luminance_range = m_auto_exposure_log2_luminance_range }, rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(
         target.get_create_info().width / compute_luminance_histogram_pipeline.get_group_size_x(),
         target.get_create_info().height / compute_luminance_histogram_pipeline.get_group_size_y(),
@@ -121,8 +119,8 @@ void Exposure::process_gui()
         ImGui::InputFloat("Aperture", &m_aperture);
         ImGui::InputFloat("Shutter", &m_shutter);
         ImGui::InputFloat("ISO", &m_iso);
-        ImGui::InputFloat("Auto exposure log2 cutoff low", &m_auto_exposure_log2_luminance_cutoff_low);
-        ImGui::InputFloat("Auto exposure log2 cutoff high", &m_auto_exposure_log2_luminance_cutoff_high);
+        ImGui::InputFloat("Auto exposure min EV", &m_auto_exposure_min_log2_luminance);
+        ImGui::InputFloat("Auto exposure EV range", &m_auto_exposure_log2_luminance_range);
         ImGui::InputFloat("Auto exposure compensation", &m_auto_exposure_exposure_compensation);
     }
 }

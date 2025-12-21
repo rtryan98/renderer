@@ -40,6 +40,7 @@ void main(uint idx : SV_GroupIndex)
         float weighted_average_luminance = exp2(weighted_log2_average_luminance / 254. * pc.log_luminance_range + pc.min_log_luminance);
         float last_frame_luminance = rhi::buf_load<float>(pc.luminance_histogram_buffer);
         float current_luminance = last_frame_luminance + (weighted_average_luminance - last_frame_luminance) * (1. - exp(-pc.delta_time * pc.tau));
+
         rhi::buf_store<float>(pc.luminance_histogram_buffer, current_luminance);
     }
 }
