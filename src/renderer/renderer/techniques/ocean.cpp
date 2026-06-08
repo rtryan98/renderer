@@ -48,7 +48,7 @@ Ocean::Ocean(Asset_Repository& asset_repository, GPU_Transfer_Context& gpu_trans
         .depth = 1,
         .array_size = 1,
         .mip_levels = 1,
-        .usage = rhi::Image_Usage::Depth_Stencil_Attachment,
+        .usage = rhi::Image_Usage::Depth_Stencil_Attachment | rhi::Image_Usage::Sampled,
         .primary_view_type = rhi::Image_View_Type::Texture_2D
     };
     m_forward_pass_depth_render_target = m_render_resource_blackboard.create_image(
@@ -726,7 +726,8 @@ void Ocean::draw_all_tiles(rhi::Command_List* cmd, const Buffer& camera)
             .vertices_per_axis = TILE_VERTEX_COUNT,
             .offset_x = tile.position.x,
             .offset_y = tile.position.y,
-            .lod_differences = std::bit_cast<uint32_t>(tile.lod_differences)
+            .lod_differences = std::bit_cast<uint32_t>(tile.lod_differences),
+            .cascade_count = options.cascade_count
             }, rhi::Pipeline_Bind_Point::Graphics);
         cmd->draw_indexed(3 * 2 * (TILE_VERTEX_COUNT - 1) * (TILE_VERTEX_COUNT - 1), 1, 0, 0, 0);
     }

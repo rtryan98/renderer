@@ -73,6 +73,7 @@ struct SHADER_STRUCT_ALIGN Ocean_Render_Patch_Push_Constants
     float offset_x;
     float offset_y;
     uint lod_differences;
+    uint cascade_count;
 };
 
 struct SHADER_STRUCT_ALIGN Ocean_Render_Composition_Push_Constants

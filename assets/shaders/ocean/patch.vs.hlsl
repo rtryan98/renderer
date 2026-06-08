@@ -91,7 +91,7 @@ VS_OUT_TYPE main(uint vertex_id : SV_VertexID)
         
     Ocean_Min_Max_Values min_max_values = rhi::uni::buf_load<Ocean_Min_Max_Values>(pc.min_max_buffer);
 
-    for (uint i = 0; i < 4; ++i)
+    for (uint i = 0; i < pc.cascade_count; ++i)
     {
         if (weights[i] <= 0.0) continue;
 

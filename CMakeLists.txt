@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
+set(RENDERER_DOWNLOAD_CACHE ${CMAKE_CURRENT_LIST_DIR}/download_cache)
+
 project(
     renderer
     VERSION 0.1.0
@@ -43,43 +45,43 @@ add_custom_command(
     COMMAND $<TARGET_FILE:asset_baker> --gltf -i thirdparty/gltf-sample-assets/Models/DamagedHelmet -o ${CMAKE_BINARY_DIR}/assets/cache
     COMMAND $<TARGET_FILE:asset_baker> --gltf -i thirdparty/gltf-sample-assets/Models/MetalRoughSpheres -o ${CMAKE_BINARY_DIR}/assets/cache
     COMMAND $<TARGET_FILE:asset_baker> --gltf -i thirdparty/gltf-sample-assets/Models/Sponza -o ${CMAKE_BINARY_DIR}/assets/cache
-    COMMAND $<TARGET_FILE:asset_baker> --gltf -i ${CMAKE_BINARY_DIR}/download/intel_sponza -o ${CMAKE_BINARY_DIR}/assets/cache
-    COMMAND $<TARGET_FILE:asset_baker> --gltf -i ${CMAKE_BINARY_DIR}/download/intel_sponza_curtains -o ${CMAKE_BINARY_DIR}/assets/cache
-    COMMAND $<TARGET_FILE:asset_baker> --gltf -i ${CMAKE_BINARY_DIR}/download/intel_sponza_ivy -o ${CMAKE_BINARY_DIR}/assets/cache
-    COMMAND $<TARGET_FILE:asset_baker> --hdri -i ${CMAKE_BINARY_DIR}/download/hdri -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> --gltf -i ${RENDERER_DOWNLOAD_CACHE}/intel_sponza -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> --gltf -i ${RENDERER_DOWNLOAD_CACHE}/intel_sponza_curtains -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> --gltf -i ${RENDERER_DOWNLOAD_CACHE}/intel_sponza_ivy -o ${CMAKE_BINARY_DIR}/assets/cache
+    COMMAND $<TARGET_FILE:asset_baker> --hdri -i ${RENDERER_DOWNLOAD_CACHE}/hdri -o ${CMAKE_BINARY_DIR}/assets/cache
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
 )
 
 # Additional assets
 rhi_download_and_extract_zip(
     https://cdrdv2.intel.com/v1/dl/getContent/830833
-    ${CMAKE_BINARY_DIR}/download
+    ${RENDERER_DOWNLOAD_CACHE}
     intel_sponza
 )
 rhi_download_and_extract_zip(
     https://cdrdv2.intel.com/v1/dl/getContent/726650
-    ${CMAKE_BINARY_DIR}/download
+    ${RENDERER_DOWNLOAD_CACHE}
     intel_sponza_curtains
 )
 rhi_download_and_extract_zip(
     https://cdrdv2.intel.com/v1/dl/getContent/726656
-    ${CMAKE_BINARY_DIR}/download
+    ${RENDERER_DOWNLOAD_CACHE}
     intel_sponza_ivy
 )
-if (NOT EXISTS ${CMAKE_BINARY_DIR}/download/hdri/lonely_road_afternoon_puresky_4k_hdri)
-    message(STATUS "Downloading https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/lonely_road_afternoon_puresky_4k.hdr to ${CMAKE_BINARY_DIR}/download/hdri/lonely_road_afternoon_puresky_4k.hdr.")
+if (NOT EXISTS ${RENDERER_DOWNLOAD_CACHE}/hdri/lonely_road_afternoon_puresky_4k_hdri)
+    message(STATUS "Downloading https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/lonely_road_afternoon_puresky_4k.hdr to ${RENDERER_DOWNLOAD_CACHE}/hdri/lonely_road_afternoon_puresky_4k.hdr.")
     file(
         DOWNLOAD
         https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/lonely_road_afternoon_puresky_4k.hdr
-        ${CMAKE_BINARY_DIR}/download/hdri/lonely_road_afternoon_puresky_4k.hdr
+        ${RENDERER_DOWNLOAD_CACHE}/hdri/lonely_road_afternoon_puresky_4k.hdr
     )
 endif()
-if (NOT EXISTS ${CMAKE_BINARY_DIR}/download/hdri/qwantani_noon_puresky_4k_hdri)
-    message(STATUS "Downloading https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/qwantani_noon_puresky_4k.hdr to ${CMAKE_BINARY_DIR}/download/hdri/qwantani_noon_puresky_4k.hdr.")
+if (NOT EXISTS ${RENDERER_DOWNLOAD_CACHE}/hdri/qwantani_noon_puresky_4k_hdri)
+    message(STATUS "Downloading https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/qwantani_noon_puresky_4k.hdr to ${RENDERER_DOWNLOAD_CACHE}/hdri/qwantani_noon_puresky_4k.hdr.")
     file(
         DOWNLOAD
         https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/qwantani_noon_puresky_4k.hdr
-        ${CMAKE_BINARY_DIR}/download/hdri/qwantani_noon_puresky_4k.hdr
+        ${RENDERER_DOWNLOAD_CACHE}/hdri/qwantani_noon_puresky_4k.hdr
     )
 endif()
 

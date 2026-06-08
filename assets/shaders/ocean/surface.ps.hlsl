@@ -17,10 +17,16 @@
 
 DECLARE_PUSH_CONSTANTS(Ocean_Render_Patch_Push_Constants, pc);
 
+struct Ocean_Min_Max_Values_Full
+{
+    Ocean_Min_Max_Values x_y_z_xdx;
+    Ocean_Min_Max_Values ydx_zdx_ydy_zdy;
+};
+
 float4 main(PS_In ps_in) : SV_Target
 {
     GPU_Camera_Data camera = rhi::buf_load<GPU_Camera_Data>(pc.camera);
-    Ocean_Min_Max_Values min_max_values = rhi::uni::buf_load<Ocean_Min_Max_Values>(pc.min_max_buffer);
+    Ocean_Min_Max_Values_Full min_max_values = rhi::uni::buf_load<Ocean_Min_Max_Values_Full>(pc.min_max_buffer);
 
     float x_dx = 0.0;
     float4 ydx_zdx_ydy_zdy = 0.0;
@@ -31,22 +37,22 @@ float4 main(PS_In ps_in) : SV_Target
         5.0,
         pc.length_scales);
 
-    for (uint i = 0; i < 4; ++i)
+    for (uint i = 0; i < pc.cascade_count; ++i)
     {
         if (weights[i] <= 0.0) continue;
 
-        float4 x_y_z_xdx_ranges = min_max_values.cascades[i].max_values - min_max_values.cascades[i].min_values;
-        float4 ydx_zdx_ydy_zdy_ranges = min_max_values.cascades[i + 4].max_values - min_max_values.cascades[i + 4].min_values;
+        float4 x_y_z_xdx_ranges = min_max_values.x_y_z_xdx.cascades[i].max_values - min_max_values.x_y_z_xdx.cascades[i].min_values;
+        float4 ydx_zdx_ydy_zdy_ranges = min_max_values.ydx_zdx_ydy_zdy.cascades[i].max_values - min_max_values.ydx_zdx_ydy_zdy.cascades[i].min_values;
         
         float packed_xdx = rhi::uni::tex_sample_level_arr<float>(pc.packed_xdx_tex, REN_SAMPLER_LINEAR_WRAP, ps_in.uvs[i], i, 0.);
         packed_xdx *= x_y_z_xdx_ranges.w;
-        packed_xdx += min_max_values.cascades[i].min_values.w;
+        packed_xdx += min_max_values.x_y_z_xdx.cascades[i].min_values.w;
 
         x_dx += weights[i] * packed_xdx;
 
         float4 packed_derivatives = rhi::uni::tex_sample_level_arr<float4>(pc.packed_derivatives_tex, REN_SAMPLER_LINEAR_WRAP, ps_in.uvs[i], i, 0.);
         packed_derivatives *= ydx_zdx_ydy_zdy_ranges;
-        packed_derivatives += min_max_values.cascades[i + 4].min_values;
+        packed_derivatives += min_max_values.ydx_zdx_ydy_zdy.cascades[i].min_values;
         ydx_zdx_ydy_zdy += weights[i] * packed_derivatives;
     }
 

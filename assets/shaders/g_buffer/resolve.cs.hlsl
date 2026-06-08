@@ -46,7 +46,7 @@ void main(uint3 id : SV_DispatchThreadID)
     Scene_Info scene_info = rhi::uni::buf_load<Scene_Info>(REN_GLOBAL_SCENE_INFORMATION_BUFFER);
 
     RayDesc ray = {
-        surface.position + 0.05 * surface.normal,
+        surface.position + 0.00125 * surface.normal,
         0.05,
         -scene_info.sun_direction,
         500.0
@@ -63,7 +63,7 @@ void main(uint3 id : SV_DispatchThreadID)
     q.Proceed();
     if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
-        color *= 0.00125;
+        color *= 0.025;
     }
 
     float4 result = float4(color, 1.0);

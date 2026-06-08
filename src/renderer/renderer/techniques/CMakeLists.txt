@@ -6,6 +6,8 @@ target_sources(
     exposure.hpp
     g_buffer.cpp
     g_buffer.hpp
+    hillaire_sky.cpp
+    hillaire_sky.hpp
     hosek_wilkie_sky.cpp
     hosek_wilkie_sky.hpp
     hosek_wilkie_sky_data.hpp
@@ -15,6 +17,9 @@ target_sources(
     imgui.hpp
     ocean.cpp
     ocean.hpp
+    rt_soft_shadows.cpp
+    rt_soft_shadows.hpp
+    technique_base.hpp
     tone_map.cpp
     tone_map.hpp
 )

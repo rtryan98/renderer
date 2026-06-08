@@ -25,7 +25,7 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         }))
     , m_input_state(std::make_unique<Input_State>(*m_window))
     , m_device(rhi::Graphics_Device::create({
-        .graphics_api = rhi::Graphics_API::D3D12,
+        .graphics_api = rhi::Graphics_API::Vulkan,
         .enable_validation = create_info.enable_validation,
         .enable_gpu_validation = create_info.enable_gpu_validation,
         .enable_locking = false,
@@ -33,7 +33,7 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         .reserved_bindless_sampler_index_count = RESERVED_BINDLESS_SAMPLER_COUNT
         }))
     , m_swapchain(m_device->create_swapchain({
-        .hwnd = m_window->get_native_handle(),
+        .hwnd = static_cast<HWND>(m_window->get_native_handle()),
         .preferred_format = rhi::Image_Format::R8G8B8A8_UNORM, // SDR
         // .preferred_format = rhi::Image_Format::A2R10G10B10_UNORM_PACK32, // HDR
         .image_count = REN_MAX_FRAMES_IN_FLIGHT + 1,
@@ -252,7 +252,7 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
         .fence = frame.frame_fence,
         .value = frame.fence_value
     };
-    m_device->submit({
+    auto submit_result = m_device->submit({
         .queue_type = rhi::Queue_Type::Graphics,
         .wait_swapchain = m_swapchain.get(),
         .present_swapchain = m_swapchain.get(),
@@ -260,6 +260,10 @@ void Application::render_frame(Frame& frame, double t, double dt) noexcept
         .command_lists = cmds,
         .signal_infos = { &frame_fence_signal_info, 1 }
         });
+    if (submit_result == rhi::Result::Error_Device_Lost)
+    {
+        m_logger->error("Device lost on submit in frame {}", m_frame_counter);
+    }
     m_swapchain->present();
 }
 
