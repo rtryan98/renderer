@@ -25,7 +25,7 @@ Application::Application(const Application_Create_Info& create_info) noexcept
         }))
     , m_input_state(std::make_unique<Input_State>(*m_window))
     , m_device(rhi::Graphics_Device::create({
-        .graphics_api = rhi::Graphics_API::Vulkan,
+        .graphics_api = create_info.graphics_api,
         .enable_validation = create_info.enable_validation,
         .enable_gpu_validation = create_info.enable_gpu_validation,
         .enable_locking = false,

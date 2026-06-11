@@ -15,7 +15,8 @@ int32_t main(uint32_t argc, const char* argv[])
         .width = WINDOW_DEFAULT_WIDTH,
         .height = WINDOW_DEFAULT_HEIGHT,
         .enable_validation = false,
-        .enable_gpu_validation = false
+        .enable_gpu_validation = false,
+        .graphics_api = rhi::Graphics_API::D3D12
     };
 
     try
@@ -55,6 +56,14 @@ int32_t main(uint32_t argc, const char* argv[])
             "Start in fullscreen.",
             false);
         cmd.add(fullscreen_arg);
+        TCLAP::ValueArg<int32_t> graphics_api_arg(
+            "g",
+            "graphics-api",
+            "Sets the graphics API. '0' for D3D12, '1' for Vulkan.",
+            false,
+            0,
+            "int");
+        cmd.add(graphics_api_arg);
         cmd.parse(argc, argv);
 
         app_create_info.width = window_width_arg.getValue();
@@ -62,12 +71,22 @@ int32_t main(uint32_t argc, const char* argv[])
         app_create_info.fullscreen = fullscreen_arg.getValue();
         app_create_info.enable_validation = validation_arg.getValue();
         app_create_info.enable_gpu_validation = gpu_validation_arg.getValue();
+        app_create_info.graphics_api = static_cast<rhi::Graphics_API>(graphics_api_arg.getValue());
 
+        // Validate that a valid graphics API was passed.
+        if (static_cast<uint32_t>(app_create_info.graphics_api) > 1u) app_create_info.graphics_api = rhi::Graphics_API::D3D12;
+
+        if (app_create_info.graphics_api == rhi::Graphics_API::D3D12)
+            printf("Using D3D12.\n");
+        else
+            printf("Using Vulkan.\n");
         if (app_create_info.enable_validation) printf("Validation enabled.\n");
         if (app_create_info.enable_gpu_validation) printf("GPU Validation enabled.\n");
     }
     catch (...)
-    {} // do nothing on error.
+    {
+        printf("Failed to parse command line arguments. Starting with default options.\n");
+    }
 
     auto imgui_ctx = ren::imutil::Context_Wrapper();
     auto& io = ImGui::GetIO();

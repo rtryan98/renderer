@@ -36,6 +36,7 @@ struct Application_Create_Info
     bool fullscreen;
     bool enable_validation;
     bool enable_gpu_validation;
+    rhi::Graphics_API graphics_api;
 };
 
 class Application
