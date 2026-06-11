@@ -37,21 +37,7 @@ uint64_t Buffer::size() const noexcept
     return (*m_buffer)->size;
 }
 
-void Buffer::map(std::size_t offset, std::size_t size) noexcept
-{
-    if (!m_buffer) return;
-
-    m_blackboard->get_graphics_device()->map_buffer(*m_buffer, offset, size);
-}
-
-void Buffer::unmap() noexcept
-{
-    if (!m_buffer) return;
-
-    m_blackboard->get_graphics_device()->unmap_buffer(*m_buffer);
-}
-
-Buffer::operator unsigned int() const
+Buffer::operator uint32_t() const
 {
     if (!m_buffer) return 0u;
     return (*m_buffer)->buffer_view->bindless_index;
@@ -78,7 +64,7 @@ Image_View::Image_View(rhi::Image_View** image_view)
     : m_image_view(image_view)
 {}
 
-Image_View::operator unsigned int() const
+Image_View::operator uint32_t() const
 {
     if (!m_image_view) return 0u;
     return (*m_image_view)->bindless_index;
@@ -154,7 +140,7 @@ Image_View Image::create_image_view(const Image_View_Subresource_Info& subresour
     return {};
 }
 
-Image::operator unsigned int() const
+Image::operator uint32_t() const
 {
     if (!m_image) return 0u;
     return (*m_image)->image_view->bindless_index;
@@ -196,7 +182,7 @@ Sampler::Sampler(rhi::Sampler* sampler)
     : m_sampler(sampler)
 {}
 
-Sampler::operator unsigned int() const
+Sampler::operator uint32_t() const
 {
     if (!m_sampler) return 0u;
     return m_sampler->bindless_index;
