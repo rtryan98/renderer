@@ -135,17 +135,15 @@ void Ocean::update(float dt, const Fly_Camera& cull_camera)
     if (frame > REN_MAX_FRAMES_IN_FLIGHT)
     {
         const auto& index = frame % REN_MAX_FRAMES_IN_FLIGHT;
-        m_minmax_readback_buffer.map(index * sizeof(Ocean_Min_Max_Values), sizeof(Ocean_Min_Max_Values));
         const auto& min_max_values = static_cast<Ocean_Min_Max_Values*>(static_cast<void*>(m_minmax_readback_buffer))[index];
 
         m_min_displacement = {};
         m_max_displacement = {};
-        for (uint32_t i = 0; i < 4; ++i)
+        for (uint32_t i = 0; i < options.cascade_count; ++i)
         {
             m_min_displacement += min_max_values.cascades[i].min_values.xyz();
             m_max_displacement += min_max_values.cascades[i].max_values.xyz();
         }
-        m_minmax_readback_buffer.unmap();
     }
 
     frame += 1;
@@ -488,7 +486,7 @@ void Ocean::depth_pre_pass(rhi::Command_List* cmd, Resource_State_Tracker& track
         rhi::Barrier_Image_Layout::Depth_Stencil_Write);
     tracker.use_resource(
         m_packed_displacement_texture,
-        rhi::Barrier_Pipeline_Stage::Pixel_Shader,
+        rhi::Barrier_Pipeline_Stage::Vertex_Shader,
         rhi::Barrier_Access::Shader_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
     tracker.use_resource(
@@ -501,6 +499,10 @@ void Ocean::depth_pre_pass(rhi::Command_List* cmd, Resource_State_Tracker& track
         rhi::Barrier_Pipeline_Stage::Pixel_Shader,
         rhi::Barrier_Access::Shader_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
+    tracker.use_resource(
+        m_minmax_buffer,
+        rhi::Barrier_Pipeline_Stage::Vertex_Shader,
+        rhi::Barrier_Access::Shader_Read);
 
     tracker.flush_barriers(cmd);
 
@@ -905,12 +907,12 @@ void Ocean::process_gui_options()
         options_tmp.cascade_count != options.cascade_count;
     if (recreate_textures)
     {
-
         auto recreate_texture = [&](Image& image)
         {
             auto create_info = image.get_create_info();
             create_info.width = options_tmp.texture_size;
             create_info.height = options_tmp.texture_size;
+            create_info.array_size = static_cast<uint16_t>(options_tmp.cascade_count);
             image.recreate(create_info);
         };
         recreate_texture(m_spectrum_state_texture);
