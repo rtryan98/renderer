@@ -53,6 +53,7 @@ Asset_Repository::Asset_Repository(
 
     create_shader_and_compute_libraries();
     create_graphics_pipeline_libraries();
+    create_ray_tracing_pipeline_libraries();
     register_textures();
     register_models();
 }
@@ -95,6 +96,11 @@ Graphics_Pipeline Asset_Repository::get_graphics_pipeline(const std::string_view
     return Graphics_Pipeline(m_pipeline_library_ptrs.at(std::string(name)));
 }
 
+Ray_Tracing_Pipeline Asset_Repository::get_ray_tracing_pipeline(const std::string_view& name) const
+{
+    return Ray_Tracing_Pipeline(m_ray_tracing_pipeline_library_ptrs.at(std::string(name)));
+}
+
 Mapped_File* Asset_Repository::get_model(const std::string_view& name) const
 {
     return m_model_ptrs.at(std::string(name));
@@ -127,6 +133,7 @@ void Asset_Repository::recompile_shaders()
 {
     create_shader_and_compute_libraries();
     create_graphics_pipeline_libraries();
+    create_ray_tracing_pipeline_libraries();
 }
 
 rhi::dxc::Shader_Type shader_type_from_string(std::string_view type)
@@ -715,6 +722,233 @@ void Asset_Repository::compile_graphics_pipeline_library(const std::string_view&
     m_logger->debug("Created graphics pipeline library '{}'", name);
 }
 
+void Asset_Repository::compile_ray_tracing_pipeline(const std::string_view& json_path)
+{
+    // parse the json file
+    auto pipeline_json = nlohmann::json::parse(std::ifstream(std::string(json_path)));
+
+    auto translate_shader_type = [this](rhi::dxc::Shader_Type type)
+        {
+            switch (type)
+            {
+            case rhi::dxc::Shader_Type::Ray_Gen:
+                return rhi::Ray_Tracing_Shader_Type::Ray_Gen;
+            case rhi::dxc::Shader_Type::Ray_Any_Hit:
+                return rhi::Ray_Tracing_Shader_Type::Ray_Any_Hit;
+            case rhi::dxc::Shader_Type::Ray_Closest_Hit:
+                return rhi::Ray_Tracing_Shader_Type::Ray_Closest_Hit;
+            case rhi::dxc::Shader_Type::Ray_Miss:
+                return rhi::Ray_Tracing_Shader_Type::Ray_Miss;
+            case rhi::dxc::Shader_Type::Ray_Intersection:
+                return rhi::Ray_Tracing_Shader_Type::Ray_Intersection;
+            case rhi::dxc::Shader_Type::Ray_Callable:
+                return rhi::Ray_Tracing_Shader_Type::Ray_Callable;
+            default:
+                m_logger->warn("Invalid shader type for ray tracing pipeline.");
+                std::unreachable();
+            }
+        };
+
+    auto set_shader = [&](auto& shader_json, rhi::Ray_Tracing_Shader_Type& type, auto& shader)
+        {
+            std::string name = "";
+            std::string variant = "";
+            if (shader_json.contains("name"))
+            {
+                name = shader_json["name"].get<std::string>();
+            }
+            else
+            {
+                m_logger->warn("Shader missing name.");
+            }
+            if (shader_json.contains("type"))
+            {
+                type = translate_shader_type(shader_type_from_string(shader_json["type"].get<std::string>()));
+            }
+            else
+            {
+                m_logger->warn("Shader missing type.");
+            }
+            if (shader_json.contains("variant"))
+            {
+                variant = shader_json["variant"].get<std::string>();
+            }
+
+            if (!m_shader_library_ptrs.contains(name))
+            {
+                m_logger->error("Shader library '{}' does not exist.", name);
+                return std::make_pair(static_cast<Shader_Library*>(nullptr), std::string());
+            }
+
+            const auto shader_lib = m_shader_library_ptrs[name];
+            if (!variant.empty())
+            {
+                shader = shader_lib->get_shader(variant);
+            }
+            else
+            {
+                shader = shader_lib->shaders[0].blob;
+                variant = shader_lib->shaders[0].name;
+            }
+            return std::make_pair(m_shader_library_ptrs[name], variant);
+        };
+
+    auto name = pipeline_json["name"].get<std::string>();
+    if (!m_ray_tracing_pipeline_library_ptrs.contains(name))
+    {
+        m_ray_tracing_pipeline_library_ptrs[name] = &*m_ray_tracing_pipeline_libraries.emplace();
+    }
+
+    std::vector<Ray_Tracing_Shader_Ref> shader_refs;
+    std::vector<rhi::Ray_Tracing_Shader> shaders;
+    if (pipeline_json.contains("shaders"))
+    {
+        shaders.reserve(pipeline_json.count("shaders"));
+        shader_refs.reserve(pipeline_json.count("shaders"));
+        for (const auto& shader_json : pipeline_json["shaders"])
+        {
+            auto& shader = shaders.emplace_back();
+            const auto& shader_ref = set_shader(shader_json, shader.type, shader.blob);
+            shader_refs.push_back({ .lib = shader_ref.first, .variant = shader_ref.second });
+        }
+    }
+
+    std::vector<uint32_t> ray_gen_shaders;
+    if (pipeline_json.contains("ray_gen"))
+    {
+        for (const auto& ray_gen_json : pipeline_json["ray_gen"])
+        {
+            ray_gen_shaders.push_back(static_cast<uint32_t>(ray_gen_json.get<int32_t>()));
+        }
+    }
+
+    std::vector<rhi::Ray_Tracing_Hit_Group> hit_groups;
+    if (pipeline_json.contains("hit_groups"))
+    {
+        for (const auto& hit_group_json : pipeline_json["hit_groups"])
+        {
+            auto& hit_group = hit_groups.emplace_back();
+
+            auto hit_group_type = rhi::Ray_Tracing_Hit_Group_Type::Triangles;
+            if (hit_group_json.contains("type"))
+            {
+                auto type_string = hit_group_json["type"].get<std::string>();
+                if (type_string == "triangles")
+                {
+                    hit_group_type = rhi::Ray_Tracing_Hit_Group_Type::Triangles;
+                }
+                else if (type_string == "procedural")
+                {
+                    hit_group_type = rhi::Ray_Tracing_Hit_Group_Type::Procedural;
+                }
+                else
+                {
+                    m_logger->warn("Invalid ray tracing hit group type.");
+                }
+            }
+
+            hit_group = {
+                .type = hit_group_type,
+                .closest_hit = hit_group_json.contains("closest_hit")
+                    ? static_cast<uint32_t>(hit_group_json["closest_hit"].get<int32_t>())
+                    : rhi::RT_PIPELINE_NO_SHADER,
+                .any_hit = hit_group_json.contains("any_hit")
+                    ? static_cast<uint32_t>(hit_group_json["any_hit"].get<int32_t>())
+                    : rhi::RT_PIPELINE_NO_SHADER,
+                .intersection = hit_group_json.contains("intersection")
+                    ? static_cast<uint32_t>(hit_group_json["intersection"].get<int32_t>())
+                    : rhi::RT_PIPELINE_NO_SHADER
+            };
+        }
+    }
+
+    std::vector<uint32_t> miss_shaders;
+    if (pipeline_json.contains("miss"))
+    {
+        for (const auto& miss_json : pipeline_json["miss"])
+        {
+            miss_shaders.push_back(static_cast<uint32_t>(miss_json.get<int32_t>()));
+        }
+    }
+
+    std::vector<uint32_t> callable_shaders;
+    if (pipeline_json.contains("callable"))
+    {
+        for (const auto& callable_json : pipeline_json["callable"])
+        {
+            callable_shaders.push_back(static_cast<uint32_t>(callable_json.get<int32_t>()));
+        }
+    }
+
+    uint32_t max_recursion_depth = pipeline_json.contains("max_recursion_depth")
+        ? static_cast<uint32_t>(pipeline_json["max_recursion_depth"].get<int32_t>())
+        : 1u;
+    uint32_t max_payload_size = pipeline_json.contains("max_payload_size")
+        ? static_cast<uint32_t>(pipeline_json["max_payload_size"].get<int32_t>())
+        : 32u;
+    uint32_t max_attribute_size = pipeline_json.contains("max_attribute_size")
+        ? static_cast<uint32_t>(pipeline_json["max_attribute_size"].get<int32_t>())
+        : 16u;
+
+    rhi::Ray_Tracing_Pipeline_Create_Info create_info = {
+        .shaders = shaders,
+        .hit_groups = hit_groups,
+        .ray_gen_libraries = ray_gen_shaders,
+        .miss_libraries = miss_shaders,
+        .callable_libraries = callable_shaders,
+        .max_recursion_depth = max_recursion_depth,
+        .max_payload_size = max_payload_size,
+        .max_attribute_size = max_attribute_size
+    };
+    auto pipeline_result = m_graphics_device->create_pipeline(create_info);
+    auto pipeline = pipeline_result.value_or(nullptr);
+    if (!pipeline_result.has_value())
+    {
+        m_logger->error("Failed to create ray tracing pipeline '{}'.", std::string(json_path));
+        switch (pipeline_result.error())
+        {
+        case rhi::Result::Error_Out_Of_Memory:
+            m_logger->error("Out of memory.");
+            break;
+        case rhi::Result::Error_Invalid_Parameters:
+            m_logger->error("Invalid parameters.");
+            break;
+        case rhi::Result::Error_No_Resource:
+            m_logger->error("No resource.");
+            break;
+        default:
+            break;
+        }
+    }
+
+    auto& pipeline_library = *m_ray_tracing_pipeline_library_ptrs[name];
+
+    pipeline_library.shaders = shader_refs;
+    pipeline_library.hit_groups = hit_groups;
+    pipeline_library.ray_gen_libraries = ray_gen_shaders;
+    pipeline_library.miss_libraries = miss_shaders;
+    pipeline_library.callable_libraries = callable_shaders;
+    pipeline_library.max_recursion_depth = max_recursion_depth;
+    pipeline_library.max_payload_size = max_payload_size;
+    pipeline_library.max_attribute_size = max_attribute_size;
+
+    pipeline_library.pipeline = pipeline;
+
+    // Bookkeeping
+    auto register_pipeline_to_shader_lib = [&pipeline_library](Shader_Library* shader_library)
+        {
+            if (shader_library)
+                shader_library->referenced_ray_tracing_pipeline_libraries.push_back(&pipeline_library);
+        };
+
+    for (auto& shader_ref : pipeline_library.shaders)
+    {
+        register_pipeline_to_shader_lib(shader_ref.lib);
+    }
+
+    m_logger->debug("Created ray tracing pipeline library '{}'", name);
+}
+
 void Asset_Repository::create_shader_and_compute_libraries()
 {
     std::vector<std::wstring> shader_include_dirs;
@@ -759,6 +993,10 @@ void Asset_Repository::create_graphics_pipeline_libraries()
         if (extension == ".json")
         {
             auto full_path = (path.parent_path() / path.filename()).string();
+            if (full_path.contains("ray_tracing"))
+            {
+                continue;
+            }
             graphics_pipeline_library_set.insert(full_path);
         }
     }
@@ -766,6 +1004,30 @@ void Asset_Repository::create_graphics_pipeline_libraries()
     {
         m_logger->debug("Processing graphics pipeline library '{}'", graphics_pipeline_library);
         compile_graphics_pipeline_library(graphics_pipeline_library);
+    }
+}
+
+void Asset_Repository::create_ray_tracing_pipeline_libraries()
+{
+    ankerl::unordered_dense::set<std::string> ray_tracing_pipeline_library_set;
+    for (const auto& ray_tracing_pipeline_library_path : std::filesystem::recursive_directory_iterator(std::filesystem::path(m_paths.pipelines)))
+    {
+        const auto& path = ray_tracing_pipeline_library_path.path();
+        auto extension = path.extension();
+        if (extension == ".json")
+        {
+            auto full_path = (path.parent_path() / path.filename()).string();
+            if (!full_path.contains("ray_tracing"))
+            {
+                continue;
+            }
+            ray_tracing_pipeline_library_set.insert(full_path);
+        }
+    }
+    for (const auto& ray_tracing_pipeline_library : ray_tracing_pipeline_library_set)
+    {
+        m_logger->debug("Processing ray tracing pipeline library '{}'", ray_tracing_pipeline_library);
+        compile_ray_tracing_pipeline(ray_tracing_pipeline_library);
     }
 }
 

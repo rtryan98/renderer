@@ -32,4 +32,25 @@ struct Graphics_Pipeline_Library
 
     rhi::Pipeline* pipeline;
 };
+
+struct Ray_Tracing_Shader_Ref
+{
+    Shader_Library* lib;
+    std::string variant;
+};
+
+struct Ray_Tracing_Pipeline_Library
+{
+    // TODO: variant support
+    std::vector<Ray_Tracing_Shader_Ref> shaders;
+    std::vector<rhi::Ray_Tracing_Hit_Group> hit_groups;
+    std::vector<uint32_t> ray_gen_libraries;
+    std::vector<uint32_t> miss_libraries;
+    std::vector<uint32_t> callable_libraries;
+    uint32_t max_recursion_depth;
+    uint32_t max_payload_size;
+    uint32_t max_attribute_size;
+
+    rhi::Pipeline* pipeline;
+};
 }

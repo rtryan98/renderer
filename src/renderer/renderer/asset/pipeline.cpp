@@ -59,4 +59,14 @@ Graphics_Pipeline::operator rhi::Pipeline*() const
 {
     return m_active_pipeline;
 }
+
+Ray_Tracing_Pipeline::Ray_Tracing_Pipeline(Ray_Tracing_Pipeline_Library* ray_tracing_pipeline_library)
+    : m_ray_tracing_pipeline_library(ray_tracing_pipeline_library)
+    , m_active_pipeline(ray_tracing_pipeline_library->pipeline)
+{}
+
+Ray_Tracing_Pipeline::operator rhi::Pipeline*() const
+{
+    return m_active_pipeline;
+}
 }

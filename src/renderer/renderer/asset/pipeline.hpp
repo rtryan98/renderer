@@ -11,6 +11,7 @@ namespace ren
 struct Compute_Library;
 struct Compute_Pipeline_Wrapper;
 struct Graphics_Pipeline_Library;
+struct Ray_Tracing_Pipeline_Library;
 
 class Compute_Pipeline
 {
@@ -39,6 +40,18 @@ public:
 
 private:
     Graphics_Pipeline_Library* m_graphics_pipeline_library;
+    rhi::Pipeline* m_active_pipeline;
+};
+
+class Ray_Tracing_Pipeline
+{
+public:
+    Ray_Tracing_Pipeline() = default;
+    explicit Ray_Tracing_Pipeline(Ray_Tracing_Pipeline_Library* ray_tracing_pipeline_library);
+    operator rhi::Pipeline*() const; // NOLINT
+
+private:
+    Ray_Tracing_Pipeline_Library* m_ray_tracing_pipeline_library;
     rhi::Pipeline* m_active_pipeline;
 };
 }

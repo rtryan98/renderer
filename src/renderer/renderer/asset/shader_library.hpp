@@ -11,6 +11,7 @@ struct Shader_Blob;
 namespace ren
 {
 struct Graphics_Pipeline_Library;
+struct Ray_Tracing_Pipeline_Library;
 struct Compute_Library;
 
 struct Named_Shader
@@ -23,6 +24,7 @@ struct Shader_Library
 {
     std::vector<Named_Shader> shaders;
     std::vector<Graphics_Pipeline_Library*> referenced_pipeline_libraries;
+    std::vector<Ray_Tracing_Pipeline_Library*> referenced_ray_tracing_pipeline_libraries;
     Compute_Library* referenced_compute_library;
     std::string hlsl_path;
 

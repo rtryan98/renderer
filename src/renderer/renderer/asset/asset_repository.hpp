@@ -38,6 +38,7 @@ public:
     [[nodiscard]] rhi::Shader_Blob* get_shader_blob(const std::string_view& name) const;
     [[nodiscard]] Compute_Pipeline get_compute_pipeline(const std::string_view& name) const;
     [[nodiscard]] Graphics_Pipeline get_graphics_pipeline(const std::string_view& name) const;
+    [[nodiscard]] Ray_Tracing_Pipeline get_ray_tracing_pipeline(const std::string_view& name) const;
     [[nodiscard]] Mapped_File* get_model(const std::string_view& name) const;
     [[nodiscard]] Mapped_File* get_texture(const std::string_view& name) const;
     [[nodiscard]] Mapped_File* get_texture_safe(const std::string_view& name) const;
@@ -51,9 +52,11 @@ private:
         const std::vector<std::wstring>& include_dirs);
 
     void compile_graphics_pipeline_library(const std::string_view& json_path);
+    void compile_ray_tracing_pipeline(const std::string_view& json_path);
 
     void create_shader_and_compute_libraries();
     void create_graphics_pipeline_libraries();
+    void create_ray_tracing_pipeline_libraries();
 
     void register_textures();
     void register_texture(const std::filesystem::path& path);
@@ -82,6 +85,9 @@ private:
 
     String_Map<Graphics_Pipeline_Library*> m_pipeline_library_ptrs = {};
     plf::colony<Graphics_Pipeline_Library> m_pipeline_libraries = {};
+
+    String_Map<Ray_Tracing_Pipeline_Library*> m_ray_tracing_pipeline_library_ptrs = {};
+    plf::colony<Ray_Tracing_Pipeline_Library> m_ray_tracing_pipeline_libraries = {};
 
     String_Map<Mapped_File*> m_model_ptrs = {};
     String_Map<Mapped_File*> m_texture_ptrs = {};
