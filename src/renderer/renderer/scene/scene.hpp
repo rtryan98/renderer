@@ -157,6 +157,7 @@ public:
     [[nodiscard]] auto& get_models() const noexcept { return m_models; }
     [[nodiscard]] auto& get_instances() const noexcept { return m_model_Instances; }
     [[nodiscard]] auto* get_index_buffer() const noexcept { return m_global_index_buffer; }
+    [[nodiscard]] auto get_tlas() const noexcept { return m_tlas; }
     [[nodiscard]] glm::vec3 get_sun_direction() const noexcept;
 
     void upload_scene_info();
