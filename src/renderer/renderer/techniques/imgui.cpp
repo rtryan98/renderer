@@ -171,6 +171,12 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
                 auto clip_min = ImVec2(imgui_cmd.ClipRect.x - clip_off.x, imgui_cmd.ClipRect.y - clip_off.y);
                 auto clip_max = ImVec2(imgui_cmd.ClipRect.z - clip_off.x, imgui_cmd.ClipRect.w - clip_off.y);
 
+                // Clamp values to not be out of bounds
+                clip_min.x = std::max(clip_min.x, 0.f);
+                clip_min.y = std::max(clip_min.y, 0.f);
+                clip_max.x = std::min(clip_max.x, static_cast<float>(width));
+                clip_max.y = std::min(clip_max.x, static_cast<float>(height));
+
                 if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y)
                 {
                     continue;
