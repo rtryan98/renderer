@@ -1,0 +1,18 @@
+{
+    "name": "simple_ray_tracing",
+    "type": "ray_tracing",
+    "max_recursion_depth": 2,
+    "max_payload_size": 16,
+    "max_attribute_size": 8,
+    "shaders": [
+        { "name": "simple_ray_tracing.rgen",  "type": "rgen"  },
+        { "name": "simple_ray_tracing.rmiss", "type": "rmiss" },
+        { "name": "simple_ray_tracing.rchit", "type": "rchit" }
+    ],
+    "ray_gen": [0],
+    "miss":    [1],
+    "hit_groups": [
+        { "type": "triangles", "closest_hit": 2 }
+    ],
+    "callable": []
+}

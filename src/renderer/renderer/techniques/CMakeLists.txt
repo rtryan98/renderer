@@ -19,6 +19,8 @@ target_sources(
     ocean.hpp
     rt_soft_shadows.cpp
     rt_soft_shadows.hpp
+    simple_ray_tracing.cpp
+    simple_ray_tracing.hpp
     technique_base.hpp
     tone_map.cpp
     tone_map.hpp
