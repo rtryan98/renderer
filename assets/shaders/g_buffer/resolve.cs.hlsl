@@ -45,9 +45,11 @@ void main(uint3 id : SV_DispatchThreadID)
 
     Scene_Info scene_info = rhi::uni::buf_load<Scene_Info>(REN_GLOBAL_SCENE_INFORMATION_BUFFER);
 
+    float dist = distance(surface.position, camera.position.xyz);
+    static const float max_dist = 250.;
     RayDesc ray = {
-        surface.position + 0.00125 * surface.normal,
-        0.05,
+        surface.position,
+        lerp(0.01, 0.5, saturate(dist / max_dist)),
         -scene_info.sun_direction,
         500.0
     };
