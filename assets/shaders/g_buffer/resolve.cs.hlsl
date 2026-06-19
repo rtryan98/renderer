@@ -21,6 +21,26 @@ float3 position_from_depth(GPU_Camera_Data camera, float2 uv, float depth)
     return position.xyz / position.w;
 }
 
+static const float ORIGIN = rcp(32.);
+static const float FLOAT_SCALE = rcp(65536.);
+static const float INT_SCALE = 256.;
+
+// Ray Tracing Gems, Ch. 6 (Wächter and Binder, "A Fast and Robust Method for Avoiding Self-Intersection")
+float3 offset_ray(const float3 p, const float3 n)
+{
+    int3 of_i = int3(INT_SCALE * n);
+    float3 p_i = float3(
+        asfloat(asint(p.x) + ((p.x < 0.) ? -of_i.x : of_i.x)),
+        asfloat(asint(p.y) + ((p.y < 0.) ? -of_i.y : of_i.y)),
+        asfloat(asint(p.z) + ((p.z < 0.) ? -of_i.z : of_i.z))
+    );
+    return float3(
+        abs(p.x) < ORIGIN ? p.x + FLOAT_SCALE * n.x : p_i.x,
+        abs(p.y) < ORIGIN ? p.y + FLOAT_SCALE * n.y : p_i.y,
+        abs(p.z) < ORIGIN ? p.z + FLOAT_SCALE * n.z : p_i.z
+    );
+}
+
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 id : SV_DispatchThreadID)
@@ -46,11 +66,14 @@ void main(uint3 id : SV_DispatchThreadID)
 
     Scene_Info scene_info = rhi::uni::buf_load<Scene_Info>(REN_GLOBAL_SCENE_INFORMATION_BUFFER);
 
-    float dist = distance(surface.position, camera.position.xyz);
-    static const float max_dist = 250.;
+    float3 geometric_normal = ren::oct_signed_decode(rhi::uni::tex_sample_level<float4>(pc.geo_normals, pc.texture_sampler, uv, 0.).xyw);
+    float3 ray_origin = offset_ray(surface.position, geometric_normal);
+    float dist = distance(camera.position, ray_origin);
+    static const float MAX_DIST = 200.;
+    static const float MIN_DIST = 25.;
     RayDesc ray = {
-        surface.position,
-        lerp(0.01, 0.5, saturate(dist / max_dist)),
+        ray_origin,
+        lerp(0.05, 0.625, max(dist - MIN_DIST, 0.) / MAX_DIST),
         -scene_info.sun_direction,
         500.0
     };
