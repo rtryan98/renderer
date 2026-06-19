@@ -29,7 +29,7 @@ G_Buffer::G_Buffer(Asset_Repository& asset_repository, Render_Resource_Blackboar
     m_color_render_target = m_render_resource_blackboard.create_image(COLOR_RENDER_TARGET_NAME, color_create_info);
 
     rhi::Image_Create_Info normal_create_info = default_image_create_info;
-    normal_create_info.format = rhi::Image_Format::R16G16B16A16_SFLOAT;
+    normal_create_info.format = rhi::Image_Format::A2R10G10B10_UNORM_PACK32;
     normal_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
     m_normal_render_target = m_render_resource_blackboard.create_image(NORMAL_RENDER_TARGET_NAME, normal_create_info);
 

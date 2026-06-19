@@ -37,7 +37,7 @@ void main(uint3 id : SV_DispatchThreadID)
     ren::pbr::Surface surface;
     surface.position = position;
     surface.albedo = ren::color::spaces::Rec709_Rec2020(rhi::uni::tex_sample_level<float4>(pc.albedo, pc.texture_sampler, uv, 0.).xyz);
-    surface.normal = rhi::uni::tex_sample_level<float4>(pc.normals, pc.texture_sampler, uv, 0.).xyz;
+    surface.normal = ren::oct_signed_decode(rhi::uni::tex_sample_level<float4>(pc.normals, pc.texture_sampler, uv, 0.).xyw);
     float2 metallic_roughness = rhi::uni::tex_sample_level<float2>(pc.metallic_roughness, pc.texture_sampler, uv, 0.);
     surface.metallic = metallic_roughness.x;
     surface.roughness = metallic_roughness.y;
