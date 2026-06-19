@@ -8,6 +8,7 @@
 #include "shared/shared_resources.h"
 #include "rhi/bindless.hlsli"
 #include "util.hlsli"
+#include "shaders/common/octahedron_encoding.hlsli"
 
 DECLARE_PUSH_CONSTANTS(Immediate_Draw_Push_Constants, pc);
 
@@ -35,11 +36,13 @@ PS_Out main(PS_In ps_in)
     }
 
     float2 metallic_roughness = rhi::tex_sample<float2>(material.metallic_roughness, material.sampler_id, ps_in.tex_coord).yx;
+    float3 vn_oct = ren::oct_signed_encode(vn);
 
     PS_Out result = {
         color,
         float4(normal, 0.0),
-        metallic_roughness
+        metallic_roughness,
+        float4(vn_oct.xy, 0., vn_oct.z)
     };
     return result;
 }

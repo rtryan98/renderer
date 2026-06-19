@@ -4,7 +4,7 @@
 struct VS_Out
 {
     float4 position : SV_Position;
-    float3 normal : NORMAL;
+    float3 normal : NORMAL0;
     float4 tangent : TANGENT;
     float2 tex_coord : TEXCOORD;
     nointerpolation uint material_index : INSTANCE;
@@ -17,6 +17,7 @@ struct PS_Out
     float4 color : SV_Target0;
     float4 normal : SV_Target1;
     float2 metallic_roughness : SV_Target2;
+    float4 geo_normal : SV_Target3;
 };
 
 #endif

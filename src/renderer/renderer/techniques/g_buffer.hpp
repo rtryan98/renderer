@@ -21,6 +21,7 @@ public:
     constexpr static auto COLOR_RENDER_TARGET_NAME = "g_buffer:color_render_target";
     constexpr static auto NORMAL_RENDER_TARGET_NAME = "g_buffer:normal_render_target";
     constexpr static auto METALLIC_ROUGHNESS_RENDER_TARGET_NAME = "g_buffer:metallic_roughness_render_target";
+    constexpr static auto GEO_NORMAL_RENDER_TARGET_NAME = "g_buffer:geo_normal_render_target";
     constexpr static auto DEPTH_BUFFER_NAME = "g_buffer:depth_buffer";
 
     G_Buffer(Asset_Repository& asset_repository, Render_Resource_Blackboard& render_resource_blackboard,
@@ -50,6 +51,7 @@ private:
     Image m_color_render_target;
     Image m_normal_render_target;
     Image m_metallic_roughness_render_target;
+    Image m_geo_normal_render_target;
     Image m_depth_buffer;
     Sampler m_resolve_sampler;
 };

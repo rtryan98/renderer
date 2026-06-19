@@ -38,6 +38,11 @@ G_Buffer::G_Buffer(Asset_Repository& asset_repository, Render_Resource_Blackboar
     metallic_roughness_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
     m_metallic_roughness_render_target = m_render_resource_blackboard.create_image(METALLIC_ROUGHNESS_RENDER_TARGET_NAME, metallic_roughness_create_info);
 
+    rhi::Image_Create_Info geo_normal_create_info = default_image_create_info;
+    geo_normal_create_info.format = rhi::Image_Format::A2R10G10B10_UNORM_PACK32;
+    geo_normal_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled | rhi::Image_Usage::Unordered_Access;
+    m_geo_normal_render_target = m_render_resource_blackboard.create_image(GEO_NORMAL_RENDER_TARGET_NAME, geo_normal_create_info);
+
     rhi::Image_Create_Info depth_create_info = default_image_create_info;
     depth_create_info.format = rhi::Image_Format::D32_SFLOAT;
     depth_create_info.usage = rhi::Image_Usage::Depth_Stencil_Attachment | rhi::Image_Usage::Sampled;
@@ -66,6 +71,7 @@ G_Buffer::~G_Buffer()
     m_render_resource_blackboard.destroy_image(m_color_render_target);
     m_render_resource_blackboard.destroy_image(m_normal_render_target);
     m_render_resource_blackboard.destroy_image(m_metallic_roughness_render_target);
+    m_render_resource_blackboard.destroy_image(m_geo_normal_render_target);
     m_render_resource_blackboard.destroy_image(m_depth_buffer);
 }
 
@@ -96,6 +102,12 @@ void G_Buffer::render_scene_cpu(
         rhi::Barrier_Image_Layout::Color_Attachment,
         true);
     tracker.use_resource(
+        m_geo_normal_render_target,
+        rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
+        rhi::Barrier_Access::Color_Attachment_Write,
+        rhi::Barrier_Image_Layout::Color_Attachment,
+        true);
+    tracker.use_resource(
         m_depth_buffer,
         rhi::Barrier_Pipeline_Stage::Early_Fragment_Tests,
         rhi::Barrier_Access::Depth_Stencil_Attachment_Write,
@@ -120,6 +132,13 @@ void G_Buffer::render_scene_cpu(
             }
         },{
             .attachment = m_metallic_roughness_render_target,
+            .load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
+            .store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
+            .clear_value = {
+                .color = { 0.0f, 0.0f, 0.0f, 0.0f }
+            }
+        },{
+            .attachment = m_geo_normal_render_target,
             .load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
             .store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
             .clear_value = {

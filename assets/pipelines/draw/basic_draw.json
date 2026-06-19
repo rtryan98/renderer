@@ -15,6 +15,9 @@
         },
         {
             "format": "R8G8_UNORM"
+        },
+        {
+            "format": "A2R10G10B10_UNORM_PACK32"
         }
     ],
     "depth_stencil": {
