@@ -226,6 +226,11 @@ void G_Buffer::resolve(
         rhi::Barrier_Access::Shader_Sampled_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
     tracker.use_resource(
+        m_geo_normal_render_target,
+        rhi::Barrier_Pipeline_Stage::Compute_Shader,
+        rhi::Barrier_Access::Shader_Sampled_Read,
+        rhi::Barrier_Image_Layout::Shader_Read_Only);
+    tracker.use_resource(
         m_depth_buffer,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Shader_Sampled_Read,
@@ -245,6 +250,7 @@ void G_Buffer::resolve(
             .albedo = m_color_render_target,
             .normals = m_normal_render_target,
             .metallic_roughness = m_metallic_roughness_render_target,
+            .geo_normals = m_geo_normal_render_target,
             .depth = m_depth_buffer,
             .resolve_target = resolve_target,
             .texture_sampler = m_resolve_sampler,

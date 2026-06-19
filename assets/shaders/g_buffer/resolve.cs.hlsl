@@ -9,6 +9,7 @@
 #include "common/color/color_spaces.hlsli"
 #include "util.hlsli"
 #include "common/pbr/lighting.hlsli"
+#include "shaders/common/octahedron_encoding.hlsli"
 
 DECLARE_PUSH_CONSTANTS(G_Buffer_Resolve_Push_Constants, pc);
 
