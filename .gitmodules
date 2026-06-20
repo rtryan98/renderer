@@ -47,3 +47,6 @@
 [submodule "thirdparty/nlohmann_json"]
 	path = thirdparty/nlohmann_json
 	url = https://github.com/nlohmann/json
+[submodule "thirdparty/meshoptimizer"]
+	path = thirdparty/meshoptimizer
+	url = https://github.com/zeux/meshoptimizer

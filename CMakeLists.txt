@@ -23,6 +23,7 @@ target_link_libraries(
     enkiTS
     glm
     spdlog
+    meshoptimizer
 )
 target_include_directories(
     asset_baker PUBLIC

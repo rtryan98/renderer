@@ -78,3 +78,5 @@ file(
     COPY RobotoMono/fonts/ttf/RobotoMono-Regular.ttf
     DESTINATION ${CMAKE_SOURCE_DIR}/assets/fonts/
 )
+
+add_subdirectory(meshoptimizer)
