@@ -93,14 +93,16 @@ glm::u8vec4 pack_4x8u(float a, float b, float c, float d)
 void generate_tangents_for_submesh(GLTF_Submesh& submesh, const std::vector<GLTF_Material>& materials)
 {
     // Generate tangents with non-zero length but zero-sign.
-    submesh.tangents.resize(submesh.normals.size(), glm::vec4(1.0f, 0.0f, 0.0f, 0.0f));
+    const bool had_tangents = !submesh.tangents.empty();
 
-    if (submesh.tangents.size() == 0 &&                         // Mesh has no tangents
+    if (!had_tangents &&                                        // Mesh has no tangents
         submesh.normals.size() > 0 &&                           // and it has normals
         submesh.tex_coords.size() > 0 &&                        // and texture coordinates
         submesh.material_index != NO_INDEX &&                   // and a material
         !materials[submesh.material_index].normal_uri.empty())  // that contains a normal map
     {
+        submesh.tangents.assign(submesh.normals.size(), glm::vec4(1.f, 0.f, 0.f, 0.f));
+
         if (!(submesh.normals.size() == submesh.tangents.size() &&
             submesh.tangents.size() == submesh.tex_coords.size()))
         {
@@ -202,6 +204,10 @@ void generate_tangents_for_submesh(GLTF_Submesh& submesh, const std::vector<GLTF
         };
         genTangSpaceDefault(&mikktspace_context);
     }
+    // else if (!had_tangents)
+    // {
+    //     submesh.tangents.assign(submesh.normals.size(), glm::vec4(1.f, 0.f, 0.f, 0.f));
+    // }
 }
 
 std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesystem::path& path)
