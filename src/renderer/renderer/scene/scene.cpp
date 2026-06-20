@@ -653,7 +653,7 @@ Static_Scene_Data::Static_Scene_Data(
     };
 
     buffer_create_info.acceleration_structure_memory = true;
-    buffer_create_info.size = 1 << 20;
+    buffer_create_info.size = 1 << 22;
     m_tlas_buffer = m_graphics_device->create_buffer(buffer_create_info).value_or(nullptr);
 
     rhi::Acceleration_Structure_Create_Info tlas_create_info = {
