@@ -175,7 +175,7 @@ void Imgui::render(rhi::Command_List* cmd, const Image& target)
                 clip_min.x = std::max(clip_min.x, 0.f);
                 clip_min.y = std::max(clip_min.y, 0.f);
                 clip_max.x = std::min(clip_max.x, static_cast<float>(width));
-                clip_max.y = std::min(clip_max.x, static_cast<float>(height));
+                clip_max.y = std::min(clip_max.y, static_cast<float>(height));
 
                 if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y)
                 {
