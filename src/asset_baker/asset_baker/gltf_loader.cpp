@@ -5,13 +5,13 @@
 #include <fastgltf/tools.hpp>
 #include <shared/serialized_asset_formats.hpp>
 #include <ankerl/unordered_dense.h>
-#include <mikktspace.h>
 #include <ranges>
 #include <stb_image.h>
 #include <stb_image_resize2.h>
 #include <vector>
 #include <xxhash.h>
 #include <glm/gtc/quaternion.hpp>
+#include <meshoptimizer.h>
 
 #include "asset_baker/gltf_accessor.hpp"
 
@@ -90,124 +90,116 @@ glm::u8vec4 pack_4x8u(float a, float b, float c, float d)
     };
 }
 
-void generate_tangents_for_submesh(GLTF_Submesh& submesh, const std::vector<GLTF_Material>& materials)
+void process_submesh_geometry(GLTF_Submesh& submesh)
 {
-    // Generate tangents with non-zero length but zero-sign.
-    const bool had_tangents = !submesh.tangents.empty();
-
-    if (!had_tangents &&                                        // Mesh has no tangents
-        submesh.normals.size() > 0 &&                           // and it has normals
-        submesh.tex_coords.size() > 0 &&                        // and texture coordinates
-        submesh.material_index != NO_INDEX &&                   // and a material
-        !materials[submesh.material_index].normal_uri.empty())  // that contains a normal map
+    struct Vertex
     {
-        submesh.tangents.assign(submesh.normals.size(), glm::vec4(1.f, 0.f, 0.f, 0.f));
+        glm::vec3 position;
+        glm::vec3 normal;
+        glm::vec4 tangent;
+        glm::vec2 tex_coord;
+        glm::vec4 color;
+        glm::uvec4 joints;
+        glm::vec4 weights;
+    };
+    static_assert(std::is_trivially_copyable_v<Vertex>);
 
-        if (!(submesh.normals.size() == submesh.tangents.size() &&
-            submesh.tangents.size() == submesh.tex_coords.size()))
-        {
-            // spdlog::error("GLTF file '{}' has no tangents and they failed to generate.", path.string());
-            // return std::unexpected(GLTF_Error::Tangent_Generation_Failed);
-        }
+    const auto vertex_count = submesh.positions.size();
+    const auto index_count = submesh.indices.size();
 
-        struct Mikkt_Space_User_Data
-        {
-            std::vector<glm::vec3>& positions;
-            std::vector<glm::vec3>& normals;
-            std::vector<glm::vec2>& tex_coords;
-            std::vector<glm::vec4>& tangents;
-            std::vector<uint32_t>& indices;
-        } mikkt_space_user_data = {
-                .positions = submesh.positions,
-                .normals = submesh.normals,
-                .tex_coords = submesh.tex_coords,
-                .tangents = submesh.tangents,
-                .indices = submesh.indices,
-            };
-
-        auto get_num_faces = [](
-            const SMikkTSpaceContext* mikktspace_context) -> int32_t
-        {
-            const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-            return static_cast<int32_t>(user_data.indices.size() / 3);
-        };
-        auto get_num_vertices_of_face = [](
-            const SMikkTSpaceContext* mikktspace_context,
-            const int face_idx) -> int32_t
-        {
-            (void)mikktspace_context;
-            (void)face_idx;
-            return 3;
-        };
-        auto get_position = [](
-            const SMikkTSpaceContext* mikktspace_context,
-            float fv_pos_out[],
-            const int face_idx,
-            const int vert_idx) -> void
-        {
-            const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-            const auto& position = user_data.positions[user_data.indices[face_idx * 3 + vert_idx]];
-            fv_pos_out[0] = position[0];
-            fv_pos_out[1] = position[1];
-            fv_pos_out[2] = position[2];
-        };
-        auto get_normal = [](
-            const SMikkTSpaceContext* mikktspace_context,
-            float fv_norm_out[],
-            const int face_idx,
-            const int vert_idx) -> void
-        {
-            const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-            const auto& normal = user_data.normals[user_data.indices[face_idx * 3 + vert_idx]];
-            fv_norm_out[0] = normal[0];
-            fv_norm_out[1] = normal[1];
-            fv_norm_out[2] = normal[2];
-        };
-        auto get_tex_coord = [](
-            const SMikkTSpaceContext* mikktspace_context,
-            float fv_tex_coord_out[],
-            const int face_idx,
-            const int vert_idx) -> void
-        {
-            const auto& user_data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-            const auto& tex_coord = user_data.tex_coords[user_data.indices[face_idx * 3 + vert_idx]];
-            fv_tex_coord_out[0] = tex_coord[0];
-            fv_tex_coord_out[1] = tex_coord[1];
-        };
-        auto set_tangent_space = [](
-            const SMikkTSpaceContext* mikktspace_context,
-            const float fv_tangent[],
-            const float sign,
-            const int face_idx,
-            const int vert_idx) -> void
-        {
-            const auto& data = *static_cast<Mikkt_Space_User_Data*>(mikktspace_context->m_pUserData);
-            auto& tangent = data.tangents[data.indices[face_idx * 3 + vert_idx]];
-            tangent[0] = fv_tangent[0];
-            tangent[1] = fv_tangent[1];
-            tangent[2] = fv_tangent[2];
-            tangent[3] = sign;
-        };
-
-        SMikkTSpaceInterface mikktspace_interface = {
-            .m_getNumFaces = get_num_faces,
-            .m_getNumVerticesOfFace = get_num_vertices_of_face,
-            .m_getPosition = get_position,
-            .m_getNormal = get_normal,
-            .m_getTexCoord = +get_tex_coord,
-            .m_setTSpaceBasic = set_tangent_space,
-            .m_setTSpace = nullptr,
-        };
-        SMikkTSpaceContext mikktspace_context = {
-            .m_pInterface = &mikktspace_interface,
-            .m_pUserData = &mikkt_space_user_data
-        };
-        genTangSpaceDefault(&mikktspace_context);
+    if (vertex_count == 0 || index_count == 0)
+    {
+        return;
     }
-    // else if (!had_tangents)
-    // {
-    //     submesh.tangents.assign(submesh.normals.size(), glm::vec4(1.f, 0.f, 0.f, 0.f));
-    // }
+
+    const auto has_normals = submesh.normals.size() == vertex_count;
+    const auto has_uvs = submesh.tex_coords.size() == vertex_count;
+    const auto has_color = submesh.colors.size() == vertex_count;
+    const auto has_skin = submesh.joints.size() == vertex_count &&
+        submesh.weights.size() == vertex_count;
+    const auto has_tangents = submesh.tangents.size() == vertex_count;
+    const auto should_generate_tangents = !has_tangents && has_normals && has_uvs;
+
+    std::vector<glm::vec4> generated_tangents;
+    if (should_generate_tangents)
+    {
+        generated_tangents.resize(index_count);
+        meshopt_generateTangents(
+            &generated_tangents[0].x,
+            submesh.indices.data(), index_count,
+            &submesh.positions[0].x, vertex_count, sizeof(glm::vec3),
+            &submesh.normals[0].x, sizeof(glm::vec3),
+            &submesh.tex_coords[0].x, sizeof(glm::vec2),
+            meshopt_TangentCompatible);
+    }
+
+    // Remap data to unindexed for meshopt
+    std::vector<Vertex> vertices(index_count);
+    for (auto i = 0; i < index_count; ++i)
+    {
+        const auto vertex_index = submesh.indices[i];
+
+        Vertex vertex = {
+            .position = submesh.positions[vertex_index],
+            .normal = has_normals ? submesh.normals[vertex_index] : glm::vec3(0.f, 0.f, 1.f),
+            .tex_coord = has_uvs ? submesh.tex_coords[vertex_index] : glm::vec2(0.f),
+            .color = has_color ? submesh.colors[vertex_index] : glm::vec4(1.f),
+            .joints = has_skin ? submesh.joints[vertex_index] : glm::uvec4(0u),
+            .weights = has_skin ? submesh.weights[vertex_index] : glm::vec4(0.f)
+        };
+
+        if (should_generate_tangents)
+            vertex.tangent = generated_tangents[i];
+        else if (has_tangents)
+            vertex.tangent = submesh.tangents[vertex_index];
+        else
+            vertex.tangent = glm::vec4(1, 0, 0, 0);
+        vertices[i] = vertex;
+    }
+
+    // Remap back to indexed
+    std::vector<uint32_t> remap(index_count);
+    const size_t unique_vertex_count = meshopt_generateVertexRemap(
+        remap.data(), nullptr, index_count,
+        vertices.data(), index_count, sizeof(Vertex));
+
+    std::vector<Vertex> interleaved(unique_vertex_count);
+    std::vector<uint32_t> new_indices(index_count);
+    meshopt_remapVertexBuffer(interleaved.data(), vertices.data(), index_count, sizeof(Vertex), remap.data());
+    meshopt_remapIndexBuffer(new_indices.data(), nullptr, index_count, remap.data());
+
+    // Optimize data
+    meshopt_optimizeVertexCache(new_indices.data(), new_indices.data(), index_count, unique_vertex_count);
+    std::vector<uint32_t> fetch_remap(unique_vertex_count);
+    meshopt_optimizeVertexFetchRemap(fetch_remap.data(), new_indices.data(), index_count, unique_vertex_count);
+    meshopt_remapIndexBuffer(new_indices.data(), new_indices.data(), index_count, fetch_remap.data());
+    meshopt_remapVertexBuffer(interleaved.data(), interleaved.data(), unique_vertex_count, sizeof(Vertex), fetch_remap.data());
+
+    // Re-assign remapped data
+    submesh.indices = std::move(new_indices);
+    submesh.positions.resize(unique_vertex_count);
+    submesh.normals.resize(has_normals ? unique_vertex_count : 0);
+    submesh.tangents.resize(unique_vertex_count);
+    submesh.tex_coords.resize(has_uvs ? unique_vertex_count : 0);
+    submesh.colors.resize(has_color ? unique_vertex_count : 0);
+    submesh.joints.resize(has_skin ? unique_vertex_count : 0);
+    submesh.weights.resize(has_skin ? unique_vertex_count : 0);
+    for (auto i = 0; i < unique_vertex_count; ++i)
+    {
+        submesh.positions[i] = interleaved[i].position;
+        if (has_normals)
+            submesh.normals[i] = interleaved[i].normal;
+        submesh.tangents[i] = interleaved[i].tangent;
+        if (has_uvs)
+            submesh.tex_coords[i] = interleaved[i].tex_coord;
+        if (has_color)
+            submesh.colors[i] = interleaved[i].color;
+        if (has_skin)
+        {
+            submesh.joints[i] = interleaved[i].joints;
+            submesh.weights[i] = interleaved[i].weights;
+        }
+    }
 }
 
 std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesystem::path& path)
@@ -386,7 +378,7 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
             get_joints(asset.get(), primitive, mesh.joints);
             get_weights(asset.get(), primitive, mesh.weights);
 
-            generate_tangents_for_submesh(mesh, result.materials);
+            process_submesh_geometry(mesh);
 
             for (auto& position : mesh.positions)
             {
