@@ -572,10 +572,10 @@ void Static_Scene_Data::create_default_images()
     };
 
     std::array<uint8_t, 16> default_empty_attributes_data = {
-        0, 0, 0, 0,
-        0, 0, 0, 0,
-        0, 0, 0, 0,
-        0, 0, 0, 0,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
     };
 
     void* data = default_missing_texture_data.data();

@@ -36,6 +36,8 @@ PS_Out main(PS_In ps_in)
     }
 
     float2 metallic_roughness = rhi::tex_sample<float2>(material.metallic_roughness, material.sampler_id, ps_in.tex_coord).yx;
+    metallic_roughness.x *= material.pbr_metallic;
+    metallic_roughness.y *= material.pbr_roughness;
     normal = ren::oct_signed_encode(normal);
     float3 vn_oct = ren::oct_signed_encode(vn);
 
