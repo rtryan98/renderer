@@ -34,7 +34,7 @@ void main(uint3 id : SV_DispatchThreadID)
     float sun_value = smoothstep(SUN_RADIUS_FROM_EARTH - SUN_BUILTIN_BLOOM, SUN_RADIUS_FROM_EARTH, sun_theta);
     color += scene_info.sun_intensity * sun_value;
 
-    if (depth == 1.0)
+    if (depth == 0.0)
     {
         rhi::uni::tex_store(pc.target_image, id.xy, color);
     }
