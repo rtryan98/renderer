@@ -38,6 +38,14 @@ int32_t main(uint32_t argc, const char* argv[])
             WINDOW_DEFAULT_HEIGHT,
             "int");
         cmd.add(window_height_arg);
+        TCLAP::ValueArg<int32_t> log_level_arg(
+            "l",
+            "log-level",
+            "Set log level. (0-5: [trace, debug, info, warn, error, critical])",
+            false,
+            2,
+            "int");
+        cmd.add(log_level_arg);
         TCLAP::SwitchArg validation_arg(
             "v",
             "validation-enable",
@@ -71,6 +79,7 @@ int32_t main(uint32_t argc, const char* argv[])
         app_create_info.fullscreen = fullscreen_arg.getValue();
         app_create_info.enable_validation = validation_arg.getValue();
         app_create_info.enable_gpu_validation = gpu_validation_arg.getValue();
+        app_create_info.log_level = log_level_arg.getValue();
         app_create_info.graphics_api = static_cast<rhi::Graphics_API>(graphics_api_arg.getValue());
 
         // Validate that a valid graphics API was passed.

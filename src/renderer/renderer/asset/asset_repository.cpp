@@ -1078,7 +1078,7 @@ void Asset_Repository::register_models()
     {
         if (directory_entry.path().extension() == serialization::MODEL_FILE_EXTENSION)
         {
-            m_logger->info("Registering model '{}'", directory_entry.path().string());
+            m_logger->debug("Registering model '{}'", directory_entry.path().string());
             register_model(directory_entry.path());
         }
     }

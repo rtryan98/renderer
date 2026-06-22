@@ -14,7 +14,7 @@ static const uint32_t RESERVED_BINDLESS_RESOURCE_COUNT = 1000;
 static const uint32_t RESERVED_BINDLESS_SAMPLER_COUNT = 20;
 
 Application::Application(const Application_Create_Info& create_info) noexcept
-    : m_logger(std::make_shared<Logger>())
+    : m_logger(std::make_shared<Logger>(create_info.log_level))
     , m_window(Window::create({
         .width = create_info.width,
         .height = create_info.height,
