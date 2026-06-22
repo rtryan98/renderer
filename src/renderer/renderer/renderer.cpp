@@ -31,6 +31,8 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
     , m_resource_blackboard(resource_blackboard)
     , m_fly_cam{
         .fov_y = 60.f,
+        .width = static_cast<float>(m_swapchain.get_width()),
+        .height = static_cast<float>(m_swapchain.get_height()),
         .aspect = calculate_aspect_ratio(m_swapchain),
         .near_plane = .01f,
         .far_plane = 500.f,
@@ -115,6 +117,8 @@ void Renderer::process_gui()
 void Renderer::update(const Input_State& input_state, const Static_Scene_Data& scene, double t, double dt) noexcept
 {
     // set aspect ratio in case of resize
+    m_fly_cam.width = static_cast<float>(m_swapchain.get_width());
+    m_fly_cam.height = static_cast<float>(m_swapchain.get_height());
     m_fly_cam.aspect = calculate_aspect_ratio(m_swapchain);
     m_fly_cam.update();
 

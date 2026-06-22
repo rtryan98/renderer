@@ -11,6 +11,6 @@
         "format": "D32_SFLOAT",
         "depth_enable": true,
         "depth_write_enable": true,
-        "comparison_func": "Less"
+        "comparison_func": "Greater"
     }
 }

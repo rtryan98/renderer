@@ -4,6 +4,7 @@
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_inverse.hpp"
 #include "renderer/window.hpp"
+#include "renderer/math/projection.hpp"
 
 namespace ren
 {
@@ -16,8 +17,7 @@ void Fly_Camera::update()
     });
     right = glm::normalize(glm::cross(WORLD_UP, forward));
     up = glm::normalize(glm::cross(forward, right));
-    // camera_data.camera_to_clip = glm::infinitePerspectiveRH(glm::radians(fov_y), aspect, near_plane);
-    camera_data.camera_to_clip = glm::perspectiveRH(glm::radians(fov_y), aspect, near_plane, far_plane);
+    camera_data.camera_to_clip = math::infinite_perspective_fov_reverse_z_rh_zo(glm::radians(fov_y), width, height, near_plane);
     camera_data.world_to_camera = glm::lookAtRH(
         position,
         position + forward,

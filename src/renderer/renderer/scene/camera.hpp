@@ -38,6 +38,8 @@ public:
     Camera_Input_Mapping input_map;
 
     float fov_y;
+    float width;
+    float height;
     float aspect;
     float near_plane;
     float far_plane;

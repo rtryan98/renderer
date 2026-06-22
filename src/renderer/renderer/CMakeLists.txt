@@ -1,6 +1,7 @@
 add_subdirectory(asset)
 add_subdirectory(filesystem)
 add_subdirectory(imgui)
+add_subdirectory(math)
 add_subdirectory(scene)
 add_subdirectory(techniques)
 

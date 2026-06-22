@@ -154,7 +154,7 @@ void G_Buffer::render_scene_cpu(
             .stencil_load_op = rhi::Render_Pass_Attachment_Load_Op::No_Access,
             .stencil_store_op = rhi::Render_Pass_Attachment_Store_Op::No_Access,
             .clear_value = {
-                .depth_stencil = { 1.0f, 0 }
+                .depth_stencil = { 0.0f, 0 }
             }
         }
     };
