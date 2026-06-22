@@ -9,6 +9,7 @@ class Logger
 {
 public:
     Logger() noexcept;
+    Logger(int32_t level) noexcept;
 
     template<typename... Args>
     void trace(fmt::format_string<Args...> fmt, Args&&... args)
