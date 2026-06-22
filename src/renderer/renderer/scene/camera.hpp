@@ -15,6 +15,7 @@ struct Camera_Data
     glm::mat4 clip_to_camera;
     glm::mat4 camera_to_world;
     glm::mat4 clip_to_world;
+    glm::mat4 world_to_clip_previous_frame;
     glm::vec4 position;
 };
 
@@ -55,7 +56,7 @@ public:
 
     Camera_Data camera_data;
 
-    void update();
+    void update(bool reset_previous);
     void process_inputs(const Input_State& input_state, float dt);
 
     [[nodiscard]] bool box_in_frustum(const glm::vec3& min, const glm::vec3& max) const;

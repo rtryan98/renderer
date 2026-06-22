@@ -8,7 +8,7 @@
 
 namespace ren
 {
-void Fly_Camera::update()
+void Fly_Camera::update(bool reset_previous)
 {
     forward = glm::normalize(glm::vec3{
         glm::sin(glm::radians(yaw)) * glm::cos(glm::radians(pitch)),
@@ -22,11 +22,17 @@ void Fly_Camera::update()
         position,
         position + forward,
         up);
+    camera_data.world_to_clip_previous_frame = camera_data.world_to_clip;
     camera_data.world_to_clip = camera_data.camera_to_clip * camera_data.world_to_camera;
     camera_data.position = { position.x, position.y, position.z, 1.0f };
     camera_data.clip_to_camera = glm::inverse(camera_data.camera_to_clip);
     camera_data.camera_to_world = glm::inverse(camera_data.world_to_camera);
     camera_data.clip_to_world = glm::inverse(camera_data.world_to_clip);
+
+    if (reset_previous)
+    {
+        camera_data.world_to_clip_previous_frame = camera_data.world_to_clip;
+    }
 }
 
 void Fly_Camera::process_inputs(const Input_State& input_state, const float dt)

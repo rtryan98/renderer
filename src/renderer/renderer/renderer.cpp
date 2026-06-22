@@ -116,11 +116,13 @@ void Renderer::process_gui()
 
 void Renderer::update(const Input_State& input_state, const Static_Scene_Data& scene, double t, double dt) noexcept
 {
+    static bool is_first_frame = true;
+
     // set aspect ratio in case of resize
     m_fly_cam.width = static_cast<float>(m_swapchain.get_width());
     m_fly_cam.height = static_cast<float>(m_swapchain.get_height());
     m_fly_cam.aspect = calculate_aspect_ratio(m_swapchain);
-    m_fly_cam.update();
+    m_fly_cam.update(is_first_frame);
 
     if (!m_cull_cam_locked)
     {
@@ -177,11 +179,14 @@ void Renderer::update(const Input_State& input_state, const Static_Scene_Data& s
         .clip_to_camera = m_fly_cam.camera_data.clip_to_camera,
         .camera_to_world = m_fly_cam.camera_data.camera_to_world,
         .clip_to_world = m_fly_cam.camera_data.clip_to_world,
+        .world_to_clip_previous_frame = m_fly_cam.camera_data.world_to_clip_previous_frame,
         .position = m_fly_cam.camera_data.position,
         .near_plane = m_fly_cam.near_plane,
         .far_plane = m_fly_cam.far_plane,
     };
     m_gpu_transfer_context.enqueue_immediate_upload(m_camera_buffer, camera_data);
+
+    is_first_frame = false;
 }
 
 void Renderer::setup_frame()
