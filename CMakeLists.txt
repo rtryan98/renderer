@@ -24,6 +24,7 @@ target_link_libraries(
     glm
     spdlog
     meshoptimizer
+    bc7enc_rdo
 )
 target_include_directories(
     asset_baker PUBLIC

@@ -1,5 +1,7 @@
 target_sources(
     asset_baker PRIVATE
+    bc7enc_rdo.cpp
+    bc7enc_rdo.hpp
     gltf_accessor.cpp
     gltf_accessor.hpp
     gltf_loader.cpp
