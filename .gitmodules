@@ -50,3 +50,6 @@
 [submodule "thirdparty/meshoptimizer"]
 	path = thirdparty/meshoptimizer
 	url = https://github.com/zeux/meshoptimizer
+[submodule "thirdparty/bc7enc_rdo"]
+	path = thirdparty/bc7enc_rdo
+	url = https://github.com/richgel999/bc7enc_rdo

@@ -80,3 +80,39 @@ file(
 )
 
 add_subdirectory(meshoptimizer)
+
+add_library(bc7enc_rdo)
+target_sources(
+    bc7enc_rdo PRIVATE
+    bc7enc_rdo/bc7enc.cpp
+    bc7enc_rdo/bc7enc.h
+    bc7enc_rdo/bc7decomp.cpp
+    bc7enc_rdo/bc7decomp_ref.cpp
+    bc7enc_rdo/bc7decomp.h
+    bc7enc_rdo/ert.cpp
+    bc7enc_rdo/ert.h
+    bc7enc_rdo/rdo_bc_encoder.cpp
+    bc7enc_rdo/rdo_bc_encoder.h
+    bc7enc_rdo/rgbcx.cpp
+    bc7enc_rdo/rgbcx.h
+    bc7enc_rdo/rgbcx_table4.h
+    bc7enc_rdo/rgbcx_table4_small.h
+    bc7enc_rdo/utils.cpp
+    bc7enc_rdo/utils.h
+    bc7enc_rdo/lodepng.cpp
+    bc7enc_rdo/lodepng.h
+    bc7enc_rdo/miniz.h
+    bc7enc_rdo/dds_defs.h
+)
+target_include_directories(
+    bc7enc_rdo PUBLIC
+    bc7enc_rdo
+)
+set_target_properties(
+    bc7enc_rdo PROPERTIES
+    CXX_STANDARD 23
+)
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(bc7enc_rdo PRIVATE OpenMP::OpenMP_CXX)
+endif()
