@@ -83,6 +83,6 @@ private:
     std::size_t m_current_frame = 0;
 
 private:
-    Staging_Buffer get_next_staging_buffer(std::size_t size);
+    Staging_Buffer get_next_staging_buffer(std::size_t size, std::size_t alignment = 1ull);
 };
 }

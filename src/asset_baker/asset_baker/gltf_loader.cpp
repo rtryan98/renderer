@@ -14,6 +14,7 @@
 #include <meshoptimizer.h>
 
 #include "asset_baker/gltf_accessor.hpp"
+#include "asset_baker/bc7enc_rdo.hpp"
 
 namespace asset_baker
 {
@@ -328,19 +329,19 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
             .albedo_uri = get_uri.template operator()<fastgltf::TextureInfo>(
                 material.pbrData.baseColorTexture,
                 false,
-                rhi::Image_Format::R8G8B8A8_SRGB),
+                rhi::Image_Format::BC7_SRGB_BLOCK),
             .normal_uri = get_uri.template operator()<fastgltf::NormalTextureInfo>(
                 material.normalTexture,
                 false,
-                rhi::Image_Format::R8G8B8A8_UNORM),
+                rhi::Image_Format::BC7_UNORM_BLOCK),
             .metallic_roughness_uri = get_uri.template operator()<fastgltf::TextureInfo>(
                 material.pbrData.metallicRoughnessTexture,
                 true,
-                rhi::Image_Format::R8G8_UNORM),
+                rhi::Image_Format::BC5_UNORM_BLOCK),
             .emissive_uri = get_uri.template operator()<fastgltf::TextureInfo>(
                 material.emissiveTexture,
                 false,
-                rhi::Image_Format::R8G8B8A8_SRGB),
+                rhi::Image_Format::BC7_SRGB_BLOCK),
             .alpha_mode = std::bit_cast<GLTF_Alpha_Mode>(material.alphaMode),
             .double_sided = material.doubleSided
         });
@@ -455,11 +456,10 @@ std::expected<GLTF_Model, GLTF_Error> process_gltf_from_file(const std::filesyst
 std::vector<char> process_and_serialize_gltf_texture(const GLTF_Texture_Load_Request& request)
 {
     int32_t x = 0, y = 0, comp = 0;
-    auto original_data = stbi_load_from_memory(
+    auto* original_data = stbi_load_from_memory(
         reinterpret_cast<const uint8_t*>(request.data.data()),
         static_cast<int>(request.data.size()),
-        &x, &y, &comp,
-        STBI_rgb_alpha);
+        &x, &y, &comp, STBI_rgb_alpha);
     if (!original_data)
     {
         spdlog::error("Failed to load texture.");
@@ -481,85 +481,84 @@ std::vector<char> process_and_serialize_gltf_texture(const GLTF_Texture_Load_Req
     request.name.copy(image_data.name, std::min(request.name.size(), serialization::NAME_MAX_SIZE));
     request.hash_identifier.copy(image_data.hash_identifier, serialization::HASH_IDENTIFIER_FIELD_SIZE);
 
-    std::vector<uint8_t> squashed_data;
+    const uint32_t input_channels = request.squash_gb_to_rg ? 2u : 4u;
+
+    std::vector<uint8_t> prev_pixels(static_cast<uint64_t>(x) * y * input_channels);
     if (request.squash_gb_to_rg)
     {
-        squashed_data.resize(rhi::get_image_format_info(image_data.format).bytes * x * y);
-        spdlog::trace("squashing texture");
-        for (auto i = 0; i < y; ++i)
+        for (auto p = 0ull; p < static_cast<uint64_t>(x) * y; ++p)
         {
-            for (auto j = 0; j < x; ++j)
-            {
-                squashed_data[(i * x + j) * 2 + 0] = original_data[(i * x + j) * 4 + 1];
-                squashed_data[(i * x + j) * 2 + 1] = original_data[(i * x + j) * 4 + 2];
-            }
+            prev_pixels[p * 2 + 0] = original_data[p * 4 + 1];
+            prev_pixels[p * 2 + 1] = original_data[p * 4 + 2];
         }
     }
+    else
+    {
+        memcpy(prev_pixels.data(), original_data, static_cast<uint64_t>(x) * y * 4);
+    }
+    stbi_image_free(original_data);
 
     std::vector<std::vector<uint8_t>> mip_image_data;
+    mip_image_data.reserve(mip_level_count);
     uint32_t image_data_size = 0;
+
     for (auto i = 0; i < mip_level_count; ++i)
     {
         const uint32_t size_x = x >> i;
         const uint32_t size_y = y >> i;
+        image_data.mips[i] = { .width = size_x, .height = size_y };
 
-        image_data.mips[i] = {
-            .width = size_x,
-            .height = size_y,
-        };
-
-        spdlog::trace("Generating mip {} with size w:{}, h:{}", i, size_x, size_y);
-
-        auto& mip_data = mip_image_data.emplace_back();
-
-        const auto data_size = size_x * size_y * rhi::get_image_format_info(image_data.format).bytes;
-        mip_data.resize(data_size);
-
-        if (i > 0)
+        std::vector<uint8_t> pixels;
+        if (i == 0)
         {
-            auto& last_mip_data = mip_image_data[i - 1];
+            pixels = std::move(prev_pixels);
+        }
+        else
+        {
+            pixels.resize(static_cast<uint64_t>(size_x) * size_y * input_channels);
             if (request.squash_gb_to_rg)
             {
                 stbir_resize_uint8_linear(
-                    last_mip_data.data(), size_x << 1, size_y << 1, 0,
-                    mip_data.data(), size_x, size_y, 0,
-                    STBIR_2CHANNEL);
+                    prev_pixels.data(), size_x << 1, size_y << 1, 0,
+                    pixels.data(), size_x, size_y, 0, STBIR_2CHANNEL);
             }
             else
             {
                 stbir_resize_uint8_srgb(
-                    last_mip_data.data(), size_x << 1, size_y << 1, 0,
-                    mip_data.data(), size_x, size_y, 0,
-                    STBIR_RGBA);
+                    prev_pixels.data(), size_x << 1, size_y << 1, 0,
+                    pixels.data(), size_x, size_y, 0, STBIR_RGBA);
             }
         }
-        else
+
+        const uint8_t* rgba_for_encode = pixels.data();
+        std::vector<uint8_t> rgba_expanded;
+        if (request.squash_gb_to_rg)
         {
-            if (request.squash_gb_to_rg)
+            rgba_expanded.resize(static_cast<uint64_t>(size_x) * size_y * 4);
+            for (auto p = 0ull; p < static_cast<uint64_t>(size_x) * size_y; ++p)
             {
-                mip_data.assign(squashed_data.begin(), squashed_data.end());
+                rgba_expanded[p * 4 + 0] = pixels[p * 2 + 0];
+                rgba_expanded[p * 4 + 1] = pixels[p * 2 + 1];
+                rgba_expanded[p * 4 + 2] = 0;
+                rgba_expanded[p * 4 + 3] = 255;
             }
-            else
-            {
-                memcpy(mip_data.data(), original_data, data_size);
-            }
+            rgba_for_encode = rgba_expanded.data();
         }
-        image_data_size += data_size;
+
+        auto compressed = bc7enc_rdo::encode_mip(rgba_for_encode, size_x, size_y, image_data.format);
+        image_data_size += static_cast<uint32_t>(compressed.size());
+        mip_image_data.push_back(std::move(compressed));
+
+        prev_pixels = std::move(pixels);
     }
 
-    stbi_image_free(original_data);
-
     std::vector<char> result;
-    result.resize(
-        sizeof(serialization::Image_Data_00)
-        + image_data_size);
+    result.resize(sizeof(serialization::Image_Data_00) + image_data_size);
 
-    spdlog::trace("Saving results. Image data size: {}, Total size: {}", image_data_size, result.size());
-
-    auto ptr = result.data();
+    auto* ptr = result.data();
     memcpy(ptr, &image_data, sizeof(serialization::Image_Data_00));
     auto* image_data_ptr = reinterpret_cast<serialization::Image_Data_00*>(ptr);
-    for (auto i = 0; i < image_data.mip_count; ++i)
+    for (uint32_t i = 0; i < image_data.mip_count; ++i)
     {
         memcpy(image_data_ptr->get_mip_data(i), mip_image_data[i].data(), mip_image_data[i].size());
     }

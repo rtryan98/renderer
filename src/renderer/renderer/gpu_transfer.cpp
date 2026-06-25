@@ -50,22 +50,38 @@ void GPU_Transfer_Context::enqueue_immediate_upload(rhi::Image* image, void** da
 {
     const auto frame_in_flight = m_current_frame % REN_MAX_FRAMES_IN_FLIGHT;
 
-    const auto byte_size = rhi::get_image_format_info(image->format).bytes;
+    const auto info = rhi::get_image_format_info(image->format);
     std::size_t size = 0;
+
+    auto get_size = [&](uint32_t w, uint32_t h) {
+        if (info.is_block_compressed)
+        {
+            w = (w + info.block_size_x - 1) / info.block_size_x;
+            h = (h + info.block_size_y - 1) / info.block_size_y;
+        }
+        return info.bytes * w * h;
+    };
+
     for (auto i = 0; i < image->mip_levels; ++i)
     {
-        size += byte_size * (image->width / (1 << i)) * (image->height / (1 << i));
+        auto w = (image->width / (1 << i));
+        auto h = (image->height / (1 << i));
+        size += get_size(w, h);
     }
 
-    auto staging_buffer = get_next_staging_buffer(size);
+    auto staging_buffer = get_next_staging_buffer(size, info.is_block_compressed ? info.bytes : 1ull);
     auto mip_offset = 0ull;
 
     for (auto i = 0; i < image->mip_levels; ++i)
     {
-        std::size_t current_size = byte_size * (image->width / (1 << i)) * (image->height / (1 << i));
+        auto w = (image->width / (1 << i));
+        auto h = (image->height / (1 << i));
+        std::size_t current_size = get_size(w, h);
         if (i > 0)
         {
-            mip_offset += byte_size * (image->width / (1 << (i - 1))) * (image->height / (1 << (i - 1)));
+            auto w_p = (image->width / (1 << (i - 1)));
+            auto h_p = (image->height / (1 << (i - 1)));
+            mip_offset += get_size(w_p, h_p);
         }
         memcpy(&static_cast<char*>(staging_buffer.buffer->data)[staging_buffer.offset + mip_offset], data[i], current_size);
     }
@@ -142,10 +158,24 @@ void GPU_Transfer_Context::process_immediate_uploads_on_graphics_queue(
             const auto byte_size = rhi::get_image_format_info(image_staging_info.dst->format).bytes;
             const auto width = image_staging_info.dst->width / (1 << i);
             const auto height = image_staging_info.dst->height / (1 << i);
+
+            const auto info = rhi::get_image_format_info(image_staging_info.dst->format);
+            auto get_size = [&](uint32_t w, uint32_t h) {
+                if (info.is_block_compressed)
+                {
+                    w = (w + info.block_size_x - 1) / info.block_size_x;
+                    h = (h + info.block_size_y - 1) / info.block_size_y;
+                }
+                return info.bytes * w * h;
+                };
+
             if (i > 0)
             {
-                offset += byte_size * (image_staging_info.dst->width / (1 << (i - 1))) * (image_staging_info.dst->height / (1 << (i - 1)));
+                const auto w_p = (image_staging_info.dst->width / (1 << (i - 1)));
+                const auto h_p = (image_staging_info.dst->height / (1 << (i - 1)));
+                offset += get_size(w_p, h_p);
             }
+
             cmd->copy_buffer_to_image(
                 image_staging_info.src,
                 image_staging_info.src_offset + offset,
@@ -200,13 +230,23 @@ void GPU_Transfer_Context::garbage_collect()
     }
 }
 
-GPU_Transfer_Context::Staging_Buffer GPU_Transfer_Context::get_next_staging_buffer(std::size_t size)
+[[nodiscard]] constexpr uint64_t pow2_align_up(uint64_t x, uint64_t a) noexcept
+{
+    return (x + (a - 1ull)) & ~(a - 1ull);
+}
+
+GPU_Transfer_Context::Staging_Buffer GPU_Transfer_Context::get_next_staging_buffer(std::size_t size, std::size_t alignment)
 {
     const auto frame_in_flight = m_current_frame % REN_MAX_FRAMES_IN_FLIGHT;
 
     Staging_Buffer result = {};
     for (auto& staging_buffer : m_coherent_staging_buffers[frame_in_flight])
     {
+        if (alignment > 1ull)
+        {
+            staging_buffer.offset = pow2_align_up(staging_buffer.offset, alignment);
+        }
+
         if (staging_buffer.offset + size <= staging_buffer.buffer->size)
         {
             result = staging_buffer;

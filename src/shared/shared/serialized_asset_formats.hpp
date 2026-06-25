@@ -72,9 +72,19 @@ struct Image_Data_00
     {
         auto ptr = reinterpret_cast<char*>(this);
         ptr += sizeof(Image_Data_00);
+        auto info = rhi::get_image_format_info(format);
         for (uint32_t i = 0; i < mip_level; ++i)
         {
-            ptr += rhi::get_image_format_info(format).bytes * mips[i].width * mips[i].height;
+            if (info.is_block_compressed)
+            {
+                const auto bx = (mips[i].width + info.block_size_x - 1) / info.block_size_x;
+                const auto by = (mips[i].height + info.block_size_y - 1) / info.block_size_y;
+                ptr += bx * by * info.bytes;
+            }
+            else
+            {
+                ptr += info.bytes * mips[i].width * mips[i].height;
+            }
         }
         return ptr;
     }
