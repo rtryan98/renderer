@@ -72,10 +72,6 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         m_resource_blackboard,
         m_swapchain.get_width(),
         m_swapchain.get_height())
-    //, m_simple_ray_tracing(
-    //    m_asset_repository,
-    //    m_gpu_transfer_context,
-    //    m_resource_blackboard)
     , m_tone_map(
         m_asset_repository,
         m_gpu_transfer_context,
@@ -229,31 +225,23 @@ void Renderer::render(
         tracker,
         m_camera_buffer,
         m_shaded_geometry_render_target,
-        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
+        m_resource_blackboard.get_image(techniques::G_Buffer::G_BUFFER_DEPTH_BUFFER_NAME));
     m_ocean.depth_pre_pass(
         cmd,
         tracker,
         m_camera_buffer,
-        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
+        m_resource_blackboard.get_image(techniques::G_Buffer::G_BUFFER_DEPTH_BUFFER_NAME));
     m_ocean.opaque_forward_pass(
         cmd,
         tracker,
         m_camera_buffer,
         m_shaded_geometry_render_target,
-        m_resource_blackboard.get_image(techniques::G_Buffer::DEPTH_BUFFER_NAME));
+        m_resource_blackboard.get_image(techniques::G_Buffer::G_BUFFER_DEPTH_BUFFER_NAME));
     m_tone_map.render_debug(
         cmd,
         tracker,
         m_shaded_geometry_render_target,
         m_camera_buffer);
-    /*
-    m_simple_ray_tracing.trace_rays(
-        cmd,
-        tracker,
-        m_camera_buffer,
-        m_shaded_geometry_render_target,
-        scene.get_tlas()->bindless_index);
-    */
     m_exposure.compute_luminance_histogram(
         cmd,
         tracker,

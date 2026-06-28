@@ -23,55 +23,38 @@ G_Buffer::G_Buffer(Asset_Repository& asset_repository, Render_Resource_Blackboar
         .primary_view_type = rhi::Image_View_Type::Texture_2D
     };
 
-    rhi::Image_Create_Info color_create_info = default_image_create_info;
-    color_create_info.format = rhi::Image_Format::R8G8B8A8_SRGB;
-    color_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
-    m_color_render_target = m_render_resource_blackboard.create_image(COLOR_RENDER_TARGET_NAME, color_create_info);
+    rhi::Image_Create_Info gbuffer_0_create_info = default_image_create_info;
+    gbuffer_0_create_info.format = rhi::Image_Format::R8G8B8A8_SRGB;
+    gbuffer_0_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
+    m_g_buffer_0_render_target = m_render_resource_blackboard.create_image(G_BUFFER_0_RENDER_TARGET_NAME, gbuffer_0_create_info);
 
-    rhi::Image_Create_Info normal_create_info = default_image_create_info;
-    normal_create_info.format = rhi::Image_Format::A2R10G10B10_UNORM_PACK32;
-    normal_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
-    m_normal_render_target = m_render_resource_blackboard.create_image(NORMAL_RENDER_TARGET_NAME, normal_create_info);
+    rhi::Image_Create_Info gbuffer_1_create_info = default_image_create_info;
+    gbuffer_1_create_info.format = rhi::Image_Format::A2R10G10B10_UNORM_PACK32;
+    gbuffer_1_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
+    m_g_buffer_1_render_target = m_render_resource_blackboard.create_image(G_BUFFER_1_RENDER_TARGET_NAME, gbuffer_1_create_info);
 
-    rhi::Image_Create_Info metallic_roughness_create_info = default_image_create_info;
-    metallic_roughness_create_info.format = rhi::Image_Format::R8G8_UNORM;
-    metallic_roughness_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
-    m_metallic_roughness_render_target = m_render_resource_blackboard.create_image(METALLIC_ROUGHNESS_RENDER_TARGET_NAME, metallic_roughness_create_info);
+    rhi::Image_Create_Info gbuffer_2_create_info = default_image_create_info;
+    gbuffer_2_create_info.format = rhi::Image_Format::R8G8_UNORM;
+    gbuffer_2_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
+    m_g_buffer_2_render_target = m_render_resource_blackboard.create_image(G_BUFFER_2_RENDER_TARGET_NAME, gbuffer_2_create_info);
 
-    rhi::Image_Create_Info geo_normal_create_info = default_image_create_info;
-    geo_normal_create_info.format = rhi::Image_Format::A2R10G10B10_UNORM_PACK32;
-    geo_normal_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled | rhi::Image_Usage::Unordered_Access;
-    m_geo_normal_render_target = m_render_resource_blackboard.create_image(GEO_NORMAL_RENDER_TARGET_NAME, geo_normal_create_info);
+    rhi::Image_Create_Info gbuffer_3_create_info = default_image_create_info;
+    gbuffer_3_create_info.format = rhi::Image_Format::R16G16_SFLOAT;
+    gbuffer_3_create_info.usage = rhi::Image_Usage::Color_Attachment | rhi::Image_Usage::Sampled;
+    m_g_buffer_3_render_target = m_render_resource_blackboard.create_image(G_BUFFER_3_RENDER_TARGET_NAME, gbuffer_3_create_info);
 
     rhi::Image_Create_Info depth_create_info = default_image_create_info;
     depth_create_info.format = rhi::Image_Format::D32_SFLOAT;
     depth_create_info.usage = rhi::Image_Usage::Depth_Stencil_Attachment | rhi::Image_Usage::Sampled;
-    m_depth_buffer = m_render_resource_blackboard.create_image(DEPTH_BUFFER_NAME, depth_create_info);
-
-    m_resolve_sampler = m_render_resource_blackboard.get_sampler({
-        .filter_min = rhi::Sampler_Filter::Nearest,
-        .filter_mag = rhi::Sampler_Filter::Nearest,
-        .filter_mip = rhi::Sampler_Filter::Nearest,
-        .address_mode_u = rhi::Image_Sample_Address_Mode::Clamp,
-        .address_mode_v = rhi::Image_Sample_Address_Mode::Clamp,
-        .address_mode_w = rhi::Image_Sample_Address_Mode::Clamp,
-        .mip_lod_bias = 0.f,
-        .max_anisotropy = 0,
-        .comparison_func = rhi::Comparison_Func::None,
-        .reduction = rhi::Sampler_Reduction_Type::Standard,
-        .border_color = {},
-        .min_lod = .0f,
-        .max_lod = .0f,
-        .anisotropy_enable = false
-    });
+    m_depth_buffer = m_render_resource_blackboard.create_image(G_BUFFER_DEPTH_BUFFER_NAME, depth_create_info);
 }
 
 G_Buffer::~G_Buffer()
 {
-    m_render_resource_blackboard.destroy_image(m_color_render_target);
-    m_render_resource_blackboard.destroy_image(m_normal_render_target);
-    m_render_resource_blackboard.destroy_image(m_metallic_roughness_render_target);
-    m_render_resource_blackboard.destroy_image(m_geo_normal_render_target);
+    m_render_resource_blackboard.destroy_image(m_g_buffer_0_render_target);
+    m_render_resource_blackboard.destroy_image(m_g_buffer_1_render_target);
+    m_render_resource_blackboard.destroy_image(m_g_buffer_2_render_target);
+    m_render_resource_blackboard.destroy_image(m_g_buffer_3_render_target);
     m_render_resource_blackboard.destroy_image(m_depth_buffer);
 }
 
@@ -84,25 +67,25 @@ void G_Buffer::render_scene_cpu(
     cmd->begin_debug_region("g_buffer:render_scene_cpu", 1.f, .5f, 1.f);
 
     tracker.use_resource(
-        m_color_render_target,
+        m_g_buffer_0_render_target,
         rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
         rhi::Barrier_Access::Color_Attachment_Write,
         rhi::Barrier_Image_Layout::Color_Attachment,
         true);
     tracker.use_resource(
-        m_normal_render_target,
+        m_g_buffer_1_render_target,
         rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
         rhi::Barrier_Access::Color_Attachment_Write,
         rhi::Barrier_Image_Layout::Color_Attachment,
         true);
     tracker.use_resource(
-        m_metallic_roughness_render_target,
+        m_g_buffer_2_render_target,
         rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
         rhi::Barrier_Access::Color_Attachment_Write,
         rhi::Barrier_Image_Layout::Color_Attachment,
         true);
     tracker.use_resource(
-        m_geo_normal_render_target,
+        m_g_buffer_3_render_target,
         rhi::Barrier_Pipeline_Stage::Color_Attachment_Output,
         rhi::Barrier_Access::Color_Attachment_Write,
         rhi::Barrier_Image_Layout::Color_Attachment,
@@ -117,28 +100,28 @@ void G_Buffer::render_scene_cpu(
 
     auto color_attachment_infos = std::to_array<rhi::Render_Pass_Color_Attachment_Info>(
         {{
-            .attachment = m_color_render_target,
+            .attachment = m_g_buffer_0_render_target,
             .load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
             .store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
             .clear_value = {
                 .color = { 0.0f, 0.0f, 0.0f, 0.0f }
             }
         },{
-            .attachment = m_normal_render_target,
+            .attachment = m_g_buffer_1_render_target,
             .load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
             .store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
             .clear_value = {
                 .color = { 0.0f, 0.0f, 0.0f, 0.0f }
             }
         },{
-            .attachment = m_metallic_roughness_render_target,
+            .attachment = m_g_buffer_2_render_target,
             .load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
             .store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
             .clear_value = {
                 .color = { 0.0f, 0.0f, 0.0f, 0.0f }
             }
         },{
-            .attachment = m_geo_normal_render_target,
+            .attachment = m_g_buffer_3_render_target,
             .load_op = rhi::Render_Pass_Attachment_Load_Op::Clear,
             .store_op = rhi::Render_Pass_Attachment_Store_Op::Store,
             .clear_value = {
@@ -160,14 +143,13 @@ void G_Buffer::render_scene_cpu(
     };
     cmd->begin_render_pass(render_pass_info);
 
-    const uint32_t width = static_cast<rhi::Image*>(m_color_render_target)->width;
-    const uint32_t height = static_cast<rhi::Image*>(m_color_render_target)->height;
+    auto create_info = m_g_buffer_0_render_target.get_create_info();
 
     cmd->set_viewport(0.f, 0.f,
-        static_cast<float>(width), static_cast<float>(height), 0.f, 1.f);
-    cmd->set_scissor(0, 0, width, height);
+        static_cast<float>(create_info.width), static_cast<float>(create_info.height), 0.f, 1.f);
+    cmd->set_scissor(0, 0, create_info.width, create_info.height);
 
-    cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("basic_draw"));
+    cmd->set_pipeline(m_asset_repository.get_graphics_pipeline("g_buffer_draw"));
     cmd->set_index_buffer(scene_data.get_index_buffer(), rhi::Index_Type::U32);
 
     for (const auto& model_instance : scene_data.get_instances())
@@ -211,22 +193,22 @@ void G_Buffer::resolve(
     cmd->begin_debug_region("g_buffer:resolve", 1.f, .5f, 1.f);
 
     tracker.use_resource(
-        m_color_render_target,
+        m_g_buffer_0_render_target,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Shader_Sampled_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
     tracker.use_resource(
-        m_normal_render_target,
+        m_g_buffer_1_render_target,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Shader_Sampled_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
     tracker.use_resource(
-        m_metallic_roughness_render_target,
+        m_g_buffer_2_render_target,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Shader_Sampled_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
     tracker.use_resource(
-        m_geo_normal_render_target,
+        m_g_buffer_3_render_target,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Shader_Sampled_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
@@ -244,22 +226,20 @@ void G_Buffer::resolve(
 
     const auto resolve_pipeline = m_asset_repository.get_compute_pipeline("g_buffer_resolve");
     cmd->set_pipeline(resolve_pipeline);
-    const auto target_width = resolve_target.get_create_info().width;
-    const auto target_height = resolve_target.get_create_info().height;
+    const auto create_info = resolve_target.get_create_info();
     cmd->set_push_constants<G_Buffer_Resolve_Push_Constants>({
-            .albedo = m_color_render_target,
-            .normals = m_normal_render_target,
-            .metallic_roughness = m_metallic_roughness_render_target,
-            .geo_normals = m_geo_normal_render_target,
+            .g_buffer_0 = m_g_buffer_0_render_target,
+            .g_buffer_1 = m_g_buffer_1_render_target,
+            .g_buffer_2 = m_g_buffer_2_render_target,
+            .g_buffer_3 = m_g_buffer_3_render_target,
             .depth = m_depth_buffer,
             .resolve_target = resolve_target,
-            .texture_sampler = m_resolve_sampler,
             .camera_buffer = camera,
-            .width = target_width,
-            .height = target_height
+            .width = create_info.width,
+            .height = create_info.height
         }, rhi::Pipeline_Bind_Point::Compute);
-    const auto groups_x = target_width / resolve_pipeline.get_group_size_x();
-    const auto groups_y = target_height / resolve_pipeline.get_group_size_y();
+    const auto groups_x = create_info.width / resolve_pipeline.get_group_size_x();
+    const auto groups_y = create_info.height / resolve_pipeline.get_group_size_y();
     cmd->dispatch(groups_x, groups_y, 1);
 
     cmd->end_debug_region(); // g_buffer:resolve

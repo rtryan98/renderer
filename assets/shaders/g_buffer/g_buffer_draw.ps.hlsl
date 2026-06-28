@@ -1,9 +1,9 @@
-// SHADER DEF basic_draw
+// SHADER DEF g_buffer_draw
 // ENTRYPOINT main
 // TYPE ps
 // SHADER END DEF
 
-#include "draw/basic_draw.hlsli"
+#include "g_buffer/g_buffer_draw.hlsli"
 #include "shared/draw_shared_types.h"
 #include "shared/shared_resources.h"
 #include "rhi/bindless.hlsli"
@@ -11,6 +11,16 @@
 #include "shaders/common/octahedron_encoding.hlsli"
 
 DECLARE_PUSH_CONSTANTS(Immediate_Draw_Push_Constants, pc);
+
+float2 compute_ndc_mv(float4 position_current, float4 position_prev)
+{
+    // DX/HLSL uses rcp(w) for SV_Position. Reciprocal of w is not computed for other attributes.
+    float2 current = (position_current.xy * position_current.w);
+    float2 prev = (position_prev.xy / position_prev.w);
+    current = .5 + .5 * current;
+    prev = .5 + .5 * prev;
+    return prev - current;
+}
 
 PS_Out main(PS_In ps_in)
 {
@@ -39,13 +49,12 @@ PS_Out main(PS_In ps_in)
     metallic_roughness.x *= material.pbr_metallic;
     metallic_roughness.y *= material.pbr_roughness;
     normal = ren::oct_signed_encode(normal);
-    float3 vn_oct = ren::oct_signed_encode(vn);
 
     PS_Out result = {
-        color,
+        float4(color.xyz, 1.0),
         float4(normal.xy, 0., normal.z),
         metallic_roughness,
-        float4(vn_oct.xy, 0., vn_oct.z)
+        compute_ndc_mv(ps_in.position, ps_in.position_prev)
     };
     return result;
 }

@@ -5,93 +5,42 @@
 
 #include "shared/g_buffer_shared_types.h"
 #include "shared/camera_shared_types.h"
+#include "shared/shared_resources.h"
 #include "rhi/bindless.hlsli"
 #include "common/color/color_spaces.hlsli"
 #include "util.hlsli"
 #include "common/pbr/lighting.hlsli"
 #include "shaders/common/octahedron_encoding.hlsli"
+#include "shaders/common/projection.hlsli"
 
 DECLARE_PUSH_CONSTANTS(G_Buffer_Resolve_Push_Constants, pc);
 
-float3 position_from_depth(GPU_Camera_Data camera, float2 uv, float depth)
-{
-    float4 position = float4(uv * 2.0 - 1.0, depth, 1.0); // NDC
-    position.y *= -1;
-    position = mul(camera.clip_to_world, position);
-    return position.xyz / position.w;
-}
-
-static const float ORIGIN = rcp(32.);
-static const float FLOAT_SCALE = rcp(65536.);
-static const float INT_SCALE = 256.;
-
-// Ray Tracing Gems, Ch. 6 (Wächter and Binder, "A Fast and Robust Method for Avoiding Self-Intersection")
-float3 offset_ray(const float3 p, const float3 n)
-{
-    int3 of_i = int3(INT_SCALE * n);
-    float3 p_i = float3(
-        asfloat(asint(p.x) + ((p.x < 0.) ? -of_i.x : of_i.x)),
-        asfloat(asint(p.y) + ((p.y < 0.) ? -of_i.y : of_i.y)),
-        asfloat(asint(p.z) + ((p.z < 0.) ? -of_i.z : of_i.z))
-    );
-    return float3(
-        abs(p.x) < ORIGIN ? p.x + FLOAT_SCALE * n.x : p_i.x,
-        abs(p.y) < ORIGIN ? p.y + FLOAT_SCALE * n.y : p_i.y,
-        abs(p.z) < ORIGIN ? p.z + FLOAT_SCALE * n.z : p_i.z
-    );
-}
-
 [shader("compute")]
 [numthreads(16, 16, 1)]
-void main(uint3 id : SV_DispatchThreadID)
+void main(uint2 id : SV_DispatchThreadID)
 {
     if (id.x >= pc.width || id.y >= pc.height)
         return;
-    float2 uv = (0.5 + float2(id.xy)) / float2(pc.width, pc.height);
+    float2 uv = ren::uv_from_thread_id(id, uint2(pc.width, pc.height));
 
-    float depth = rhi::uni::tex_sample_level<float>(pc.depth, pc.texture_sampler, uv, 0.).x;
-    GPU_Camera_Data camera = rhi::uni::buf_load<GPU_Camera_Data>(pc.camera_buffer);
-    float3 position = position_from_depth(camera, uv, depth);
-    float3 V = normalize(camera.position.xyz - position);
+    float4 g_buffer_0 = rhi::tex_sample_level<float4>(pc.g_buffer_0, REN_SAMPLER_LINEAR_CLAMP, uv, 0.);
+    float4 g_buffer_1 = rhi::tex_sample_level<float4>(pc.g_buffer_1, REN_SAMPLER_LINEAR_CLAMP, uv, 0.);
+    float2 g_buffer_2 = rhi::tex_sample_level<float2>(pc.g_buffer_2, REN_SAMPLER_LINEAR_CLAMP, uv, 0.);
+    // float2 g_buffer_3 = rhi::tex_sample_level<float2>(pc.g_buffer_3, REN_SAMPLER_LINEAR_CLAMP, uv, 0.); // unused
+    float depth = rhi::tex_sample_level<float>(pc.depth, REN_SAMPLER_LINEAR_CLAMP, uv, 0.).x;
+    
+    GPU_Camera_Data camera = rhi::buf_load<GPU_Camera_Data>(pc.camera_buffer);
 
     ren::pbr::Surface surface;
-    surface.position = position;
-    surface.albedo = ren::color::spaces::Rec709_Rec2020(rhi::uni::tex_sample_level<float4>(pc.albedo, pc.texture_sampler, uv, 0.).xyz);
-    surface.normal = ren::oct_signed_decode(rhi::uni::tex_sample_level<float4>(pc.normals, pc.texture_sampler, uv, 0.).xyw);
-    float2 metallic_roughness = rhi::uni::tex_sample_level<float2>(pc.metallic_roughness, pc.texture_sampler, uv, 0.);
-    surface.metallic = metallic_roughness.x;
-    surface.roughness = metallic_roughness.y;
+    surface.position = ren::position_from_depth(camera.clip_to_world, uv, depth);
+    surface.albedo = ren::color::spaces::Rec709_Rec2020(g_buffer_0.xyz);
+    surface.normal = ren::oct_signed_decode(g_buffer_1.xyw);
+    surface.metallic = g_buffer_2.x;
+    surface.roughness = g_buffer_2.y;
 
+    float3 V = normalize(camera.position.xyz - surface.position);
     float3 color = ren::pbr::evaluate_lights(V, surface);
 
-    Scene_Info scene_info = rhi::uni::buf_load<Scene_Info>(REN_GLOBAL_SCENE_INFORMATION_BUFFER);
-
-    float3 geometric_normal = ren::oct_signed_decode(rhi::uni::tex_sample_level<float4>(pc.geo_normals, pc.texture_sampler, uv, 0.).xyw);
-    float3 ray_origin = offset_ray(surface.position, geometric_normal);
-    float dist = distance(camera.position, ray_origin);
-    static const float MAX_DIST = 200.;
-    static const float MIN_DIST = 25.;
-    RayDesc ray = {
-        ray_origin,
-        lerp(0.05, 0.625, max(dist - MIN_DIST, 0.) / MAX_DIST),
-        -scene_info.sun_direction,
-        500.0
-    };
-
-    RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> q;
-    q.TraceRayInline(
-        rhi::get_rtas(scene_info.tlas),
-        0,
-        0xFF,
-        ray
-    );
-
-    q.Proceed();
-    if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
-    {
-        color *= 0.025;
-    }
-
     float4 result = float4(color, 1.0);
-    rhi::uni::tex_store(pc.resolve_target, id.xy, result);
+    rhi::tex_store(pc.resolve_target, id.xy, result);
 }

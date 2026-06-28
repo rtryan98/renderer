@@ -1,10 +1,10 @@
 {
-    "name": "basic_draw",
+    "name": "g_buffer_draw",
     "vs": {
-        "name": "basic_draw.vs"
+        "name": "g_buffer_draw.vs"
     },
     "ps": {
-        "name": "basic_draw.ps"
+        "name": "g_buffer_draw.ps"
     },
     "color_attachments": [
         {
@@ -17,7 +17,7 @@
             "format": "R8G8_UNORM"
         },
         {
-            "format": "A2R10G10B10_UNORM_PACK32"
+            "format": "R16G16_SFLOAT"
         }
     ],
     "depth_stencil": {

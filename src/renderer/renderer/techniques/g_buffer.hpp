@@ -18,11 +18,11 @@ namespace techniques
 class G_Buffer
 {
 public:
-    constexpr static auto COLOR_RENDER_TARGET_NAME = "g_buffer:color_render_target";
-    constexpr static auto NORMAL_RENDER_TARGET_NAME = "g_buffer:normal_render_target";
-    constexpr static auto METALLIC_ROUGHNESS_RENDER_TARGET_NAME = "g_buffer:metallic_roughness_render_target";
-    constexpr static auto GEO_NORMAL_RENDER_TARGET_NAME = "g_buffer:geo_normal_render_target";
-    constexpr static auto DEPTH_BUFFER_NAME = "g_buffer:depth_buffer";
+    constexpr static auto G_BUFFER_0_RENDER_TARGET_NAME = "g_buffer:g_buffer_0_render_target";
+    constexpr static auto G_BUFFER_1_RENDER_TARGET_NAME = "g_buffer:g_buffer_1_render_target";
+    constexpr static auto G_BUFFER_2_RENDER_TARGET_NAME = "g_buffer:g_buffer_2_render_target";
+    constexpr static auto G_BUFFER_3_RENDER_TARGET_NAME = "g_buffer:g_buffer_3_render_target";
+    constexpr static auto G_BUFFER_DEPTH_BUFFER_NAME = "g_buffer:depth_buffer";
 
     G_Buffer(Asset_Repository& asset_repository, Render_Resource_Blackboard& render_resource_blackboard,
         uint32_t width, uint32_t height);
@@ -48,12 +48,11 @@ private:
     Asset_Repository& m_asset_repository;
     Render_Resource_Blackboard& m_render_resource_blackboard;
 
-    Image m_color_render_target;
-    Image m_normal_render_target;
-    Image m_metallic_roughness_render_target;
-    Image m_geo_normal_render_target;
+    Image m_g_buffer_0_render_target; // R8G8B8A8 SRGB [albedo.xyz, 1.0]
+    Image m_g_buffer_1_render_target; // R10G10B10A2 [oct_n.x, oct_n.y, 0., oct_n.z]
+    Image m_g_buffer_2_render_target; // R8G8 [metallic, roughness]
+    Image m_g_buffer_3_render_target; // R16G16 [mv]
     Image m_depth_buffer;
-    Sampler m_resolve_sampler;
 };
 
 }
