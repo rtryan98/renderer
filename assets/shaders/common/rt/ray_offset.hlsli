@@ -29,6 +29,11 @@ float3 offset_ray(const float3 p, const float3 n)
         abs(p.z) < detail::ORIGIN ? p.z + detail::FLOAT_SCALE * n.z : p_i.z
     );
 }
+
+float3 ray_dir_disk_point(const float3 dir, float3 tangent, float3 bitangent, const float2 disk_point)
+{
+    return normalize(dir + disk_point.x * tangent + disk_point.y * bitangent);
+}
 }
 }
 
