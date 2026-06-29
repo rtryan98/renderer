@@ -72,6 +72,12 @@ Renderer::Renderer(GPU_Transfer_Context& gpu_transfer_context,
         m_resource_blackboard,
         m_swapchain.get_width(),
         m_swapchain.get_height())
+    , m_rt_soft_shadows(
+        m_asset_repository,
+        m_gpu_transfer_context,
+        m_resource_blackboard,
+        m_swapchain.get_width(),
+        m_swapchain.get_height())
     , m_tone_map(
         m_asset_repository,
         m_gpu_transfer_context,
@@ -175,10 +181,10 @@ void Renderer::update(const Input_State& input_state, const Static_Scene_Data& s
         .clip_to_camera = m_fly_cam.camera_data.clip_to_camera,
         .camera_to_world = m_fly_cam.camera_data.camera_to_world,
         .clip_to_world = m_fly_cam.camera_data.clip_to_world,
-        .world_to_clip_previous_frame = m_fly_cam.camera_data.world_to_clip_previous_frame,
+        .prev_world_to_clip = m_fly_cam.camera_data.world_to_clip_previous_frame,
         .position = m_fly_cam.camera_data.position,
-        .near_plane = m_fly_cam.near_plane,
-        .far_plane = m_fly_cam.far_plane,
+        .jitter = {},
+        .prev_jitter = {}
     };
     m_gpu_transfer_context.enqueue_immediate_upload(m_camera_buffer, camera_data);
 
@@ -215,6 +221,12 @@ void Renderer::render(
         tracker,
         m_camera_buffer,
         scene);
+    m_rt_soft_shadows.trace_shadow_rays(
+        cmd,
+        tracker,
+        m_camera_buffer,
+        m_resource_blackboard.get_image(techniques::G_Buffer::G_BUFFER_1_RENDER_TARGET_NAME),
+        m_resource_blackboard.get_image(techniques::G_Buffer::G_BUFFER_DEPTH_BUFFER_NAME));
     m_g_buffer.resolve(
         cmd,
         tracker,

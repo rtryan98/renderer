@@ -9,6 +9,7 @@
 #include "renderer/techniques/hosek_wilkie_sky.hpp"
 #include "renderer/techniques/imgui.hpp"
 #include "renderer/techniques/ocean.hpp"
+#include "renderer/techniques/rt_soft_shadows.hpp"
 #include "renderer/techniques/tone_map.hpp"
 
 namespace rhi
@@ -75,6 +76,7 @@ private:
     techniques::Hosek_Wilkie_Sky m_hosek_wilkie_sky;
     techniques::Imgui m_imgui;
     techniques::Ocean m_ocean;
+    techniques::RT_Soft_Shadows m_rt_soft_shadows;
     techniques::Tone_Map m_tone_map;
 
 private:
