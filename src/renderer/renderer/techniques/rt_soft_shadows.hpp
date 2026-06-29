@@ -18,7 +18,8 @@ public:
 
     void trace_shadow_rays(rhi::Command_List* cmd,
         Resource_State_Tracker& tracker,
-        const Image& normals_render_target,
+        const Buffer& camera_buffer,
+        const Image& g_buffer_1_render_target,
         const Image& depth_render_target);
 
 private:

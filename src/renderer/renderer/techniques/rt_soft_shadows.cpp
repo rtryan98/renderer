@@ -2,6 +2,7 @@
 
 #include "renderer/asset/asset_repository.hpp"
 #include "renderer/resource_state_tracker.hpp"
+#include <shared/rt_shadows_shared_types.h>
 
 #include <rhi/command_list.hpp>
 
@@ -15,7 +16,7 @@ RT_Soft_Shadows::RT_Soft_Shadows(
     : Technique_Base(asset_repository, gpu_transfer_context, render_resource_blackboard)
 {
     rhi::Image_Create_Info sun_visibility_texture_create_info = {
-        .format = rhi::Image_Format::R8_UINT,
+        .format = rhi::Image_Format::R32_UINT,
         .width = width / 8,
         .height = height / 4,
         .depth = 1,
@@ -36,13 +37,14 @@ RT_Soft_Shadows::~RT_Soft_Shadows()
 void RT_Soft_Shadows::trace_shadow_rays(
     rhi::Command_List* cmd,
     Resource_State_Tracker& tracker,
-    const Image& normals_render_target,
+    const Buffer& camera_buffer,
+    const Image& g_buffer_1_render_target,
     const Image& depth_render_target)
 {
     cmd->begin_debug_region("rt_soft_shadows:trace_shadow_rays", 0.2f, 0.2f, 0.2f);
 
     tracker.use_resource(
-        normals_render_target,
+        g_buffer_1_render_target,
         rhi::Barrier_Pipeline_Stage::Compute_Shader,
         rhi::Barrier_Access::Shader_Read,
         rhi::Barrier_Image_Layout::Shader_Read_Only);
@@ -58,11 +60,19 @@ void RT_Soft_Shadows::trace_shadow_rays(
         rhi::Barrier_Image_Layout::Unordered_Access);
     tracker.flush_barriers(cmd);
 
-    auto pipeline = m_asset_repository.get_compute_pipeline("trace_shadow_rays");
+    auto pipeline = m_asset_repository.get_compute_pipeline("rt_shadows_trace");
     cmd->set_pipeline(pipeline);
+    const auto create_info = g_buffer_1_render_target.get_create_info();
+    cmd->set_push_constants<RT_Shadows_Trace_Push_Constants>({
+        .image_size = { create_info.width, create_info.height },
+        .camera_buffer = camera_buffer,
+        .g_buffer_1_texture = g_buffer_1_render_target,
+        .depth_texture = depth_render_target,
+        .visibility_output_texture = m_sun_visibility_texture
+        }, rhi::Pipeline_Bind_Point::Compute);
     cmd->dispatch(
-        normals_render_target.get_create_info().width / pipeline.get_group_size_x(),
-        normals_render_target.get_create_info().height / pipeline.get_group_size_y(),
+        create_info.width / pipeline.get_group_size_x(),
+        create_info.height / pipeline.get_group_size_y(),
         1);
 
     cmd->end_debug_region();
