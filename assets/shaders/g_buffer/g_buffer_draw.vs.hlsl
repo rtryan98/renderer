@@ -31,13 +31,14 @@ VS_Out main(uint vertex_id: SV_VertexID, uint vertex_offset: SV_StartVertexLocat
 
     float4 mesh_vertex_pos = float4(rhi::uni::buf_load_arr<float3>(pc.position_buffer, vertex_index), 1.0);
     float4 vertex_pos = mul(camera.world_to_clip, mul(instance_transform.mesh_to_world, mesh_vertex_pos));
-    float4 vertex_pos_prev = mul(camera.world_to_clip_previous_frame, mul(instance_transform.mesh_to_world, mesh_vertex_pos));
+    float4 vertex_pos_prev = mul(camera.prev_world_to_clip, mul(instance_transform.mesh_to_world, mesh_vertex_pos));
 
     Vertex_Attribute_Data vertex_attributes = rhi::uni::buf_load_arr<Vertex_Attribute_Data>(pc.attribute_buffer, vertex_index);
     vertex_attributes.normal = mul(instance_transform.normal_to_world, vertex_attributes.normal);
     vertex_attributes.tangent.xyz = mul(instance_transform.normal_to_world, vertex_attributes.tangent.xyz);
 
     VS_Out result = {
+        vertex_pos,
         vertex_pos,
         vertex_pos_prev,
         vertex_attributes.normal,

@@ -12,14 +12,13 @@
 
 DECLARE_PUSH_CONSTANTS(Immediate_Draw_Push_Constants, pc);
 
-float2 compute_ndc_mv(float4 position_current, float4 position_prev)
+float2 compute_uv_mv(float4 position_current, float4 position_prev)
 {
-    // DX/HLSL uses rcp(w) for SV_Position. Reciprocal of w is not computed for other attributes.
-    float2 current = (position_current.xy * position_current.w);
-    float2 prev = (position_prev.xy / position_prev.w);
-    current = .5 + .5 * current;
-    prev = .5 + .5 * prev;
-    return prev - current;
+    float2 ndc_current = position_current.xy / position_current.w;
+    float2 ndc_prev = position_prev.xy / position_prev.w;
+    float2 uv_current = float2(0.5, -0.5) * ndc_current + 0.5;
+    float2 uv_prev = float2(0.5, -0.5) * ndc_prev + 0.5;
+    return uv_prev - uv_current;
 }
 
 PS_Out main(PS_In ps_in)
@@ -54,7 +53,7 @@ PS_Out main(PS_In ps_in)
         float4(color.xyz, 1.0),
         float4(normal.xy, 0., normal.z),
         metallic_roughness,
-        compute_ndc_mv(ps_in.position, ps_in.position_prev)
+        compute_uv_mv(ps_in.position_clip, ps_in.prev_position_clip)
     };
     return result;
 }

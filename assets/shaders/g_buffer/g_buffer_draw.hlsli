@@ -4,7 +4,8 @@
 struct VS_Out
 {
     float4 position : SV_Position;
-    float4 position_prev : POSITION;
+    float4 position_clip : POSITION0;
+    float4 prev_position_clip : POSITION1;
     float3 normal : NORMAL;
     float4 tangent : TANGENT;
     float2 tex_coord : TEXCOORD;
